@@ -16,10 +16,13 @@
 
 ```
 lib/               构建产物（host ESM + 浏览器半体 lib/client.js + 类型声明）
+!lib/**/*.map      source map 不发布 —— 它们指向未随包的 src/，对使用者是悬空的
 cordis.patch.yml   bundle patch，把插件行插入 profile
 README.md
 LICENSE
 ```
+
+tsconfig 仍生成 source map（本地调试照常），只在打包清单里剔除。
 
 校验：
 
