@@ -61,9 +61,9 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
   return defineTool({
     name: ZHIHU_SEARCH_TOOL,
     description:
-      '在知乎站内搜索高质量中文问答与文章，适合中文经验、产品评测、行业讨论、技术实践类问题。' +
-      '可按点赞数、评论数或更新时间排序，并支持发布时间范围过滤。' +
-      '不要用它搜索 GitHub 代码仓库或英文学术论文；也不要把它当作全网搜索。',
+      '知乎站内搜索：检索知乎的问答与文章，可筛出高赞、多评论或近期更新的内容，也支持限定发布时间。' +
+      '适合中文经验、产品评测、行业讨论、技术实践。' +
+      '要搜知乎站外某个网站上的资料改用 zhihu_global_search；要一段成体系的解释而不是来源列表改用 zhihu_zhida。',
 
     // 语义化参数：模型永远不会看到 SortBy / Filter 的字符串语法。
     parameters: {
@@ -75,10 +75,15 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
         description: '排序字段。default 表示沿用知乎相关性排序；其余按该指标排序。',
         default: 'default',
       },
-      order: { type: 'string', enum: ['desc', 'asc'], description: '排序方向，默认 desc（降序）。', default: 'desc' },
+      order: {
+        type: 'string',
+        enum: ['desc', 'asc'],
+        description: '排序方向，默认 desc（降序）。仅在指定了 sortField 时生效。',
+        default: 'desc',
+      },
       minValue: {
         type: 'number',
-        description: '排序字段的下限（含）。例如 sortField=voteUpCount 且 minValue=100 表示只要点赞数 ≥ 100 的结果。',
+        description: '排序字段的下限（含），必须配合 sortField 使用。例如 sortField=voteUpCount 且 minValue=100 表示只要点赞数 ≥ 100 的结果。',
       },
       publishedAfter: { type: 'string', description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。' },
       publishedBefore: { type: 'string', description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。' },

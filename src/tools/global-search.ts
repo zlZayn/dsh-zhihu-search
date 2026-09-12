@@ -59,16 +59,16 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
   return defineTool({
     name: ZHIHU_GLOBAL_SEARCH_TOOL,
     description:
-      '在知乎的全网索引中搜索公开网页内容，可按站点域名与发布时间过滤，适合查找某个网站上的资料。' +
-      '要找知乎站内的问答和文章请改用 zhihu_search；本站点过滤不接受知乎域名（知乎会直接拒绝该请求）。',
+      '知乎全网索引搜索：检索知乎索引收录的公开网页，可限定域名与发布时间，适合查找特定网站上的资料。' +
+      '要搜知乎站内的问答和文章改用 zhihu_search；域名过滤不接受知乎域名。',
 
     parameters: {
       query: { type: 'string', required: true, description: '搜索关键词。' },
       count: { type: 'integer', description: `返回条数，1–${String(MAX_COUNT)}，默认 ${String(DEFAULT_COUNT)}。`, default: DEFAULT_COUNT },
-      site: { type: 'string', description: '只搜索该域名，例如 github.com。不支持知乎域名。' },
+      site: { type: 'string', description: '只搜索该域名，例如 github.com；传完整 URL 也会被自动剥成域名。不支持知乎域名。' },
       publishedAfter: { type: 'string', description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。' },
       publishedBefore: { type: 'string', description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。' },
-      searchDb: { type: 'string', enum: ['all', 'realtime', 'static'], description: '索引库，默认 all。realtime 偏最新，static 偏长期收录。' },
+      searchDb: { type: 'string', enum: ['all', 'realtime', 'static'], description: '索引库，默认 all。realtime 偏最新，static 偏长期收录。', default: 'all' },
     },
 
     output: {

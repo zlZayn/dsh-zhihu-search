@@ -42,8 +42,9 @@ export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
   return defineTool({
     name: ZHIHU_ZHIDA_TOOL,
     description:
-      '向知乎直答提问，获得一段带推理过程的综合性回答。适合需要「先检索再总结」的中文问题。' +
-      '快问快答用 fast，需要推理链用 thinking，需要多步检索用 agent。答案由知乎生成，可能有误，重要结论请自行核对。',
+      '知乎直答：由知乎生成一段带推理过程的综合回答，适合需要「先检索再总结」的问题。' +
+      '与两个搜索工具的区别：搜索返回可点开的来源列表，直答返回一段成体系的回答——要来源用搜索，要解释用直答。' +
+      '答案由知乎生成，可能有误，重要结论请自行核对。',
 
     parameters: {
       question: { type: 'string', required: true, description: '要提问的问题，中文描述越具体越好。' },
