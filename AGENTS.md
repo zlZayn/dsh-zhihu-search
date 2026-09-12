@@ -28,7 +28,7 @@
 ## 验证快照（2026-09-12 实跑）
 
 - CI: ci.yml 与 release.yml 均绿（首个发布 run 30s）
-- test: 154 passed / 0 failed（12 个文件）
+- test: 156 passed / 0 failed（12 个文件）
 - typecheck: clean（src + test）· build: clean
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
 
@@ -36,7 +36,6 @@
 
 - [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
-- [ ] 卡片文案进 DSH locale 字典（现为硬编码中文）
 
 ## 活跃坑（工具链与 DSH 平台）
 
