@@ -3,7 +3,8 @@
 ## 状态
 
 - Released v1.0.0 → <https://github.com/zlZayn/dsh-zhihu-search>
-- 三个工具、设置卡片、149 条测试与本地真机验证全部完成；npm 未发布（见 [docs/PUBLISHING.md](docs/PUBLISHING.md)）。
+- npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 带 provenance 签名发布）
+- 三个工具、设置卡片、149 条测试与本地真机验证全部完成。
 
 ## 全局规则
 
@@ -18,6 +19,7 @@
 
 ## 验证快照（2026-09-12 实跑）
 
+- CI: ci.yml 与 release.yml 均绿（首个发布 run 30s）
 - test: 149 passed / 0 failed（12 个文件）
 - typecheck: clean（src + test）· build: clean
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
