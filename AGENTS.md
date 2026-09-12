@@ -36,7 +36,6 @@
 
 - [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
-- [ ] 换掉 [docs/images/settings-card.png](docs/images/settings-card.png)：卡片说明行新增了外链，旧图已过时
 - [ ] 卡片文案进 DSH locale 字典（现为硬编码中文）
 
 ## 活跃坑（工具链与 DSH 平台）
