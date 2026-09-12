@@ -22,11 +22,50 @@
 | `zhihu_global_search` | 知乎全网索引搜索，可按域名和时间过滤 | 查找特定网站上的公开资料 |
 | `zhihu_zhida` | 知乎直答，带推理过程的综合性回答 | 需要「先检索再总结」的复杂中文问题 |
 
+下面三个小节是每个工具的完整参数与能力边界。模型只看到下表中的语义化参数——知乎原生的字符串查询语法由插件内部编译，模型接触不到，也就不可能写错。
+
+### `zhihu_search` —— 站内检索
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `query` | string | **必填** | 搜索关键词，中文效果最好。 |
+| `count` | integer | `5` | 返回条数，1–10。 |
+| `sortField` | enum | `default` | `default` 沿用相关性排序；`voteUpCount` 点赞数 · `commentCount` 评论数 · `editTime` 更新时间。 |
+| `order` | enum | `desc` | `desc` 降序 · `asc` 升序。 |
+| `minValue` | number | — | 排序字段的下限（含）。配 `sortField=voteUpCount` + `minValue=100` 即「只要点赞数 ≥ 100」。 |
+| `publishedAfter` | string | — | 只要该日期之后发布的内容，格式 `YYYY-MM-DD`。 |
+| `publishedBefore` | string | — | 只要该日期之前发布的内容，格式 `YYYY-MM-DD`。 |
+
+**边界**：不支持按站点域名过滤——站内结果本来就全来自知乎，要按站点找资料请用 `zhihu_global_search`。`count` 上限 10。**没有翻页**：`hasMore` 恒为 `false`，要更多结果请换关键词或换排序。
+
+### `zhihu_global_search` —— 全网索引检索
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `query` | string | **必填** | 搜索关键词。 |
+| `count` | integer | `8` | 返回条数，1–20，比站内宽。 |
+| `site` | string | — | 只搜该域名，例如 `github.com`。传完整 URL 会被自动剥成主机名。 |
+| `publishedAfter` | string | — | 只要该日期之后发布的内容，格式 `YYYY-MM-DD`。 |
+| `publishedBefore` | string | — | 只要该日期之前发布的内容，格式 `YYYY-MM-DD`。 |
+| `searchDb` | enum | `all` | `all` 全部 · `realtime` 偏最新 · `static` 偏长期收录。 |
+
+**边界**：**没有排序参数**。该端点会忽略排序字段，与其给模型一个转不动的旋钮，不如不给。`site` 不接受 `zhihu.com` 及其子域——知乎会直接拒绝该请求，要搜知乎站内内容请用 `zhihu_search`。
+
+### `zhihu_zhida` —— 直答
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `question` | string | **必填** | 要提问的问题，中文描述越具体越好。 |
+| `mode` | enum | `thinking` | `fast` 快速回答 · `thinking` 深度思考 · `agent` 智能体多步检索。 |
+| `includeReasoning` | boolean | `false` | 是否把推理过程一并返回。默认关闭以节省上下文，核对答案可靠性时可打开。 |
+
+**边界**：它**不是搜索**——返回的是一段生成回答，不是来源列表。答案由知乎生成，可能有误，重要结论请自行核对。思维链默认不返回。
+
 ## 能力
 
 - 三个工具职责不重叠：站内捞经验、全网捞资料、直答做综合，模型按问题类型自行选择。
-- 站内与全网都可按发布时间范围过滤；站内另可按点赞数或评论数筛出高信号内容。
-- 搜索结果显示为带作者与点赞数的来源卡片，同时保留纯 Markdown 回退，任何界面都能读。
+- 搜索返回结构化来源条目（标题 / 链接 / 摘要 / 作者 / 点赞数），每条都带 URL，可直接引用核对。
+- 结果同时渲染为来源卡片与纯 Markdown，任何界面都能读。
 
 ## 安装
 
