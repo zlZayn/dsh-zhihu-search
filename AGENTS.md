@@ -2,7 +2,8 @@
 
 ## 状态
 
-- v1.0.0：三个工具、设置卡片、149 条测试与本地真机验证全部完成。
+- Released v1.0.0 → <https://github.com/zlZayn/dsh-zhihu-search>
+- 三个工具、设置卡片、149 条测试与本地真机验证全部完成；npm 未发布（见 [docs/PUBLISHING.md](docs/PUBLISHING.md)）。
 
 ## 全局规则
 
