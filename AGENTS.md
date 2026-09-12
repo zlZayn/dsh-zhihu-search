@@ -24,7 +24,6 @@
 
 ## 待办
 
-- [ ] 补 CI
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
 - [ ] 卡片文案进 DSH locale 字典（现为硬编码中文）
 
@@ -40,6 +39,8 @@
 - 测试默认从 `src/` 导入，**不跑编译图**；产物级回归靠 `test/dist.test.ts`
 - `@deepseek-ai/dsh-client-ui-primitives` 是浏览器静态库，Node 里加载不了（缺 `clsx`）；测试中须替身
 - 设计令牌只有 `--dsw-alias-*`，不存在 `--dsw-color-*` 系列
+- 本地用 `--legacy-peer-deps` 安装会让 `package-lock.json` 缺自动 peer，`npm ci` 随即失败；依赖变更后用 `npm install --registry=https://registry.npmjs.org/` 重建
+- 锁文件的 `resolved` 会被钉在生成时的 registry 上；国内镜像生成的锁文件不应提交
 
 ## 文档地图
 

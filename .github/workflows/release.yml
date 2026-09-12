@@ -1,0 +1,52 @@
+# 发布：推 `v*` tag 时构建并发布到 npm。
+#
+# 为什么要走 CI 而不是本地 `npm publish`：
+# - 账号启用了 2FA，本地令牌没有 bypass 权限，推送需要人工 OTP；
+# - CI 用 OIDC 附带 provenance 签名，消费者可验证包确实由本仓库的这次提交构建。
+#
+# 前提：仓库 secret `NPM_TOKEN` 必须是一个**启用了 bypass 2FA 的 Granular Access Token**，
+# 否则 npm 会以 403 拒绝（见 docs/PUBLISHING.md）。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # npm provenance 需要 OIDC；缺它时 `--provenance` 会失败。
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      # tag 与 package.json 版本不一致时，发布的版本号会和 tag 对不上，
+      # 而 npm 不允许重发同一版本号 —— 所以这一关必须拦在 publish 之前。
+      - name: Verify the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$pkg" != "$tag" ]; then
+            echo "::error::tag $tag does not match package.json version $pkg"
+            exit 1
+          fi
+          echo "publishing $pkg"
+
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

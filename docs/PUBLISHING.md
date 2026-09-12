@@ -40,16 +40,39 @@ npm pack --dry-run
 
 ## 发布到 npm
 
+### 主路径：CI 发布（推荐）
+
+推一个与 `package.json` 版本一致的 tag 即可：[release.yml](../.github/workflows/release.yml) 会跑 `npm ci` → typecheck → test → 校验 tag 与版本一致 → `npm publish --provenance`。
+
 ```bash
-npm run build
-npm pack --dry-run        # 先看内容
-npm publish --access public
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-发布前置条件：
+需要一次性配置：仓库 secret `NPM_TOKEN`，值必须是**启用了 bypass 2FA 的 Granular Access Token**。
+
+### 备选：本地发布
+
+```bash
+npm run build
+npm pack --dry-run
+npm publish --registry=https://registry.npmjs.org/ --access public
+```
+
+账号启用 2FA 而令牌没有 bypass 权限时，本地发布会以 `403` 被拒；此时改用 CI 路径，或加 `--otp=<码>` 人工提供一次性口令。
+
+### 前置条件
 
 - `package.json` 的 `repository.url` 必须指向真实仓库，否则 npm 拒绝 provenance 或页面上没有源链接。
 - 所有 `@deepseek-ai/*` 保持在 `peerDependencies` 与 `devDependencies`，**不得**进 `dependencies` —— 见 [ARCHITECTURE.md](ARCHITECTURE.md) 的「不可破坏的约束」。
+- `package-lock.json` 的 `resolved` 必须指向 `registry.npmjs.org`。锁文件若由国内镜像生成，CI 会去镜像取包（供应链隐患），且 `npm ci` 可能因 peer 未同步而失败。
+
+## CI
+
+- [ci.yml](../.github/workflows/ci.yml)：推 `main` 与每个 PR 跑 typecheck + test。
+- [release.yml](../.github/workflows/release.yml)：推 `v*` tag 发布。
+
+两者都用 `npm ci`：它严格按锁文件安装，锁文件与 `package.json` 不同步时直接失败 —— 这是我们要在 CI 里拦下的情况。
 
 ## 兼容性
 

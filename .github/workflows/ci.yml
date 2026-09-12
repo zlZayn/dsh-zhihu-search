@@ -1,0 +1,33 @@
+# 日常 CI：每次推 main 与每个 PR 都跑类型检查与全量测试。
+#
+# 用 `npm ci` 而非 `npm install`：前者严格按 lockfile 安装，lockfile 与 package.json
+# 不同步时直接失败 —— 这正是我们要在 CI 里拦下的情况（本地曾用 --legacy-peer-deps 安装，
+# 导致 lockfile 缺自动 peer，CI 首次运行即红）。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 版本基线以 .node-version 为唯一来源，避免 CI 与本机漂移。
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+
+      # `npm test` 自带 build：产物级测试（dist / client bundle）依赖 lib/ 已生成。
+      - run: npm test
