@@ -21,7 +21,7 @@
 
 ## 已就位
 
-- `zlZayn/dsh-zhihu-search`：补上 `dsh-plugin`、`search` topic；description 补上第三个工具与来源引用。
+- `zlZayn/dsh-zhihu-search`：带上必需的 `dsh-plugin` topic，并按发现入口补齐 `search`、`ai`、`ai-agent`、`agent-harness`、`deepseek`、`llm`；description 补上第三个工具与来源引用。
 - `zlZayn/awesome-dsh-plugin` 分支 `add-dsh-zhihu-search`：已含 `data/plugins/zlZayn__dsh-zhihu-search.yml`，相对上游 `main` 领先 1 个文件。
 
 ## 待执行（时间到了只跑这一条）
