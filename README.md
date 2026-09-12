@@ -36,6 +36,8 @@ dsh plugin --profile web add "$PWD"
 
 ### 从 npm 安装
 
+尚未发布到 npm；发布后此命令可用。
+
 ```bash
 dsh plugin --profile web add dsh-zhihu-search
 ```
