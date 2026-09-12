@@ -53,6 +53,13 @@ dsh plugin --profile web add "$PWD"
 dsh plugin --profile web add dsh-zhihu-search
 ```
 
+### 发现与安装
+
+- **npm**：[`dsh-zhihu-search`](https://www.npmjs.com/package/dsh-zhihu-search)
+- **GitHub**：[`zlZayn/dsh-zhihu-search`](https://github.com/zlZayn/dsh-zhihu-search)
+
+仓库带有 GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin)，插件市场据此自动发现插件。
+
 ## 配置
 
 ### 在设置界面填写

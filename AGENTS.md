@@ -5,6 +5,7 @@
 - Released v1.0.0 → <https://github.com/zlZayn/dsh-zhihu-search>
 - npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 带 provenance 签名发布）
 - 三个工具、设置卡片、149 条测试与本地真机验证全部完成。
+- 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 PR 被「仓库满 1 天」闸门挡住 → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 
 ## 全局规则
 
@@ -26,6 +27,7 @@
 
 ## 待办
 
+- [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
 - [ ] 卡片文案进 DSH locale 字典（现为硬编码中文）
 
