@@ -81,15 +81,16 @@ describe('client bundle 信封', () => {
   it('导出 apply 与 inject', () => {
     const mod = materialize(loadBundleRow());
     expect(typeof mod['apply']).toBe('function');
-    expect(mod['inject']).toEqual(['slots', 'settingsScope']);
+    expect(mod['inject']).toEqual(['slots', 'settingsScope', 'locale']);
   });
 });
 
 describe('client bundle 注册行为', () => {
-  /** 记录槽位注册的替身上下文。 */
+  /** 记录槽位注册与字典注册的替身上下文。 */
   function makeContext() {
     const registrations: Array<Record<string, unknown>> = [];
     const injected: string[] = [];
+    const dictionaries: Array<{ ns: string; locales: string[] }> = [];
     const scope = {
       subscribe: () => () => undefined,
       getSnapshot: () => ({ status: 'ready', writable: true, value: undefined, user: undefined, base: undefined }),
@@ -97,8 +98,22 @@ describe('client bundle 注册行为', () => {
       unset: async () => undefined,
     };
     const mirror = { subscribe: () => () => undefined, getSnapshot: () => ({}) };
-    const ctx = {
+    /** 卡片在 apply 期就需要 effect 与 locale，缺任一项都会让它抛错。 */
+    const base = {
       settingsScope: { bind: () => scope, describe: () => mirror },
+      locale: {
+        register(ns: string, dicts: Record<string, unknown>) {
+          dictionaries.push({ ns, locales: Object.keys(dicts) });
+          return () => undefined;
+        },
+      },
+      effect(callback: () => unknown) {
+        callback();
+        return () => undefined;
+      },
+    };
+    const ctx = {
+      ...base,
       slots: {
         inject(name: string, callback: () => unknown) {
           injected.push(name);
@@ -110,7 +125,7 @@ describe('client bundle 注册行为', () => {
         },
       },
     };
-    return { ctx, registrations, injected };
+    return { ctx, base, registrations, injected, dictionaries };
   }
 
   it('注册进 settings.plugin.item，且 key 等于 host 侧命名空间', () => {
@@ -124,14 +139,30 @@ describe('client bundle 注册行为', () => {
   });
 
   it('注册是惰性的：只在声明到账后才发生', () => {
-    const { ctx, registrations } = makeContext();
+    const { base, registrations } = makeContext();
     // 槽位声明缺席时 inject 不应回调 —— 用不触发回调的替身验证。
     const silent = {
-      settingsScope: ctx.settingsScope,
+      ...base,
       slots: { inject: () => undefined, register: () => () => undefined },
     };
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(silent);
     expect(registrations).toHaveLength(0);
+  });
+
+  it('注册时声明 locale 命名空间，框架才会注入 t 座位', () => {
+    const { ctx, registrations } = makeContext();
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(ctx);
+    expect(registrations[0]).toMatchObject({ locale: 'zhihu-search' });
+  });
+
+  it('中英字典一起注册：缺一种语言应表现为编译错误，而不是线上空白', () => {
+    const { ctx, dictionaries } = makeContext();
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(ctx);
+    expect(dictionaries).toHaveLength(1);
+    expect(dictionaries[0]?.ns).toBe('zhihu-search');
+    expect(dictionaries[0]?.locales.slice().sort()).toEqual(['en', 'zh']);
   });
 });

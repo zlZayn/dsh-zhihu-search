@@ -5,6 +5,10 @@
  * 可展开头部（名称 / 说明 / 未保存标记 / 折叠箭头）、字段行（标签 / 状态标记 / 重置）、
  * 底部「放弃 + 保存」，保存成功且 Host 回读确认后才折叠。
  *
+ * 文案全部走 DSH 的 locale 服务（`ctx.locale`），不硬编码 —— 字典在 [locales.ts](./locales.ts)，
+ * 注册时用 `locale:` 声明命名空间，框架据此把类型化的 `t` 座位注入组件 props。
+ * 切语言无需重挂载：字典注册会推进 locale 版本号，已挂载的出口自动重取。
+ *
  * 复用 `@deepseek-ai/dsh-client-ui-primitives` 的 `Tag` 与折叠图标：那是公共基础库，
  * 不是别的插件 —— 被 bundle-purity gate 禁止的是跨插件值导入。
  * 其余控件按官方 CSS 自带样式，取值只用 `--dsw-alias-*` 语义令牌。
@@ -15,14 +19,24 @@
 import { useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { IconChevronDownOutline14, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { Context } from '@deepseek-ai/cordis';
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { SettingsDescribeFace, SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client';
+// 类型导入即声明：`ctx.locale` 由 locale 包的浏览器半体合并进 Context。
+import type {} from '@deepseek-ai/dsh-client-locale/client';
 // 类型导入即声明：ctx.slots 由 ui-renderer 的浏览器半体合并进 Context。
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
+import { LOCALE_NS, ZHIHU_LOCALES } from './locales.js';
 
-/** 依赖的浏览器端服务。 */
-export const inject = ['slots', 'settingsScope'];
+/**
+ * 依赖的浏览器端服务。
+ *
+ * `locale` 是硬依赖：注册时声明了 `locale:`，渲染就需要已安装的 locale 面，
+ * 缺席时 DSH 会直接报错而不是降级。标准 web 装配必然带它
+ * （DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`）。
+ */
+export const inject = ['slots', 'settingsScope', 'locale'];
 
 /** 与 Host 侧 `ZHIHU_SETTINGS_NAMESPACE` 逐字一致；它就是卡片的分派 key。 */
 const NAMESPACE = 'zhihu-search';
@@ -32,6 +46,12 @@ const SECRET_FIELD = 'accessSecret';
 
 /** 凭据引用名字段，对应 Host 侧 `Config.accessSecretRef`。 */
 const REF_FIELD = 'accessSecretRef';
+
+/** 拿密钥的地方；与根 README 用的是同一个链接名。 */
+const PROFILE_URL = 'https://developer.zhihu.com/profile';
+
+/** 框架注入的 `t` 座位类型，绑定到本卡片的字典命名空间。 */
+type CardTranslate = TranslateNS<typeof LOCALE_NS>;
 
 /** 本卡片的 section 形状。 */
 interface ZhihuSection {
@@ -177,10 +197,11 @@ function dimStyle(base: CSSProperties, disabled: boolean): CSSProperties {
   return disabled ? { ...base, opacity: 0.4, cursor: 'default' } : base;
 }
 
-/** 卡片 props。 */
+/** 卡片 props；`t` 由框架按注册时声明的 locale 命名空间注入。 */
 interface CardProps {
   readonly scope: SettingsScope<ZhihuSection>;
   readonly mirror: SettingsDescribeFace;
+  readonly t: CardTranslate;
 }
 
 /**
@@ -189,10 +210,10 @@ interface CardProps {
  * 草稿跨折叠保留，因此头部标记「未保存」；保存成功后才折叠，
  * 失败则保持展开并保留草稿与诊断供修正。
  *
- * @param props - 命名空间作用域与描述镜像。
+ * @param props - 命名空间作用域、描述镜像，以及框架注入的翻译座位。
  * @returns 卡片元素。
  */
-function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
+function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
   const snapshot: SettingsScopeSnapshot<ZhihuSection> = useSyncExternalStore(
     (onChange) => scope.subscribe(onChange),
     () => scope.getSnapshot(),
@@ -254,10 +275,10 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
         }}
       >
         <span style={S.headText}>
-          <span style={S.name}>知乎搜索</span>
-          <span style={S.description}>知乎开放平台的站内检索、全网检索与直答工具。</span>
+          <span style={S.name}>{t('title')}</span>
+          <span style={S.description}>{t('description')}</span>
         </span>
-        {dirty ? <Tag tone="neutral">未保存</Tag> : null}
+        {dirty ? <Tag tone="neutral">{t('unsaved')}</Tag> : null}
         <span style={open ? S.chevronOpen : S.chevron}>
           <IconChevronDownOutline14 />
         </span>
@@ -267,14 +288,16 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
         ? (
           <div style={S.body}>
             {!writable && snapshot.status !== 'loading'
-              ? <p style={S.readOnly} role="status">当前连接不允许写入设置。</p>
+              ? <p style={S.readOnly} role="status">{t('readOnly')}</p>
               : null}
 
             <div style={S.field}>
               <div style={S.head}>
-                <label style={S.label} htmlFor="zhihu-access-secret">Access Secret</label>
+                <label style={S.label} htmlFor="zhihu-access-secret">{t('secretLabel')}</label>
                 <span style={S.badges}>
-                  <Tag tone={configured ? 'neutral' : 'quiet'}>{configured ? '已配置' : '未配置'}</Tag>
+                  <Tag tone={configured ? 'neutral' : 'quiet'}>
+                    {configured ? t('secretConfigured') : t('secretMissing')}
+                  </Tag>
                 </span>
               </div>
               <input
@@ -289,26 +312,26 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
                 }}
               />
               <p style={S.hint}>
-                {'在'}
+                {t('secretHintBefore')}
                 <a
                   style={S.link}
-                  href="https://developer.zhihu.com/profile"
+                  href={PROFILE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  知乎开放平台个人中心
+                  {t('secretHintLink')}
                 </a>
-                {'获取；留空则不修改已保存的密钥。'}
+                {t('secretHintAfter')}
               </p>
             </div>
 
             <div style={S.fieldDivider}>
               <div style={S.head}>
-                <label style={S.label} htmlFor="zhihu-access-secret-ref">凭据引用名</label>
+                <label style={S.label} htmlFor="zhihu-access-secret-ref">{t('refLabel')}</label>
                 {refOverridden
                   ? (
                     <span style={S.badges}>
-                      <Tag tone="neutral">已覆盖</Tag>
+                      <Tag tone="neutral">{t('refOverridden')}</Tag>
                       <button
                         type="button"
                         style={dimStyle(S.reset, disabled)}
@@ -317,7 +340,7 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
                           setRefDraft('');
                         }}
                       >
-                        重置
+                        {t('reset')}
                       </button>
                     </span>
                   )
@@ -334,13 +357,13 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
                   setRefDraft(event.target.value);
                 }}
               />
-              <p style={S.hint}>环境变量或凭据记录的名字；留空并保存会清掉覆盖，回落到默认的 ZHIHU_ACCESS_SECRET。</p>
+              <p style={S.hint}>{t('refHint')}</p>
             </div>
 
             <div style={S.footer}>
               {failed !== '' ? <p style={S.failed} role="status">{failed}</p> : null}
               <button type="button" style={dimStyle(S.discard, !dirty || saving)} disabled={!dirty || saving} onClick={discard}>
-                放弃
+                {t('discard')}
               </button>
               <button
                 type="button"
@@ -350,7 +373,7 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
                   void save();
                 }}
               >
-                {saving ? '保存中…' : '保存'}
+                {saving ? t('saving') : t('save')}
               </button>
             </div>
           </div>
@@ -361,9 +384,10 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
 }
 
 /**
- * 注册设置卡片。
+ * 注册设置卡片与它的字典。
  *
  * `key` 必须等于命名空间：面板正是按这个 key 决定分派哪些卡片。
+ * 字典注册进 `ctx.effect`，插件卸载时随之注销（`register` 返回 disposer）。
  *
  * @param ctx - 浏览器端 Cordis 上下文。
  */
@@ -371,10 +395,15 @@ export function apply(ctx: Context): void {
   const scope = ctx.settingsScope.bind<ZhihuSection>({ namespace: NAMESPACE });
   const mirror = ctx.settingsScope.describe();
 
+  ctx.effect(
+    () => ctx.locale.register(LOCALE_NS, ZHIHU_LOCALES),
+    'zhihu-search: card dictionaries',
+  );
+
   ctx.slots.inject('settings.plugin.item', () =>
     ctx.slots.register(
-      { name: 'settings.plugin.item', key: NAMESPACE },
-      () => <ZhihuCard scope={scope} mirror={mirror} />,
+      { name: 'settings.plugin.item', key: NAMESPACE, locale: LOCALE_NS },
+      (seat: { t: CardTranslate }) => <ZhihuCard scope={scope} mirror={mirror} t={seat.t} />,
     ),
   );
 }
