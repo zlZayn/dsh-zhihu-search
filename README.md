@@ -31,12 +31,12 @@
 | `query` | string | **必填** | 搜索关键词，中文效果最好。 |
 | `count` | integer | `5` | 返回条数，1–10。 |
 | `sortField` | enum | `default` | `default` 沿用相关性排序；`voteUpCount` 点赞数 · `commentCount` 评论数 · `editTime` 更新时间。 |
-| `order` | enum | `desc` | `desc` 降序 · `asc` 升序。 |
-| `minValue` | number | — | 排序字段的下限（含）。配 `sortField=voteUpCount` + `minValue=100` 即「只要点赞数 ≥ 100」。 |
+| `order` | enum | `desc` | `desc` 降序 · `asc` 升序。仅在指定了 `sortField` 时生效。 |
+| `minValue` | number | — | 排序字段的下限（含），**必须配合 `sortField`**。配 `sortField=voteUpCount` + `minValue=100` 即「只要点赞数 ≥ 100」。 |
 | `publishedAfter` | string | — | 只要该日期之后发布的内容，格式 `YYYY-MM-DD`。 |
 | `publishedBefore` | string | — | 只要该日期之前发布的内容，格式 `YYYY-MM-DD`。 |
 
-**边界**：不支持按站点域名过滤——站内结果本来就全来自知乎，要按站点找资料请用 `zhihu_global_search`。`count` 上限 10。**没有翻页**：`hasMore` 恒为 `false`，要更多结果请换关键词或换排序。
+**边界**：不支持按站点域名过滤——站内结果本来就全来自知乎，要按站点找资料请用 `zhihu_global_search`。`count` 上限 10。`minValue` 与非默认 `order` 必须配合 `sortField`：缺了会被拒绝并给出改正提示，而不是静默返回未过滤的结果。**没有翻页**：`hasMore` 恒为 `false`，要更多结果请换关键词或换排序。
 
 ### `zhihu_global_search` —— 全网索引检索
 
@@ -105,7 +105,7 @@ dsh plugin --profile web add dsh-zhihu-search
 
 打开 **设置 → 插件 → 插件配置 → 知乎搜索**，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
 
-Access Secret 在知乎开放平台的[个人中心](https://developer.zhihu.com/profile)获取。
+Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/profile)获取；设置卡片里有同一个链接。
 
 ### 用环境变量代替
 
