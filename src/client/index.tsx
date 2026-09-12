@@ -130,6 +130,13 @@ const S: Record<string, CSSProperties> = {
     width: '100%',
   },
   hint: { margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary)' },
+  // 说明句里的外链：只用卡片既有的语义令牌，颜色取自 ui-theme 的 --dsw-alias-link。
+  // 卡片是纯内联样式、无法写 :hover，所以常驻下划线作为静态可点提示。
+  link: {
+    color: 'var(--dsw-alias-link)',
+    textDecoration: 'underline',
+    textUnderlineOffset: 2,
+  },
   footer: {
     display: 'flex',
     alignItems: 'center',
@@ -281,7 +288,18 @@ function ZhihuCard({ scope, mirror }: CardProps): JSX.Element {
                   setSecret(event.target.value);
                 }}
               />
-              <p style={S.hint}>在 developer.zhihu.com 个人中心获取。留空则不修改已保存的密钥。</p>
+              <p style={S.hint}>
+                {'在'}
+                <a
+                  style={S.link}
+                  href="https://developer.zhihu.com/profile"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  知乎开放平台个人中心
+                </a>
+                {'获取；留空则不修改已保存的密钥。'}
+              </p>
             </div>
 
             <div style={S.fieldDivider}>

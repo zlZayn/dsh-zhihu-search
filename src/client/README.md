@@ -10,7 +10,8 @@
 对齐官方插件卡片（DSH `ui-settings-plugins` 的 `PluginCard.tsx` + `fields.tsx`）：
 
 - 可折叠头部：名称 / 说明 / 「未保存」标记 / 折叠箭头；展开后卡片改用 `bg-layer-2` 与 `label-dimmed` 边框。
-- 字段行：标签 + 状态标记（`Tag`）+ 重置；字段之间以 `border-l2` 分隔。
+- 字段行：标签 + 状态标记（`Tag`）+ 重置；说明行在控件下方，Access Secret 的说明里带一个「知乎开放平台个人中心」外链（新开页）。字段之间以 `border-l2` 分隔。
+- 说明行里的外链只用 `--dsw-alias-link` 令牌；卡片是纯内联样式、写不了 `:hover`，因此常驻下划线作为静态可点提示。
 - 底部：失败诊断 + 「放弃」+「保存」；保存成功且 Host 回读确认后才折叠。
 - 取值逐条抄自官方 `PluginCard.module.css` 与 `fields.module.css`，只用 `--dsw-alias-*` 令牌。
 
