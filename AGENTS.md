@@ -2,7 +2,7 @@
 
 ## 状态
 
-- Released v1.0.0 → <https://github.com/zlZayn/dsh-zhihu-search>
+- Released v1.1.0 → <https://github.com/zlZayn/dsh-zhihu-search>（上一版 v1.0.0）
 - npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 带 provenance 签名发布）
 - 三个工具、设置卡片、154 条测试与本地真机验证全部完成。
 - 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 PR 被「仓库满 1 天」闸门挡住 → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
@@ -24,11 +24,13 @@
 - test: 154 passed / 0 failed（12 个文件）
 - typecheck: clean（src + test）· build: clean
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
+- v1.1.0 的 CI 与 Release 均绿；npm `latest` = 1.1.0
 
 ## 待办
 
 - [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
+- [ ] 换掉 [docs/images/settings-card.png](docs/images/settings-card.png)：卡片说明行新增了外链，旧图已过时
 - [ ] 卡片文案进 DSH locale 字典（现为硬编码中文）
 
 ## 活跃坑（工具链与 DSH 平台）
