@@ -51,3 +51,4 @@
 - 呈现层 → [src/present/README.md](src/present/README.md)
 - 浏览器半体 → [src/client/README.md](src/client/README.md)
 - 测试对应关系 → [test/README.md](test/README.md)
+- 构建脚本 → [scripts/README.md](scripts/README.md)

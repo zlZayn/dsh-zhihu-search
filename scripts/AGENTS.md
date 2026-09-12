@@ -1,0 +1,11 @@
+# scripts/ — 规则层
+
+继承根规则，见 [../AGENTS.md](../AGENTS.md)。
+
+本目录特有约束：
+
+- 产物格式契约由本目录负责：`lib/client.js` 必须是 DSH 的 lazy-CJS 工厂信封，不得手改产物。
+- 输出路径不得与 `tsc` 的产物撞车 —— `src/<name>.ts` 会编译到 `lib/<name>.js`，因此路径冲突守卫必须保留。
+- 外部依赖只允许 `PLATFORM_MODULES` 清单内的模块；清单外的一律标记 external 并写 `dsh.client.inject`。
+- 脚本内不得写死本机路径或凭据。
+- 改动后必须跑 `test/client-bundle.test.ts` 与 `test/dist.test.ts`，并同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的构建链说明。
