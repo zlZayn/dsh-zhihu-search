@@ -1,7 +1,7 @@
 {
   "name": "dsh-zhihu-search",
   "version": "1.0.0",
-  "description": "DSH host tool plugin: Zhihu in-site search and Zhida (直答) over the official Zhihu Open Platform API.",
+  "description": "DSH plugin: Zhihu in-site search, global web search, and Zhida — with a native settings card and source-cited results.",
   "keywords": [
     "dsh",
     "deepseek-harness",
