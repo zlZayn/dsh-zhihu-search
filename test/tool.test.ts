@@ -76,6 +76,17 @@ describe('zhihu_search', () => {
     harness.dispose();
   });
 
+  it('minValue 缺 sortField 时返回 param 错误，而不是静默下发未过滤查询', async () => {
+    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const value = (await tool.execute({ query: 'RAG', minValue: 100 }, execContext())) as SearchOutput;
+    expect(value.ok).toBe(false);
+    expect(value.error?.kind).toBe('param');
+    expect(value.error?.hint).toBeTruthy();
+    // 关键断言：一次请求都没发出去，因此不可能把未过滤的结果当成过滤过的返回。
+    expect(harness.urls).toHaveLength(0);
+    harness.dispose();
+  });
+
   it('把日期编译成 publish_time 过滤', async () => {
     const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
     await tool.execute({ query: 'RAG', publishedAfter: '2024-01-01' }, execContext());

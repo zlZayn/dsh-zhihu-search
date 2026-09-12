@@ -56,7 +56,10 @@ export interface SortBySpec {
  */
 export function compileSortBy(spec: SortBySpec): string | undefined {
   const field = spec.sortField;
-  if (field === undefined || field === 'default') return undefined;
+  if (field === undefined || field === 'default') {
+    assertNoDeadSortIntent(spec, field);
+    return undefined;
+  }
 
   const mapped = SORT_FIELD_MAP[field];
   if (mapped === undefined) {
@@ -71,6 +74,38 @@ export function compileSortBy(spec: SortBySpec): string | undefined {
     throw new CompileError('minValue 必须是有限数字。', '例如 minValue: 100 表示「点赞数不少于 100」。');
   }
   return `${mapped}:${order}:(${String(Math.trunc(min))},)`;
+}
+
+/**
+ * 拒绝「会被静默丢弃的排序意图」。
+ *
+ * `sortField` 为 `default` 或缺省时不下发 SortBy，此时 `minValue` 与显式方向
+ * 都没有落点。静默丢弃比报错更糟：模型会以为自己筛过了，然后照着**未过滤**的结果作答。
+ *
+ * `order: 'desc'` 是文档写明的默认值，模型可能照抄，因此只拒绝非默认值——
+ * 否则「填了默认值」这种无害行为会变成调用失败。
+ *
+ * @param spec - 语义化排序意图。
+ * @param field - 已归一化的排序字段；`undefined` 表示调用方未指定。
+ * @throws CompileError 当意图没有落点时。
+ */
+function assertNoDeadSortIntent(spec: SortBySpec, field: SortField | undefined): void {
+  const where = field === undefined ? '未指定' : 'default（不排序）';
+  const usable = SORT_FIELDS.filter((name) => name !== 'default').join(' / ');
+
+  if (spec.minValue !== undefined) {
+    throw new CompileError(
+      `sortField 为 ${where} 时 minValue 不生效。`,
+      `请指定 sortField（${usable}）并给出 minValue；不需要下限就去掉 minValue。`,
+    );
+  }
+
+  if (spec.order !== undefined && spec.order !== 'desc') {
+    throw new CompileError(
+      `sortField 为 ${where} 时 order 不生效。`,
+      '请指定 sortField 后再用 order，或去掉 order（不排序即按知乎相关性返回）。',
+    );
+  }
 }
 
 /**

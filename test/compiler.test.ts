@@ -28,6 +28,29 @@ describe('compileSortBy', () => {
     expect(compileSortBy({})).toBeUndefined();
   });
 
+  it('sortField 缺省时，显式 order=desc 仍然放行（那是文档写明的默认值）', () => {
+    expect(compileSortBy({ order: 'desc' })).toBeUndefined();
+  });
+
+  it('拒绝会被静默丢弃的 minValue，而不是当作没传', () => {
+    expect(() => compileSortBy({ minValue: 100 })).toThrow(CompileError);
+    expect(() => compileSortBy({ sortField: 'default', minValue: 100 })).toThrow(CompileError);
+  });
+
+  it('拒绝会被静默丢弃的非默认 order', () => {
+    expect(() => compileSortBy({ order: 'asc' })).toThrow(CompileError);
+  });
+
+  it('拦截错误带可据以纠正的 hint', () => {
+    try {
+      compileSortBy({ minValue: 100 });
+      expect.unreachable('应当抛出 CompileError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(CompileError);
+      expect((error as CompileError).hint).toContain('sortField');
+    }
+  });
+
   it('下限截断为整数，避免生成知乎不认的小数语法', () => {
     expect(compileSortBy({ sortField: 'voteUpCount', minValue: 99.9 })).toBe('VoteUpCount:desc:(99,)');
   });
