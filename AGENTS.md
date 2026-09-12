@@ -42,7 +42,8 @@
 知乎 API 自身的反直觉处归 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，此处只记会咬人的工程陷阱。
 
 - `link:` 安装下 DSH 直接读 `lib/`：改完 `src/`（含浏览器半体）必须重新 build，否则跑的还是旧代码
-- `dsh.profile.bundles` 只在启动时读取；免重启生效必须走 `cordis.patch.yml` 的 patch 层
+- `dsh.profile.bundles` 只在启动时读取 → **首次挂载**新插件要重启，或走 `cordis.patch.yml` 的 patch 层
+- **升级已挂载的插件免重启**：`dsh-client-hmr`（`dsh-web-app` 的运行时依赖）以 500ms 轮询插件 bundle，被 `dsh plugin add` 改写即原地换装 → 发版后可直接 `dsh plugin --profile web add <pkg>@<ver>`，不必请人重启
 - 挂载用官方 CLI `dsh plugin --profile web add <path>`，它会顺带 reconcile `dsh.profile.bundles`；不要手改 `cordis.patch.yml`
 - 可用作值导入的外部模块只有 `PLATFORM_MODULES`（DSH `packages/client/web/src/platform.ts`）；超出该清单必须写 `dsh.client.inject` / `external`
 - `lib/client.js` 专供浏览器半体；host 模块不得命名 `src/client.ts`，否则被 esbuild 覆盖（[复盘](docs/postmortem/2026-09-12-client-js-path-collision.md)）
