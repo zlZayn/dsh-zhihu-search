@@ -6,6 +6,10 @@
 
 给 DSH 装上知乎：站内检索、全网检索与直答三个工具，返回可引用的来源列表，而不是一段无法核对的摘要。
 
+![插件配置页中的「知乎搜索」卡片](https://raw.githubusercontent.com/zlZayn/dsh-zhihu-search/main/docs/images/settings-card.png)
+
+*在 **设置 → 插件 → 插件配置** 中与其他插件并排，Access Secret 就地填写、立即生效。*
+
 ## 能力
 
 - 检索知乎站内问答与文章：按点赞数、评论数或更新时间排序，可按发布时间范围过滤。
@@ -35,8 +39,6 @@ dsh plugin --profile web add "$PWD"
 `dsh plugin` 会把本包装进 profile 并挂进 `dsh.profile.bundles`。重启 `dsh web` 后生效。
 
 ### 从 npm 安装
-
-尚未发布到 npm；发布后此命令可用。
 
 ```bash
 dsh plugin --profile web add dsh-zhihu-search
