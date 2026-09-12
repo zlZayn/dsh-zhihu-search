@@ -6,6 +6,8 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](.node-version)
 [![DSH](https://img.shields.io/badge/DSH-0.1.5--rc.2-blue.svg)](package.json)
 
+[简体中文](README.md) | [English](README_en.md)
+
 给 DSH 装上知乎：站内检索、全网检索与直答三个工具，返回可引用的来源列表，而不是一段无法核对的摘要。
 
 ![插件配置页中的「知乎搜索」卡片](https://raw.githubusercontent.com/zlZayn/dsh-zhihu-search/main/docs/images/settings-card.png)
