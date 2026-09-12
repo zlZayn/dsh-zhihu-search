@@ -4,9 +4,9 @@
 
 ## 文件索引
 
-- `deps.ts`：三个工具共用的依赖包与缓存键计算。被三个工具模块依赖。
-- `search.ts`：`zhihu_search` 站内搜索。`Count` 上限 10，`Filter` 仅 `publish_time`。
-- `global-search.ts`：`zhihu_global_search` 全网搜索。`Count` 上限 20，支持 `site`，本地拒绝知乎域名。
+- `deps.ts`：各工具共用的依赖包与缓存键计算。
+- `search.ts`：`zhihu_search` 站内搜索。不接受站点过滤。
+- `global-search.ts`：`zhihu_global_search` 全网搜索，本地拒绝知乎域名。
 - `zhida.ts`：`zhihu_zhida` 知乎直答。走 SSE，语义化档位映射为真实模型 id。
 
 ## 契约要点

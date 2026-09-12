@@ -45,8 +45,8 @@ npm pack --dry-run
 推一个与 `package.json` 版本一致的 tag 即可：[release.yml](../.github/workflows/release.yml) 会跑 `npm ci` → typecheck → test → 校验 tag 与版本一致 → `npm publish --provenance`。
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag vX.Y.Z          # X.Y.Z 必须与 package.json 的 version 逐字一致
+git push origin vX.Y.Z
 ```
 
 需要一次性配置：仓库 secret `NPM_TOKEN`，值必须是**启用了 bypass 2FA 的 Granular Access Token**。
@@ -76,7 +76,7 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 ## 兼容性
 
-- 宿主版本 `0.1.5-rc.2`。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`role('secret')` 脱敏、
+- 宿主版本以 [package.json](../package.json) 的 `peerDependencies` 为准。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`role('secret')` 脱敏、
   `settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示或密钥读不到）。
 - 判断依据始终以 DSH 源码为准，不凭文档推断。
 - 已知缺口见 [AGENTS.md](../AGENTS.md) 的待办。

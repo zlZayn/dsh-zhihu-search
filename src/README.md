@@ -9,7 +9,7 @@
 - `state.ts`：缓存与令牌桶，以及缓存键计算。被 `index.ts` 创建、被 `tools/` 使用。
 - `credentials.ts`：Access Secret 的解析优先级（凭据域 → 设置字面量 → 环境变量）。纯函数 + 注入来源，被 `index.ts` 使用。
 - `types.ts`：知乎原始响应类型与 Canonical Output 类型。
-- `tools/`：三个工具定义，见 [tools/README.md](tools/README.md)。
+- `tools/`：工具定义，见 [tools/README.md](tools/README.md)。
 - `utils/`：编译器与文本清洗，见 [utils/README.md](utils/README.md)。
 - `present/`：纯函数呈现层，见 [present/README.md](present/README.md)。
 - `client/`：浏览器半体（设置卡片），见 [client/README.md](client/README.md)。

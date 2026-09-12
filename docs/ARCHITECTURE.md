@@ -28,20 +28,20 @@
 
 ## 端点契约
 
-两个搜索端点的 `Filter` 语法互不兼容，因此各自独立成工具：
+两个搜索端点的 `Filter` 语法互不兼容：站内只认发布时间，全网才认域名。因此各自独立成工具，而不是一个工具的开关——合成一个意味着模型要记住「哪个参数在哪个模式下非法」，那是必然出错的负担。
 
-- `zhihu_search`：`Count` 上限 10，`Filter` 只接受 `publish_time`。
-- `zhihu_global_search`：`Count` 上限 20，`Filter` 接受 `host`，拒绝知乎域名。
+- `zhihu_search`：站内检索，不接受站点过滤。
+- `zhihu_global_search`：全网索引检索，接受站点过滤但拒绝知乎域名。
 - `zhihu_zhida`：SSE 流式，语义化档位映射为真实模型 id。
 
-参数集合与输出 schema 以源码与测试为准，见 [src/tools/README.md](../src/tools/README.md)。
+`Count` 上限、参数集合与输出 schema **不在本文重复**，以源码常量与测试为准：[src/tools/](../src/tools/)、[src/utils/compiler.ts](../src/utils/compiler.ts)，由 [test/compiler.test.ts](../test/compiler.test.ts) 与 [test/tool.test.ts](../test/tool.test.ts) 固化。
 
 ## 工具描述约定
 
 工具描述是模型选工具与填参数的主要依据，按固定三槽写，顺序不变：
 
 1. **是什么**：检索或生成什么。
-2. **什么时候选它**：含「该用别的工具时指向谁」。三个工具互为路由，不让模型自行推断边界。
+2. **什么时候选它**：含「该用别的工具时指向谁」。各工具互为路由，不让模型自行推断边界。
 3. **结果形态或硬边界**：一句。
 
 唯一禁止项：**工具描述不枚举自己参数的取值**。枚举属于参数描述，两边都写就是同一事实说两遍，而参数 schema 永远与描述一同进入上下文。

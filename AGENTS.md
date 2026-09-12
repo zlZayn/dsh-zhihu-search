@@ -2,9 +2,9 @@
 
 ## 状态
 
-- Released v1.1.0 → <https://github.com/zlZayn/dsh-zhihu-search>（上一版 v1.0.0）
+- 已发布版本以 [package.json](package.json) 的 `version` 为准 → <https://github.com/zlZayn/dsh-zhihu-search>
 - npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 带 provenance 签名发布）
-- 三个工具、设置卡片、154 条测试与本地真机验证全部完成。
+- 功能、设置卡片与本地真机验证全部完成；工具清单见 [README.md](README.md)。
 - 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 PR 被「仓库满 1 天」闸门挡住 → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 
 ## 全局规则
@@ -13,6 +13,13 @@
 - 红线以测试固化（依赖分层、呈现隔离、无全局状态、模型不见原始语法）→ [test/README.md](test/README.md)
 - 对外可见行为变化，同一次改动内同步 [README.md](README.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 决策理由 → [.agents/notes/](.agents/notes/)
+
+## 事实来源（只查不抄）
+
+- 版本号、依赖、宿主兼容性 → [package.json](package.json)
+- 工具参数、默认值与上限 → [src/tools/](src/tools/) 各模块的常量，由 [test/tool.test.ts](test/tool.test.ts) 守护
+- 端点语法与实测偏差 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 构建产物的运行方式 → [docs/PUBLISHING.md](docs/PUBLISHING.md)
 
 ## 常用命令
 
@@ -24,7 +31,6 @@
 - test: 154 passed / 0 failed（12 个文件）
 - typecheck: clean（src + test）· build: clean
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
-- v1.1.0 的 CI 与 Release 均绿；npm `latest` = 1.1.0
 
 ## 待办
 
