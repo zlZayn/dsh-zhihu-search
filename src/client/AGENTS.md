@@ -1,0 +1,12 @@
+# client/ — 规则层
+
+继承根规则，见 [../../AGENTS.md](../../AGENTS.md)。
+
+本目录特有约束：
+
+- 禁止运行时 import 其他插件的值：跨插件只走 Cordis 服务，DSH 的 bundle-purity gate 会拒绝值导入。
+- 只允许 `import type`（DSH 类型）与**外壳预置模块**的值导入。预置清单是 DSH `packages/client/web/src/platform.ts` 的 `PLATFORM_MODULES`（react、react/jsx-runtime、react-dom、cordis、client-store、ui-slots、ui-primitives、ui-dockkit）—— 这些由 seed 表解析，不需要依赖边。
+- 落在 `PLATFORM_MODULES` 之外的值导入必须同时写进 `dsh.client.inject` 与 `dsh.client.external`，否则工厂不会先到。
+- 样式只用 `--dsw-alias-*` 语义令牌（见 DSH `docs/web-styling.md`），不写字面色值、不引外部 UI 库。
+- 注册必须走 `ctx.slots.inject(name, () => ctx.slots.register(...))`，禁止模块级副作用。
+- 改完必须重新 build；产物格式由 [../../scripts/build-client.mjs](../../scripts/build-client.mjs) 负责，不得手改 `lib/client.js`。

@@ -1,0 +1,13 @@
+# dsh-zhihu-search bundle patch —— 把本插件作为一行插入 dsh profile。
+#
+# 格式对齐 DSH 官方 bundle patch（见 @deepseek-ai/dsh-base/cordis.patch.yml）：
+# 顶层是 loader patch 条目数组；`insert` 在 profile 根上追加插件行。
+#
+# 关于 name：必须是 loader 能从 profile 的 node_modules 解析到的模块 id，即本包自身的包名。
+#
+# 关于 config：**刻意不写 accessSecret**。写了空串会让设置卡片的「已配置」判据
+# （DSH 的 RedactedSecret.set = value !== undefined）把空串当成已设值，卡片一打开就显示
+# 「已配置」，而实际没有任何密钥。密钥应当只从设置界面写入。
+- insert:
+    - id: dsh-zhihu-search
+      name: dsh-zhihu-search
