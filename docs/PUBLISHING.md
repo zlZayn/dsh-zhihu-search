@@ -7,7 +7,7 @@
 1. 工作区干净：`git status` 无未提交改动。
 2. 版本号已按下方[版本号](#版本号)的判据定档。
 3. `npm run typecheck && npm test` 全绿。
-4. `README.md` 的安装与配置说明与当前行为一致。
+4. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
 5. `cordis.patch.yml` 里**不含**任何凭据。
 
 ## 版本号
@@ -20,7 +20,7 @@
 | **minor** | 向后兼容的功能新增 | 新工具；新参数；新配置项；UI 新能力 |
 | **patch** | 向后兼容的修复 | bug 修复；文档修正；依赖小版本更新；性能优化 |
 
-两条边界：
+三条边界：
 
 - 改工具**描述**不改契约，按性质归：修掉一句虚假陈述是 patch，新增参数或错误路径才是 minor。
 - 只动不随包发布的文件（测试、CI、决策记录）不构成发布理由，搭下次发布的车即可。
@@ -28,17 +28,13 @@
 
 ## 打包内容
 
-`package.json` 的 `files` 决定发布内容，只有四项：
+发布内容由 [package.json](../package.json) 的 `files` 决定，**以它为准，本文不复制清单** —— 复制的清单会漂移，已经漏过一次 `README_en.md`。
 
-```
-lib/               构建产物（host ESM + 浏览器半体 lib/client.js + 类型声明）
-!lib/**/*.map      source map 不发布 —— 它们指向未随包的 src/，对使用者是悬空的
-cordis.patch.yml   bundle patch，把插件行插入 profile
-README.md
-LICENSE
-```
+三处需要解释，其余自明：
 
-tsconfig 仍生成 source map（本地调试照常），只在打包清单里剔除。
+- `lib/**/*.map` 被排除：这些 source map 指向未随包的 `src/`，对使用者是悬空的，却占了三分之一体积。tsconfig 仍生成它们，本地调试照常。
+- `README_en.md` 必须随包：`README.md` 顶部链接指向它，不随包就是 npm 页面上的死链。
+- `scripts/` 与 `src/` 不发布，因此 `npm run build` 必须在打包前跑过，`lib/` 是唯一交付物。
 
 校验：
 
@@ -46,8 +42,6 @@ tsconfig 仍生成 source map（本地调试照常），只在打包清单里剔
 npm run build
 npm pack --dry-run
 ```
-
-`scripts/` 与 `src/` **不发布** —— 因此 `npm run build` 必须在打包前跑过，`lib/` 是唯一交付物。
 
 ## 构建链的两个事实
 

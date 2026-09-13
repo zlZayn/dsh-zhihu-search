@@ -5,7 +5,7 @@
 - 已发布版本以 [package.json](package.json) 的 `version` 为准 → <https://github.com/zlZayn/dsh-zhihu-search>
 - npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 带 provenance 签名发布）
 - 功能、设置卡片与本地真机验证全部完成；工具清单见 [README.md](README.md)。
-- 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 PR 被「仓库满 1 天」闸门挡住 → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
+- 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 PR 待提 → [笔记与命令](.agents/notes/2026-09-12-marketplace-submission.md)
 
 ## 全局规则
 
@@ -27,17 +27,16 @@
 
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）
 
-## 验证快照（2026-09-12 实跑）
+## 验证快照（2026-09-13 实跑）
 
-- CI: ci.yml 与 release.yml 均绿（首个发布 run 30s）
-- test: 162 passed / 0 failed（13 个文件）
+- CI: ci.yml 与 release.yml 均绿
+- test: 163 passed / 0 failed（13 个文件）
 - typecheck: clean（src + test）· build: clean
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
 
 ## 待办
 
 - [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
-- [x] ~~全网搜索有无翻页参数~~ → **实测定案：没有**，`Count` 上限 20、`HasMore` 从未为 true；`targetCount` 无法兑现 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
 
 ## 活跃坑（工具链与 DSH 平台）
@@ -46,7 +45,7 @@
 
 - `link:` 安装下 DSH 直接读 `lib/`：改完 `src/`（含浏览器半体）必须重新 build，否则跑的还是旧代码
 - `dsh.profile.bundles` 只在启动时读取 → **首次挂载**新插件要重启，或走 `cordis.patch.yml` 的 patch 层
-- **升级已挂载的插件免重启**：`dsh-client-hmr`（`dsh-web-app` 的运行时依赖）以 500ms 轮询插件 bundle，被 `dsh plugin add` 改写即原地换装 → 发版后可直接 `dsh plugin --profile web add <pkg>@<ver>`，不必请人重启
+- **升级已挂载的插件免重启**：`dsh-client-hmr`（`dsh-web-app` 的运行时依赖）轮询插件 bundle，被 `dsh plugin add` 改写即原地换装 → 发版后可直接 `dsh plugin --profile web add <pkg>@<ver>`，不必请人重启
 - 挂载用官方 CLI `dsh plugin --profile web add <path>`，它会顺带 reconcile `dsh.profile.bundles`；不要手改 `cordis.patch.yml`
 - 可用作值导入的外部模块只有 `PLATFORM_MODULES`（DSH `packages/client/web/src/platform.ts`）；超出该清单必须写 `dsh.client.inject` / `external`
 - `lib/client.js` 专供浏览器半体；host 模块不得命名 `src/client.ts`，否则被 esbuild 覆盖（[复盘](docs/postmortem/2026-09-12-client-js-path-collision.md)）
@@ -67,3 +66,4 @@
 - 浏览器半体 → [src/client/README.md](src/client/README.md)
 - 测试对应关系 → [test/README.md](test/README.md)
 - 构建脚本 → [scripts/README.md](scripts/README.md)
+- 截图资源 → [assets/](assets/)（双语 README 各引一张；换图要同改两份）
