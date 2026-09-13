@@ -22,6 +22,7 @@
 - 端点语法与实测偏差 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 构建产物的运行方式 → [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - DSH 平台知识（插件装配、Remote API、设置卡片、i18n、工具契约）→ [DSH cookbook](https://github.com/deepseek-ai/deepseek-harness/tree/master/docs/cookbook)，每篇都有 `.zh.md` 中文版
+- **有自更新来源的事实一律指向来源**：测试与类型检查 → Actions；发布版本 → npm badge。别在本文件留快照数值。
 
 ## 常用命令
 
@@ -29,9 +30,14 @@
 
 ## 验证快照（2026-09-13 实跑）
 
-- CI: ci.yml 与 release.yml 均绿
-- test: 163 passed / 0 failed（13 个文件）
-- typecheck: clean（src + test）· build: clean
+**会随每次改动漂移的数字一律不抄，指向自更新来源** —— 抄一次就要手动跟一次，本文件已经因此过时过两回。
+
+- 测试与类型检查 → [Actions](https://github.com/zlZayn/dsh-zhihu-search/actions)，每次推送自更新
+- 发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)，badge 自更新
+
+只留下不随数字漂移的定性结论：
+
+- 本机 `npm run build` / `npm run typecheck` / `npm test` 全绿
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
 
 ## 待办
