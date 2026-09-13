@@ -18,6 +18,8 @@
 
 `index.ts` → `tools/` + `state.ts` + `transport.ts`；`tools/` → `utils/` + `present/` + `transport.ts`；`present/` 与 `utils/` 不反向依赖任何模块。
 
+为什么必须单向、哪些模块不认识框架 → 见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」。
+
 ## 变更影响路由
 
 - 改 `transport.ts` 的端点或响应处理 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「请求生命周期」，并跑 `test/sse.test.ts`、`test/tool.test.ts`。
