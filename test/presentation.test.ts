@@ -78,17 +78,23 @@ describe('renderSearch（模型可见层）', () => {
     expect(text).toContain('\\[入门\\]');
   });
 
-  it('内容类型缺失时整段省略，不编造标签（实测外部网页没有 ContentType）', () => {
+  it('内容类型为空串时整段省略「类型」，而不是渲染成空的「类型: 」（外站页面实测形态）', () => {
     const text = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, contentType: '' }] }));
     expect(text).not.toContain('类型');
-    expect(text).toContain('**点赞**: 42');
+    expect(text).toContain('**作者**: 张三');
   });
 
-  it('点赞数缺失时整段省略，为 0 时照常渲染（「不知道」与「没人赞」是两回事）', () => {
-    const external = { title: '第三方页面', url: 'https://example.com/a', snippet: '摘要', author: '某站', contentType: 'Article' };
-    const withoutVotes = textOf(renderSearch({ ...okValue, items: [external] }));
-    expect(withoutVotes).not.toContain('点赞');
-    expect(withoutVotes).toContain('**作者**: 某站');
+  it('外站页面不渲染点赞段：内容类型为空，上游那个 0 是占位值而不是「没人赞」', () => {
+    const external = { title: '第三方页面', url: 'https://example.com/a', snippet: '摘要', author: '某站', contentType: '', voteUpCount: 0 };
+    const text = textOf(renderSearch({ ...okValue, items: [external] }));
+    expect(text).not.toContain('点赞');
+    expect(text).not.toContain('类型');
+    expect(text).toContain('**作者**: 某站');
+  });
+
+  it('知乎内容缺失点赞数时省略，真 0 照常渲染（「不知道」与「没人赞」是两回事）', () => {
+    const missing = { title: '知乎回答', url: 'https://www.zhihu.com/question/1/answer/2', snippet: '摘要', author: '张三', contentType: 'Answer' };
+    expect(textOf(renderSearch({ ...okValue, items: [missing] }))).not.toContain('点赞');
 
     const zeroVotes = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, voteUpCount: 0 }] }));
     expect(zeroVotes).toContain('**点赞**: 0');

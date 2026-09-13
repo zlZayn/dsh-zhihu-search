@@ -44,11 +44,12 @@ function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number] | und
     url,
     snippet: sanitizeSnippet(typeof item.ContentText === 'string' ? item.ContentText : ''),
     author: sanitizeSnippet(typeof item.AuthorName === 'string' ? item.AuthorName : '', 60),
-    // 上游没报点赞数时整个键省略，不兜底成 0：全网的第三方网页没有这个字段，
-    // 写 0 等于告诉模型「这个页面没人赞」，而事实是「不知道」。
+    // 上游没报点赞数时整个键省略，不兜底成 0 —— 写 0 等于告诉模型「没人赞」。
+    // 注意实测结论：上游**从未省略**该字段，外站网页也有这个键、值是占位的 0。
+    // 省略分支是防伪造的兜底；外站那个 0 由渲染层决定不展示（present/search.ts）。
     ...(typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? { voteUpCount: item.VoteUpCount } : {}),
-    // ContentType 缺失时留空，不编造标签：实测第三方网页（如接单平台）就没有这个字段，
-    // 兜底成 'Article' 会让模型把广告页当成知乎文章。
+    // ContentType 缺失时留空，不编造标签：实测第三方网页（如接单平台）的类型是**空串**
+    // （字段在、值为空），兜底成 'Article' 会让模型把广告页当成知乎文章。
     contentType: typeof item.ContentType === 'string' ? item.ContentType : '',
   };
 }

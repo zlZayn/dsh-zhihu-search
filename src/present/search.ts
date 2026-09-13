@@ -58,8 +58,10 @@ export function renderSearch(value: SearchOutput): ContentBlock[] {
   for (const item of value.items) {
     lines.push(`### [${escapeLinkText(item.title)}](${item.url})`);
     const meta = [`**作者**: ${item.author || '匿名'}`];
-    // 点赞数缺失时整段省略：写 `**点赞**: 0` 会把「不知道」说成「没人赞」。
-    if (item.voteUpCount !== undefined) meta.push(`**点赞**: ${String(item.voteUpCount)}`);
+    // 点赞段只对知乎内容渲染。
+    // 全网搜索会混进第三方网页：外站没有「知乎点赞」这回事，上游对它恒报 0，
+    // 渲染出来就是把「不适用」说成「没人赞」——所以连同缺失一起整段省略。
+    if (item.contentType !== '' && item.voteUpCount !== undefined) meta.push(`**点赞**: ${String(item.voteUpCount)}`);
     // 类型缺失时整段省略，而不是渲染成空的「类型: 」。
     if (item.contentType !== '') meta.push(`**类型**: ${item.contentType}`);
     lines.push(meta.join(' | '));

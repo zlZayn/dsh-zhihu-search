@@ -254,19 +254,22 @@ describe('zhihu_global_search', () => {
     harness.dispose();
   });
 
-  it('第三方网页没有点赞数时省略该字段，不兜底成 0（与 zhihu_search 行为一致）', async () => {
+  it('外站网页的占位 0 如实进 Canonical Output，展示层的取舍归渲染层', async () => {
+    // 实测形态：外站网页 ContentType 是空串（字段在、值为空），VoteUpCount 是 0。
     const external = {
       Title: '某接单平台',
+      ContentType: '',
       ContentText: '摘要',
       Url: 'https://example.com/a',
       AuthorName: '某站',
+      VoteUpCount: 0,
     };
     const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [external] })));
     const tool = createZhihuGlobalSearchTool(harness.deps);
     const value = (await tool.execute({ query: 'crawler' }, execContext())) as SearchOutput;
     expect(value.items).toHaveLength(1);
-    expect(value.items[0]).not.toHaveProperty('voteUpCount');
     expect(value.items[0]?.contentType).toBe('');
+    expect(value.items[0]?.voteUpCount).toBe(0);
     harness.dispose();
   });
 
