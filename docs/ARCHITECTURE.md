@@ -30,11 +30,11 @@
 
 两个搜索端点的 `Filter` 语法互不兼容：站内只认发布时间，全网才认域名。因此各自独立成工具，而不是一个工具的开关——合成一个意味着模型要记住「哪个参数在哪个模式下非法」，那是必然出错的负担。
 
-- `zhihu_search`：站内检索，不接受站点过滤。
-- `zhihu_global_search`：全网索引检索，接受站点过滤但拒绝知乎域名。
+- `zhihu_search`：站内检索，不接受站点过滤。`Count` **服务端上限 10**（与官方文档一致；实测传 15 / 20 / 30 都只回 10 条）。
+- `zhihu_global_search`：全网索引检索，接受站点过滤但拒绝知乎域名。`Count` **服务端上限 20**（实测传 30 回 20，传 0 回落 10）。**没有翻页参数**——`Count` 之外拿不到更多。
 - `zhihu_zhida`：SSE 流式，语义化档位映射为真实模型 id。
 
-`Count` 上限、参数集合与输出 schema **不在本文重复**，以源码常量与测试为准：[src/tools/](../src/tools/)、[src/utils/compiler.ts](../src/utils/compiler.ts)，由 [test/compiler.test.ts](../test/compiler.test.ts) 与 [test/tool.test.ts](../test/tool.test.ts) 固化。
+上表的上限是**上游契约**：实测得出，不是本项目可调的旋钮。本项目自己的参数集合与输出 schema 不在本文重复，以源码常量与测试为准：[src/tools/](../src/tools/)、[src/utils/compiler.ts](../src/utils/compiler.ts)，由 [test/compiler.test.ts](../test/compiler.test.ts) 与 [test/tool.test.ts](../test/tool.test.ts) 固化。
 
 ## 工具描述约定
 
