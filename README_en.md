@@ -1,18 +1,41 @@
-# dsh-zhihu-search
+<p align="center">
+  <h1 align="center">dsh-zhihu-search</h1>
+</p>
 
-[![CI](https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg)](https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/dsh-zhihu-search.svg)](https://www.npmjs.com/package/dsh-zhihu-search)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](.node-version)
-[![DSH](https://img.shields.io/badge/DSH-0.1.5--rc.2-blue.svg)](package.json)
+<div align="center">
+  <p><strong>Empowering DeepSeek Harness with Zhihu Insights</strong></p>
+  <p><em>赋予 DeepSeek Harness 检索知乎社区的能力</em></p>
 
-[简体中文](README.md) | [English](README_en.md)
+  <p>
+    <a href="https://developer.zhihu.com/"><img src="https://img.shields.io/badge/Zhihu%20Open%20Platform-Official%20API-0084FF?style=flat&logo=zhihu&logoColor=white" alt="Zhihu Open Platform Official API"></a>
+    <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4176E6?style=flat" alt="DeepSeek Harness Plugin"></a>
+    <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-Auto%20Discovered-orange?style=flat" alt="dsh-plugin"></a>
+  </p>
 
-Zhihu for DSH: in-site search, global-index search and Zhida — three tools that return a citable list of sources instead of a summary you cannot check.
+  <p>
+    <a href="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml"><img src="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/npm/v/dsh-zhihu-search.svg" alt="npm"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
+    <a href="https://slsa.dev/"><img src="https://img.shields.io/badge/SLSA-Provenance-green?logo=slsa" alt="SLSA Provenance"></a>
+  </p>
 
-![The "Zhihu Search" card in the plugin configuration page](https://raw.githubusercontent.com/zlZayn/dsh-zhihu-search/main/assets/settings-card_en.png)
+  <p>
+    <a href="README.md">简体中文</a> · <strong><a href="README_en.md">English</a></strong>
+  </p>
+</div>
 
-*Sits alongside your other plugins in **Settings → Plugins → Plugin configuration**; the Access Secret is entered right there and takes effect immediately.*
+---
+
+> [!NOTE]
+> **Built on the official Zhihu Open Platform API**, not web scraping. All search results include citable original links and community interaction data (upvotes/comments), ensuring every model response is verifiable.
+
+Equips DSH with three Zhihu tools: in-site search, global web search, and Zhida direct answers — returning a list of citable sources instead of an unverifiable summary.
+
+<p align="center">
+  <img src="assets/settings-card_en.png" alt="Zhihu Search card in the plugin settings" width="600">
+  <br>
+  <em>Sits alongside other plugins in <strong>Settings → Plugins → Plugin configuration</strong>. Enter your Access Secret and it takes effect immediately.</em>
+</p>
 
 ## Tools
 

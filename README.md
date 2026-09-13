@@ -1,18 +1,41 @@
-# dsh-zhihu-search
+<p align="center">
+  <h1 align="center">dsh-zhihu-search</h1>
+</p>
 
-[![CI](https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg)](https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/dsh-zhihu-search.svg)](https://www.npmjs.com/package/dsh-zhihu-search)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](.node-version)
-[![DSH](https://img.shields.io/badge/DSH-0.1.5--rc.2-blue.svg)](package.json)
+<div align="center">
+  <p><strong>赋予 DeepSeek Harness 检索知乎社区的能力</strong></p>
+  <p><em>Empowering DeepSeek Harness with Zhihu Insights</em></p>
 
-[简体中文](README.md) | [English](README_en.md)
+  <p>
+    <a href="https://developer.zhihu.com/"><img src="https://img.shields.io/badge/Zhihu%20Open%20Platform-Official%20API-0084FF?style=flat&logo=zhihu&logoColor=white" alt="知乎开放平台官方 API"></a>
+    <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4176E6?style=flat" alt="DeepSeek Harness Plugin"></a>
+    <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-Auto%20Discovered-orange?style=flat" alt="dsh-plugin"></a>
+  </p>
+
+  <p>
+    <a href="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml"><img src="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/npm/v/dsh-zhihu-search.svg" alt="npm"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT 许可证"></a>
+    <a href="https://slsa.dev/"><img src="https://img.shields.io/badge/SLSA-Provenance-green?logo=slsa" alt="SLSA Provenance"></a>
+  </p>
+
+  <p>
+    <strong><a href="README.md">简体中文</a></strong> · <a href="README_en.md">English</a>
+  </p>
+</div>
+
+---
+
+> [!NOTE]
+> **基于知乎开放平台官方 API 构建**，非爬虫抓取。所有检索结果均附带可引用的原始链接与社区互动数据（点赞/评论），让模型的每一次回答都有据可查。
 
 给 DSH 装上知乎：站内检索、全网检索与直答三个工具，返回可引用的来源列表，而不是一段无法核对的摘要。
 
-![插件配置页中的「知乎搜索」卡片](https://raw.githubusercontent.com/zlZayn/dsh-zhihu-search/main/assets/settings-card.png)
-
-*在 **设置 → 插件 → 插件配置** 中与其他插件并排，Access Secret 就地填写、立即生效。*
+<p align="center">
+  <img src="assets/settings-card.png" alt="插件配置页中的「知乎搜索」卡片" width="600">
+  <br>
+  <em>在 <strong>设置 → 插件 → 插件配置</strong> 中与其他插件并排，Access Secret 就地填写、立即生效。</em>
+</p>
 
 ## 工具一览
 
