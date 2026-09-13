@@ -42,7 +42,7 @@ export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
   return defineTool({
     name: ZHIHU_ZHIDA_TOOL,
     description:
-      '知乎直答：由知乎生成一段带推理过程的综合回答，适合需要「先检索再总结」的问题。' +
+      '知乎直答：由知乎生成一段成体系的综合回答，适合需要「先检索再总结」的问题。' +
       '与两个搜索工具的区别：搜索返回可点开的来源列表，直答返回一段成体系的回答——要来源用搜索，要解释用直答。' +
       '答案由知乎生成，可能有误，重要结论请自行核对。',
 

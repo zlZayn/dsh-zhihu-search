@@ -22,7 +22,7 @@ Installing adds three tools to the model:
 |---|---|---|
 | `zhihu_search` | Searches Zhihu's own questions and articles; sortable by votes / comments / time | Chinese experience, product reviews, industry discussion, engineering practice |
 | `zhihu_global_search` | Searches Zhihu's global web index; filterable by domain and time | Finding material on a specific site |
-| `zhihu_zhida` | Zhihu Zhida: a synthesized answer that carries its reasoning | Complex Chinese questions that need "retrieve, then summarize" |
+| `zhihu_zhida` | Zhihu Zhida: a synthesized answer that pulls a topic together | Complex Chinese questions that need "retrieve, then summarize" |
 
 The three sections below are each tool's full parameter set and limits. The model only ever sees the semantic parameters in these tables — Zhihu's native string query syntax is compiled inside the plugin, so the model cannot get it wrong.
 
