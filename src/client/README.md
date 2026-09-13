@@ -1,7 +1,7 @@
 # client/ — 浏览器半体
 
 - 职责：在「设置 → 插件 → 插件配置」里渲染 Access Secret 卡片，并通过公开的 `ctx.settingsScope` 读写。
-- 文件索引：`index.tsx` 卡片本体与注册；[locales.ts](locales.ts) 中英字典与命名空间声明。
+- 文件索引：`index.tsx` 卡片本体与注册；[locales.ts](locales.ts) 中英字典，并导出 `LOCALE_NS`、`ZhihuLocaleKey` 与 `LocaleNamespaceMap` 增强声明（key 拼错或漏一种语言即编译错误）。
 - 关键导出：`apply`（注册字典与卡片）、`inject`（`['slots', 'settingsScope', 'locale']`）、`readConfigured`（纯函数，判断密钥槽位是否已有值）。
 - 被谁依赖：DSH Web 的客户端模块系统按包清单的 `dsh.client` 扫描并加载 `lib/client.js`。
 - 改后必测：`npm test` 的 [产物契约](../../test/README.md)（信封 id、导出面、注册 key）。
@@ -25,7 +25,7 @@
 - 改样式 → 只用 `--dsw-alias-*` 语义令牌，不写字面色值。
 - 加文案 → 只改 [locales.ts](locales.ts) 的 key 与两份字典；两处都补齐才编得过。
 - 改 locale 命名空间 → 必须与槽位注册的 `locale:` 一致，否则 `t` 取不到值、界面显示 key 本身。
-- 改完必须 `npm run build`：`link:` 安装下 DSH 直接读 `lib/client.js`。
+- 改完必须 `npm run build`。客户端半体由 `dsh-client-hmr` 轮询 `lib/client.js` 就地换装；**host 半体换不了** —— 本机 profile 装的是版本化 registry 副本（不是 `link:`），生效链是 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>` → 重启 → 见 [../AGENTS.md](../AGENTS.md) 的活跃坑。
 
 ## 参考
 

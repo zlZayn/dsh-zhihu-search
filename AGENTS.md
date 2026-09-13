@@ -10,7 +10,7 @@
 ## 全局规则
 
 - 结论必须来自实测，不得来自文档推断 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- 红线以测试固化（依赖分层、呈现隔离、无全局状态、模型不见原始语法）→ [test/README.md](test/README.md)
+- 红线以测试固化，共五条（依赖分层、呈现隔离、模型上下文隔离、无全局状态、模型不见原始语法）→ [test/README.md](test/README.md)
 - 对外可见行为变化，同一次改动内同步 [README.md](README.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)，冲突以中文为准
 - 决策理由 → [.agents/notes/](.agents/notes/)

@@ -85,11 +85,12 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 
 发布内容由 [package.json](../package.json) 的 `files` 决定，**以它为准，本文不复制清单** —— 复制的清单会漂移，已经漏过一次 `README_en.md`。
 
-三处需要解释，其余自明：
+四处需要解释，其余自明：
 
 - `lib/**/*.map` 被排除：这些 source map 指向未随包的 `src/`，对使用者是悬空的，却占了三分之一体积。tsconfig 仍生成它们，本地调试照常。
 - `README_en.md` 必须随包：`README.md` 顶部链接指向它，不随包就是 npm 页面上的死链。
 - `scripts/` 与 `src/` 不发布，因此 `npm run build` 必须在打包前跑过，`lib/` 是唯一交付物。
+- `assets/` **不必**进包：npm 页面会把 README 里的相对图片路径改写到默认分支的 raw 地址（实测 `assets/cover.svg` → `raw.githubusercontent.com/zlZayn/dsh-zhihu-search/HEAD/assets/cover.svg`，1170×513 正常渲染）。代价是**所有已发布版本的页面都跟着 `main` 上的图走** —— 换图或删图等于同时改历史版本的展示。
 
 校验：
 

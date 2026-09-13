@@ -5,7 +5,7 @@
 ## 文件索引
 
 - `index.ts`：插件入口。导出 `name` / `inject` / `Config` / `apply`，以及常量 `ZHIHU_SETTINGS_NAMESPACE` 与 `DEFAULT_ACCESS_SECRET_REF`；在 `ctx.effect()` 内创建客户端与状态并注册工具。被 DSH loader 加载。
-- `transport.ts`：知乎传输层。鉴权、GET/POST、SSE 解析、错误映射、可取消重试。被 `tools/` 依赖。
+- `transport.ts`：知乎传输层。鉴权、两个搜索与额度自检走 GET、chat 走 POST、SSE 解析、错误映射、可取消重试。被 `tools/` 与 `utils/errors.ts` 依赖。
 - `state.ts`：缓存与令牌桶，以及缓存键计算。被 `index.ts` 创建、被 `tools/` 使用。
 - `credentials.ts`：Access Secret 的解析优先级（凭据域 → 设置字面量 → 环境变量）。纯函数 + 注入来源，被 `index.ts` 使用。
 - `types.ts`：知乎原始响应类型与 Canonical Output 类型。
@@ -16,7 +16,13 @@
 
 ## 依赖方向
 
-`index.ts` → `tools/` + `state.ts` + `transport.ts`；`tools/` → `utils/` + `present/` + `transport.ts`；`present/` 与 `utils/` 不反向依赖任何模块。
+`index.ts` → `tools/` + `state.ts` + `transport.ts` + `credentials.ts`；`tools/` → `utils/` + `present/` + `transport.ts` + `state.ts`；`utils/errors.ts` → `transport.ts` + `state.ts` + `utils/compiler.ts`（只为 `instanceof` 判定取错误类）。`present/` 与 `types.ts` 无值依赖。
+
+逐条：
+
+- `tools/*.ts` 还值导入 `@deepseek-ai/dsh-tools`（工具定义类型与常量），依赖注入经 `tools/deps.ts` 收口，因此三个工具实现本身不认识 Cordis。
+- `utils/compiler.ts` 与 `utils/text.ts` 无内部依赖；`utils/errors.ts` 是 `utils/` 唯一的例外。
+- `present/` 只有 `import type`，`types.ts` 是纯类型 —— 这两个是真正的「不反向依赖任何模块」。
 
 为什么必须单向、哪些模块不认识框架 → 见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」。
 

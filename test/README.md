@@ -1,7 +1,7 @@
 # test/ — 测试对应关系
 
 - 运行：`npm test`（vitest）；类型检查：`npm run typecheck`（覆盖 `src/` 与 `test/`）。
-- 夹具在 [helpers.ts](helpers.ts)：走真实 `ZhihuClient`，只替换最外层 `fetch`。
+- 夹具在 [helpers.ts](helpers.ts)：走真实 `ZhihuClient`，只替换最外层 `fetch`；导出 `makeHarness` / `jsonResponse` / `sseResponse` / `execContext` / `envelope` 与 `Harness` / `FetchHandler` 类型。
 
 ## 覆盖范围
 
@@ -15,8 +15,11 @@
 - [presentation.test.ts](presentation.test.ts)：呈现层纯度。对应 [src/present/](../src/present/)。
 - [tool.test.ts](tool.test.ts)：工具端到端，覆盖投影、参数编译、缓存、错误映射、SSE 拼接。对应 [src/tools/](../src/tools/)。
 - [plugin.test.ts](plugin.test.ts)：`apply` 装配、设置命名空间注册、配置默认值与 schema 角色、开关裁剪、effect 释放。对应 [src/index.ts](../src/index.ts)。
-- [client-bundle.test.ts](client-bundle.test.ts)：浏览器半体的**产物契约**（信封 id、导出面、注册进 `settings.plugin.item` 的 key）。依赖 `lib/client.js` 已构建，故 `npm test` 先跑 build。
-- [redlines.test.ts](redlines.test.ts)：四条红线的可执行守卫，含 `package.json` 依赖检查与源码静态检查。
+- [client-bundle.test.ts](client-bundle.test.ts)：浏览器半体的**产物契约**（信封 id、导出面、注册进 `settings.plugin.item` 的 key）。
+- [dist.test.ts](dist.test.ts)：host 半体**编译产物图**的两条不变量 —— `lib/` 里的 host 图能在 Node 中求值、浏览器信封不与 host 传输层抢同一路径（[事故复盘](../docs/postmortem/2026-09-12-client-js-path-collision.md)）。
+- [redlines.test.ts](redlines.test.ts)：五条红线的可执行守卫（依赖分层 / 呈现隔离 / 模型上下文隔离 / 无全局状态 / 模型不见原始语法），含 `package.json` 依赖检查与源码静态检查。
+
+产物级测试是**两个**（client-bundle 与 dist），它们读 `lib/`，故 `npm test` 先跑 build；其余测试一律从 `src/` 导入。
 
 ## 测试约定
 

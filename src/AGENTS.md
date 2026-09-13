@@ -4,7 +4,8 @@
 
 本目录特有约束：
 
-- 只有 `index.ts` 可以 import Cordis（`@deepseek-ai/cordis`）。其他模块引用 `ctx` 会让它们无法脱离框架单测 → [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」。
+- host 半体只有 `index.ts` 可以 import Cordis（`@deepseek-ai/cordis`），另一半体的等价入口是 `client/index.tsx`。其他模块引用 `ctx` 会让它们无法脱离框架单测 → [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」。
+- 值导入 `@deepseek-ai/dsh-tools` 不算破例：三个 `tools/*.ts` 都这么做，框架侧能力经 [tools/deps.ts](tools/deps.ts) 收口。
 - `present/` 与 `utils/` 里禁止运行时 import `@deepseek-ai/*`；DSH 类型一律用 `import type`，否则纯函数测试会拖入整条运行时依赖链 → 同上。
 - 任何状态都不得声明在模块顶层，必须经由 `ctx.effect()` 创建并释放 → 见架构文档「不可破坏的约束」。
 - 文件职责与变更路由写在 [README.md](README.md)，本文件只写约束。
