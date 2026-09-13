@@ -11,6 +11,7 @@
 - [state.test.ts](state.test.ts)：缓存 TTL 与 LRU、令牌桶补充、缓存键隔离。对应 [src/state.ts](../src/state.ts)。
 - [credentials.test.ts](credentials.test.ts)：密钥解析优先级与空白串处理。对应 [src/credentials.ts](../src/credentials.ts)。
 - [auth.test.ts](auth.test.ts)：字面量与凭据服务的取用顺序、逐请求重取、缺密钥的失败形态。对应 [src/transport.ts](../src/transport.ts)。
+- [quota.test.ts](quota.test.ts)：额度自检端点的路径、鉴权头与失败形态。对应 [src/transport.ts](../src/transport.ts)。
 - [presentation.test.ts](presentation.test.ts)：呈现层纯度。对应 [src/present/](../src/present/)。
 - [tool.test.ts](tool.test.ts)：工具端到端，覆盖投影、参数编译、缓存、错误映射、SSE 拼接。对应 [src/tools/](../src/tools/)。
 - [plugin.test.ts](plugin.test.ts)：`apply` 装配、设置命名空间注册、配置默认值与 schema 角色、开关裁剪、effect 释放。对应 [src/index.ts](../src/index.ts)。
