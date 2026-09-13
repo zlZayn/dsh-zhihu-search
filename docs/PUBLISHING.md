@@ -2,13 +2,30 @@
 
 发布前必读。不变的设计约束归 [ARCHITECTURE.md](ARCHITECTURE.md)，日常命令与验证快照归 [AGENTS.md](../AGENTS.md)。
 
-## 发布前检查
+## 发版前确认
 
-1. 工作区干净：`git status` 无未提交改动。
-2. 版本号已按下方[版本号](#版本号)的问题链定档，并用 `npm version <tier> --no-git-tag-version` 同时写进 `package.json` 与 `package-lock.json`（只手改前者会漏掉后者）。
-3. `npm run typecheck && npm test` 全绿。
-4. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
-5. `cordis.patch.yml` 里**不含**任何凭据。
+只列需要人判断的项；构建、测试、两处版本号一致、工作区状态由工作流自己保证。
+
+1. 档位已按下方[版本号](#版本号)的问题链定好，**major 必须人类确认**。
+2. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
+3. `cordis.patch.yml` 里**不含**任何凭据。
+
+## 发版
+
+发版只有一个入口：手动触发 [release.yml](../.github/workflows/release.yml)。
+
+```bash
+gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run workflow
+```
+
+一次运行按顺序做完：校验触发分支是 `main` → `npm ci` / typecheck / test → 拦两处版本号漂移 → `npm version <tier> --no-git-tag-version`（同时写两处）→ 提交 `chore: release vX.Y.Z` → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
+
+四条设计约束：
+
+- **先发布、后动远端**：publish 失败时远端不发生任何变化，tag 与 Release 也只可能在发布成功后创建。
+- **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
+- **手工推 tag 不会发布**：tag 由工作流创建，绕过上面的顺序没有意义。
+- **档位由人给**：`tier` 是入参，不从 commit 类型推断。
 
 ## 版本号
 
@@ -89,18 +106,27 @@ npm pack --dry-run
 - 浏览器半体只允许值导入 `PLATFORM_MODULES` 里列出的模块（DSH `packages/client/web/src/platform.ts`）。
   超出该清单必须同时声明 `dsh.client.inject` 与 `dsh.client.external`。
 
-## 发布到 npm
+## 认证与发布
 
-### 主路径：CI 发布（推荐）
+### 主路径：Trusted Publishing（OIDC）
 
-推一个与 `package.json` 版本一致的 tag 即可：[release.yml](../.github/workflows/release.yml) 会跑 `npm ci` → typecheck → test → 校验 tag 与版本一致 → `npm publish --provenance`。
+工作流已声明 `id-token: write`，npm CLI 自动检测 OIDC 环境并优先使用它，**不需要任何长期凭据**。
 
-```bash
-git tag vX.Y.Z          # X.Y.Z 必须与 package.json 的 version 逐字一致
-git push origin vX.Y.Z
-```
+一次性配置（npmjs.com → 包 → Settings → Trusted Publisher → GitHub Actions）：
 
-需要一次性配置：仓库 secret `NPM_TOKEN`，值必须是**启用了 bypass 2FA 的 Granular Access Token**。
+- **Organization or user**：`zlZayn` —— 填 **GitHub 属主**，不是 npm 用户名。
+- **Repository**：`dsh-zhihu-search`；**Workflow filename**：`release.yml`（只填文件名，不含路径）。
+- **Allowed actions**：必须显式勾上 `npm publish` —— 2026-09-03 之后新建的连接默认只给 `npm stage publish`。
+- 保存后确认页面出现「已连接」状态：向导末尾出现的恢复码不等于连接已建立。
+- npm 保存时不校验配置，填错只会在发布时以 `ENEEDAUTH` 暴露。
+
+验证一次发布成功后，把 Settings → Publishing access 收紧为「Require two-factor authentication and disallow tokens」，并吊销 `NPM_TOKEN`。
+
+时间约束：npm 已于 2026-07-31 收回这类 token 的账户与包管理权限，**2027-01 起收回直接发布**（[公告](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)）。
+
+### 过渡期回退
+
+发布步骤仍带 `NODE_AUTH_TOKEN: secrets.NPM_TOKEN`：OIDC 未授权时 npm CLI 回退到 token。吊销该 secret 后，这一步的 `env` 两行与 `--provenance` 都可删（OIDC 发布自动生成 provenance）。
 
 ### 备选：本地发布
 
@@ -110,7 +136,9 @@ npm pack --dry-run
 npm publish --registry=https://registry.npmjs.org/ --access public
 ```
 
-账号启用 2FA 而令牌没有 bypass 权限时，本地发布会以 `403` 被拒；此时改用 CI 路径，或加 `--otp=<码>` 人工提供一次性口令。
+账号启用 2FA 而令牌没有 bypass 权限时，本地发布会以 `403` 被拒；此时改用工作流，或加 `--otp=<码>` 人工提供一次性口令。
+
+本地发布不建 tag 与 GitHub Release：补 tag 走工作流重跑（幂等，不会重复发布），不要手工打 tag。
 
 ### 前置条件
 
@@ -121,11 +149,13 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 ## CI
 
 - [ci.yml](../.github/workflows/ci.yml)：推 `main` 与每个 PR 跑 typecheck + test。
-- [release.yml](../.github/workflows/release.yml)：推 `v*` tag 发布。
+- [release.yml](../.github/workflows/release.yml)：手动触发，一次跑完[发版](#发版)全流程。
 
 两者都用 `npm ci`：它严格按锁文件安装，锁文件与 `package.json` 不同步时直接失败 —— 这是我们要在 CI 里拦下的情况。
 
-两处还各自校验 `package.json` 与 `package-lock.json` 的**版本号**一致：日常 CI 在每次推送就拦，release 在 `publish` 前连同 tag 再拦一次。版本号写两处，漏一处不该等到发版才发现。
+两者都校验 `package.json` 与 `package-lock.json` 的**版本号**一致：ci.yml 在每次推送就拦，release.yml 在 bump 之前再拦一次。版本号写两处，漏一处不该等到发版才发现。
+
+发版提交由 `GITHUB_TOKEN` 推送，因此不会再触发一轮 ci.yml；发布工作流自身已跑过 typecheck 与 test。
 
 ## 兼容性
 

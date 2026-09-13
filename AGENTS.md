@@ -3,7 +3,7 @@
 ## 状态
 
 - 已发布版本以 [package.json](package.json) 的 `version` 为准 → <https://github.com/zlZayn/dsh-zhihu-search>
-- npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 带 provenance 签名发布）
+- npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 手动触发，一次跑完 bump → 发布 → tag → GitHub Release）
 - 功能、设置卡片与本地真机验证全部完成；工具清单见 [README.md](README.md)。
 - 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 PR 待提 → [笔记与命令](.agents/notes/2026-09-12-marketplace-submission.md)
 
@@ -27,6 +27,7 @@
 ## 常用命令
 
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）
+- 发版：`gh workflow run release.yml -f tier=patch|minor|major` —— 唯一入口，档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定
 
 ## 验证快照（2026-09-13 实跑）
 
@@ -44,6 +45,7 @@
 
 - [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
+- [ ] Trusted Publisher 在 npmjs.com 配好后跑一次发版验证 OIDC 路径，再吊销 `NPM_TOKEN` → [docs/PUBLISHING.md](docs/PUBLISHING.md)
 
 ## 活跃坑（工具链与 DSH 平台）
 
@@ -62,6 +64,7 @@
 - 锁文件的 `resolved` 会被钉在生成时的 registry 上；国内镜像生成的锁文件不应提交
 - 两份 workflow 的 action 均已升 v7。v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底（`.npmrc` 引用 `${NODE_AUTH_TOKEN}`，而 `npm ci` 跑在带真 token 的 `npm publish` 之前）→ 2026-09-13 用 `workflow_dispatch` 在 PR 分支实跑验证过：`npm ci` 通过、publish 认证通过（仅因版本已存在被拒），无需为它留在 v4
 - action 版本漂移交给 [.github/dependabot.yml](.github/dependabot.yml)（每周一个 bump PR）；**PR 上的 CI 只跑 ci.yml，动 `release.yml` 的 PR 就算绿勾也不代表发布链路验过**；npm 生态没开，DSH 的 rc 依赖会变噪音
+- Trusted Publisher 的 owner 栏填 **GitHub 属主**（`zlZayn`），不是 npm 用户名；2026-09-03 之后新建的连接默认只给 `npm stage publish`，必须显式勾上 `npm publish` —— 填错不会在保存时报错，只在发布时以 `ENEEDAUTH` 暴露
 
 ## 文档地图
 

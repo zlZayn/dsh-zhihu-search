@@ -1,28 +1,47 @@
-# 发布：推 `v*` tag 时构建并发布到 npm。
+# 发布：唯一入口是手动触发（Actions → Release → Run workflow，或 gh workflow run release.yml -f tier=patch）。
 #
-# 为什么要走 CI 而不是本地 `npm publish`：
-# - 账号启用了 2FA，本地令牌没有 bypass 权限，推送需要人工 OTP；
-# - CI 用 OIDC 附带 provenance 签名，消费者可验证包确实由本仓库的这次提交构建。
+# 为什么单入口、且不再由 tag 触发：
+# - 档位由人按 docs/PUBLISHING.md 的问题链定档（major 必须人类确认），不适合由 commit 类型自动推断。
+# - 顺序是全有或全无：先发布成功，才推 main、才建 tag 与 GitHub Release；
+#   发布失败时远端零残留，不会留下「有 tag 没版本」的半成品。
+# - 手工推 tag 不触发任何发布，避免绕过上面的顺序。
 #
-# 前提：仓库 secret `NPM_TOKEN` 必须是一个**启用了 bypass 2FA 的 Granular Access Token**，
-# 否则 npm 会以 403 拒绝（见 docs/PUBLISHING.md）。
+# 幂等：重跑不会重复发布 —— 目标版本已在 npm 上时跳过 publish，只补齐 git 侧（提交 / tag / Release）。
+#
+# 认证：npm Trusted Publishing（OIDC）。secrets.NPM_TOKEN 仅作过渡期回退，
+# 确认 OIDC 路径跑通后吊销它（npm 于 2027-01 停止接受 bypass-2FA token 直接发布）。
 name: Release
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tier:
+        description: 'SemVer 档位，按 docs/PUBLISHING.md 的问题链定档'
+        type: choice
+        required: true
+        options: [patch, minor, major]
 
 permissions:
-  contents: read
-  # npm provenance 需要 OIDC；缺它时 `--provenance` 会失败。
-  id-token: write
+  contents: write # 推提交、建 tag 与 GitHub Release
+  id-token: write # npm Trusted Publishing 与 provenance 需要 OIDC
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify this dispatch came from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::发版只能从 main 触发，当前 ref 是 ${{ github.ref }}"
+          exit 1
+
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # gh release create --generate-notes 需要完整历史
 
       - uses: actions/setup-node@v7
         with:
@@ -34,26 +53,57 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-      # 三处版本号必须一致：tag、package.json、package-lock.json。
-      # 前两者不一致会让发布的版本号与 tag 对不上，而后者的漂移说明 bump 漏了一处 ——
-      # npm 不允许重发同一版本号，所以这一关必须拦在 publish 之前。
-      - name: Verify the tag matches the package and lockfile versions
-        if: startsWith(github.ref, 'refs/tags/v')
+      # bump 前先拦两处版本号漂移：npm version 会同时写两处，漂移只可能来自手工改动。
+      - name: Verify the lockfile version matches package.json
         run: |
           pkg=$(node -p "require('./package.json').version")
           lock=$(node -p "require('./package-lock.json').version")
-          tag="${GITHUB_REF_NAME#v}"
-          if [ "$pkg" != "$tag" ]; then
-            echo "::error::tag $tag does not match package.json version $pkg"
-            exit 1
-          fi
-          if [ "$lock" != "$pkg" ]; then
+          if [ "$pkg" != "$lock" ]; then
             echo "::error::package-lock.json version $lock does not match package.json version $pkg"
             echo "bump with: npm version <patch|minor|major> --no-git-tag-version"
             exit 1
           fi
-          echo "publishing $pkg"
 
-      - run: npm publish --provenance --access public
+      - name: Bump both version fields
+        id: bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          version=$(npm version "${{ inputs.tier }}" --no-git-tag-version)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "准备发布 $version"
+
+      - name: Check whether that version is already on npm
+        id: check
+        run: |
+          if npm view "dsh-zhihu-search@${{ steps.bump.outputs.version }}" version > /dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "${{ steps.bump.outputs.version }} 已在 npm 上：跳过 publish，只补齐 git 侧"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit the version bump
+        run: |
+          git add package.json package-lock.json
+          git commit -m "chore: release ${{ steps.bump.outputs.version }}"
+
+      - name: Publish to npm
+        if: steps.check.outputs.published == 'false'
+        run: npm publish --provenance --access public
         env:
+          # 过渡期回退：Trusted Publisher 生效前，OIDC 未授权时 npm CLI 回退到该 token。
+          # 吊销 NPM_TOKEN 后这两行可直接删除；--provenance 届时也变冗余（OIDC 发布自动生成 provenance）。
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push the release commit
+        run: git push origin HEAD:main
+
+      - name: Create the tag and the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.bump.outputs.version }}" \
+            --target "$(git rev-parse HEAD)" \
+            --title "${{ steps.bump.outputs.version }}" \
+            --generate-notes
