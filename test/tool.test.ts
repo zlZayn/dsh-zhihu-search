@@ -225,6 +225,15 @@ describe('zhihu_search', () => {
     harness.dispose();
   });
 
+  it('两个搜索工具的描述都写明结果只有文字、不含图片', async () => {
+    const harness = makeHarness(async () => jsonResponse(envelope({})));
+    // 模型拿不到图，描述就必须说清楚：否则它会向用户承诺一张它看不到的图。
+    for (const tool of [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps)]) {
+      expect(tool.description).toContain('不含图片');
+    }
+    harness.dispose();
+  });
+
   it('两个搜索工具的 Canonical Output schema 完全一致（防止契约漂移）', async () => {
     const harness = makeHarness(async () => jsonResponse(envelope({})));
     const local = createZhihuSearchTool(harness.deps);

@@ -68,7 +68,8 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
     description:
       '知乎站内搜索：检索知乎的问答与文章，可筛出高赞、多评论或近期更新的内容，也支持限定发布时间。' +
       '适合中文经验、产品评测、行业讨论、技术实践。' +
-      '要搜知乎站外某个网站上的资料改用 zhihu_global_search；要一段成体系的解释而不是来源列表改用 zhihu_zhida。',
+      '要搜知乎站外某个网站上的资料改用 zhihu_global_search；要一段成体系的解释而不是来源列表改用 zhihu_zhida。' +
+      '只返回文字摘要与原始链接，结果不含图片。',
 
     // 语义化参数：模型永远不会看到 SortBy / Filter 的字符串语法。
     parameters: {
