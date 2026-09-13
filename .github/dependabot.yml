@@ -1,0 +1,16 @@
+# Actions 版本漂移自动上门：dependabot 每周提一个 bump PR，CI 会先替我们跑一遍。
+#
+# 只开 github-actions 生态：本项目的 npm 依赖大半是 DSH 的 rc 版本，放开自动 PR
+# 只会变成噪音，需要时手工升。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]

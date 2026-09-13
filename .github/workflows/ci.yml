@@ -18,9 +18,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # v7 的 action 自带 node24 运行时；v4 声明 node20，该运行时已被 GitHub 弃用，
+      # 会被强制切到 24 跑并在每次 run 顶部挂一条告警。
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # 版本基线以 .node-version 为唯一来源，避免 CI 与本机漂移。
           node-version-file: .node-version
