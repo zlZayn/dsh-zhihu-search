@@ -2,6 +2,10 @@
   <h1 align="center">dsh-zhihu-search</h1>
 </p>
 
+<p align="center">
+  <img src="assets/cover.svg" alt="dsh-zhihu-search: Equipping DSH with Zhihu search" width="600">
+</p>
+
 <div align="center">
   <p><strong>Empowering DeepSeek Harness with Zhihu Insights</strong></p>
   <p><em>赋予 DeepSeek Harness 检索知乎社区的能力</em></p>

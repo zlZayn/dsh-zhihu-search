@@ -72,4 +72,4 @@
 - 浏览器半体 → [src/client/README.md](src/client/README.md)
 - 测试对应关系 → [test/README.md](test/README.md)
 - 构建脚本 → [scripts/README.md](scripts/README.md)
-- 截图资源 → [assets/](assets/)（双语 README 各引一张；换图要同改两份）
+- 图片资源 → [assets/](assets/)（`cover.svg` 头图双语共用，`cover.jpg` 为旧版位图未引用；设置卡片中英各一张，换图要同改两份）
