@@ -40,12 +40,14 @@ export interface ZhihuApiResponse<T> {
  */
 export interface ZhihuSearchData {
   /**
-   * ⚠ 站内搜索当前**固定返回 false**（官方文档原文）。
-   * 因此它不能当作「还有下一页」使用，也不能据此提示模型翻页；
-   * 只有全网搜索的 HasMore 才是真实分页标识。
+   * ⚠ 站内搜索按官方文档**固定返回 false**；全网搜索在 12 个宽泛查询的实测里**也全部为 false**。
+   * 因此两个端点都不能据此翻页——全网搜索根本没有翻页参数（见 ARCHITECTURE 的防错清单）。
    */
   HasMore: boolean;
-  /** 搜索请求标识，排障用，不面向模型。 */
+  /**
+   * 搜索请求标识，排障用，不面向模型。
+   * ⚠ 实测**不是游标**：原样传回不改变结果（试过 SearchHashId / HashId / Cursor / Offset / Page / Start）。
+   */
   SearchHashId?: string;
   /** 无结果原因；有结果时为空串。 */
   EmptyReason?: string;
