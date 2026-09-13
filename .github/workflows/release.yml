@@ -32,6 +32,9 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # npm 上的 Trusted Publisher 连接把 Environment name 配成了 github-release，
+    # OIDC 声明里的 environment 必须与之一致，否则连接匹配不上。
+    environment: github-release
     steps:
       - name: Verify this dispatch came from main
         if: github.ref != 'refs/heads/main'
@@ -87,6 +90,24 @@ jobs:
         run: |
           git add package.json package-lock.json
           git commit -m "chore: release ${{ steps.bump.outputs.version }}"
+
+      # 诊断（排障用，确认后即删）：打出 npm 校验 Trusted Publisher 时会看到的 OIDC 声明。
+      # 只打印解码后的 claim，不打印 token 本身。
+      - name: Show the identity npm will see
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, urllib.request
+          req = urllib.request.Request(
+              os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"] + "&audience=npm:registry.npmjs.org",
+              headers={"Authorization": "bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]},
+          )
+          token = json.load(urllib.request.urlopen(req))["value"]
+          payload = token.split(".")[1]
+          payload += "=" * (-len(payload) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+          keys = ("aud", "sub", "repository", "repository_owner", "job_workflow_ref", "environment", "ref", "event_name")
+          print(json.dumps({k: claims.get(k) for k in keys}, indent=2, ensure_ascii=False))
+          PY
 
       - name: Publish to npm
         if: steps.check.outputs.published == 'false'
