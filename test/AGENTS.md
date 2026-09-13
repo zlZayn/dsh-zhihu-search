@@ -8,5 +8,5 @@
 - 时间相关断言必须注入 `now`，不得依赖真实时钟，否则会在 CI 上随机失败。
 - 外壳预置模块（`PLATFORM_MODULES`）在测试中用替身：`ui-primitives` 是浏览器静态库，Node 中导入会失败。
 - 断言失败时先判断是**代码错**还是**测试错**：不为让测试通过而改产品代码，也不为迁就实现而弱化断言。
-- 红线以测试固化，红线条目本身就是契约，删改用例等于改契约 → [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)。
+- 红线以测试固化，红线条目本身就是契约，删改用例等于改契约 → [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「不可破坏的约束」。
 - 覆盖范围与测试约定写在 [README.md](README.md)，本文件只写约束。
