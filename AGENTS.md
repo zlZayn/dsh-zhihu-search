@@ -46,7 +46,6 @@
 ## 待办
 
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
-- [ ] 把包 Settings → Publishing access 收紧为「disallow tokens」（旧 token 已在 npm 侧吊销、GitHub secret 已删，只差这一道兜底）
 
 ## 活跃坑（工具链与 DSH 平台）
 

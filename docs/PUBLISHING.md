@@ -125,7 +125,7 @@ npm pack --dry-run
 
 时间约束：npm 已于 2026-07-31 收回这类 token 的账户与包管理权限，**2027-01 起收回直接发布**（[公告](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)），故本项目不留长期凭据。
 
-发布稳定后按官方建议收紧：Settings → Publishing access 设为「Require two-factor authentication and disallow tokens」（只影响传统 token，不影响 Trusted Publisher）。
+包的 Publishing access 已设为「Require two-factor authentication and disallow bypass-2FA tokens」：传统凭据一律不可用，发布只剩 OIDC 这一条路（该设置不影响 Trusted Publisher）。
 
 ### 备选：本地发布
 
@@ -135,7 +135,7 @@ npm pack --dry-run
 npm publish --registry=https://registry.npmjs.org/ --access public
 ```
 
-账号启用 2FA 而令牌没有 bypass 权限时，本地发布会以 `403` 被拒；此时改用工作流，或加 `--otp=<码>` 人工提供一次性口令。
+本地发布只能靠交互式 2FA（`--otp=<码>`）：包已禁止 bypass-2FA 凭据，所以本地发布**无法**用 token 自动化 —— 要无人值守就只能是工作流。
 
 本地发布不建 tag 与 GitHub Release：补 tag 走工作流重跑（幂等，不会重复发布），不要手工打 tag。
 
