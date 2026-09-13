@@ -51,7 +51,7 @@ The three sections below are each tool's full parameter set and limits. The mode
 | `publishedBefore` | string | — | Only content published before this date, `YYYY-MM-DD`. |
 | `searchDb` | enum | `all` | `all` · `realtime` newest · `static` long-term index. |
 
-**Limits**: **there is no sorting parameter.** This endpoint ignores the sort field, so the plugin does not offer a knob that does nothing. `site` rejects `zhihu.com` and its subdomains — Zhihu refuses that request outright; use `zhihu_search` for Zhihu content.
+**Limits**: **there is no sorting parameter.** This endpoint ignores the sort field, so the plugin does not offer a knob that does nothing. **There is no pagination parameter either**: when `hasMore` is `true` the result says it is incomplete, telling the model to narrow the keywords or add filters and search again. `site` rejects `zhihu.com` and its subdomains — Zhihu refuses that request outright; use `zhihu_search` for Zhihu content.
 
 ### `zhihu_zhida` — Zhida
 

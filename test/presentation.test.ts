@@ -77,6 +77,15 @@ describe('renderSearch（模型可见层）', () => {
     const text = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, title: 'RAG[入门]' }] }));
     expect(text).toContain('\\[入门\\]');
   });
+
+  it('hasMore 为真时把「结果被截断」告诉模型（工具没有翻页参数）', () => {
+    const text = textOf(renderSearch({ ...okValue, hasMore: true }));
+    expect(text).toContain('结果未全部返回');
+  });
+
+  it('hasMore 为假时不出现截断提示', () => {
+    expect(textOf(renderSearch(okValue))).not.toContain('结果未全部返回');
+  });
 });
 
 describe('searchMetaFromValue（红线 3：必须是纯函数）', () => {

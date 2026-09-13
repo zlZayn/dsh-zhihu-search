@@ -61,6 +61,11 @@ export function renderSearch(value: SearchOutput): ContentBlock[] {
     lines.push(`> ${item.snippet}`);
     lines.push('');
   }
+  // hasMore 是模型唯一能据此改行为的信号：工具没有翻页参数，
+  // 不写出来模型就会以为这就是全部结果。zhihu_search 的它恒为 false，因此不出现。
+  if (value.hasMore) {
+    lines.push('> 结果未全部返回。要更多，请收窄关键词或补充过滤条件后重搜。', '');
+  }
   return [{ type: 'text', text: lines.join('\n') }];
 }
 
