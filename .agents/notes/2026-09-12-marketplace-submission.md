@@ -1,6 +1,6 @@
 # 决策：走 awesome-dsh-plugin 注册表文件投稿，PR 延后到仓库满一天（2026-09-12）
 
-条目文件已提交到 fork 分支，PR 尚未开——被仓库年龄闸门挡住，见下。
+条目文件在 fork 分支 `add-dsh-zhihu-search`；PR 已于 2026-09-14 开出：[#5037](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5037)。
 
 ## 问题
 
@@ -24,7 +24,7 @@
 - `zlZayn/dsh-zhihu-search`：带上必需的 `dsh-plugin` topic，并按发现入口补齐 `search`、`ai`、`ai-agent`、`agent-harness`、`deepseek`、`llm`；description 统一为「三个工具 + 官方开放平台 API + 来源引用」。
 - `zlZayn/awesome-dsh-plugin` 分支 `add-dsh-zhihu-search`：已含 `data/plugins/zlZayn__dsh-zhihu-search.yml`，相对上游 `main` 领先 1 个文件。
 
-## 待执行（时间到了只跑这一条）
+## 已执行（2026-09-14）
 
 ```sh
 gh pr create --repo awesome-dsh-plugin/awesome-dsh-plugin \

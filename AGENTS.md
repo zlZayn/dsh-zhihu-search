@@ -5,7 +5,7 @@
 - 已发布版本以 [package.json](package.json) 的 `version` 为准 → <https://github.com/zlZayn/dsh-zhihu-search>
 - npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 手动触发，一次跑完 bump → 发布 → tag → GitHub Release）
 - 功能、设置卡片与本地真机验证全部完成；工具清单见 [README.md](README.md)。
-- 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 PR 待提 → [笔记与命令](.agents/notes/2026-09-12-marketplace-submission.md)
+- 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 [PR #5037](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5037) 已提，等评审 → [笔记](.agents/notes/2026-09-12-marketplace-submission.md)
 
 ## 全局规则
 
@@ -43,7 +43,6 @@
 
 ## 待办
 
-- [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
 - [ ] Trusted Publisher 在 npmjs.com 配好后跑一次发版验证 OIDC 路径，再吊销 `NPM_TOKEN` → [docs/PUBLISHING.md](docs/PUBLISHING.md)
 
