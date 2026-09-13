@@ -127,7 +127,11 @@ export interface SearchOutput {
     /** 已清洗 <em> 标签的纯文本摘要。 */
     snippet: string;
     author: string;
-    voteUpCount: number;
+    /**
+     * 点赞数。上游没报该字段时**整个键省略**，不兜底成 0 ——
+     * 全网的第三方网页就不带这个字段，「0 赞」与「不知道」是两回事。
+     */
+    voteUpCount?: number;
     contentType: string;
   }>;
   /**

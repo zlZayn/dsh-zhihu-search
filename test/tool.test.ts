@@ -202,6 +202,29 @@ describe('zhihu_search', () => {
     harness.dispose();
   });
 
+  it('上游没报点赞数时省略该字段，不兜底成 0', async () => {
+    const raw = {
+      Title: '如何入门 RAG',
+      ContentType: 'Answer',
+      ContentText: '先看论文',
+      Url: 'https://www.zhihu.com/question/1/answer/2',
+      AuthorName: '张三',
+    };
+    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [raw] })));
+    const value = (await tool.execute({ query: 'RAG' }, execContext())) as SearchOutput;
+    expect(value.items[0]).not.toHaveProperty('voteUpCount');
+    harness.dispose();
+  });
+
+  it('上游报 0 赞时保留 0，不把真零当成缺失', async () => {
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [{ ...apiItem, VoteUpCount: 0 }] })),
+    );
+    const value = (await tool.execute({ query: 'RAG' }, execContext())) as SearchOutput;
+    expect(value.items[0]?.voteUpCount).toBe(0);
+    harness.dispose();
+  });
+
   it('两个搜索工具的 Canonical Output schema 完全一致（防止契约漂移）', async () => {
     const harness = makeHarness(async () => jsonResponse(envelope({})));
     const local = createZhihuSearchTool(harness.deps);
@@ -228,6 +251,22 @@ describe('zhihu_global_search', () => {
     expect(value.error?.kind).toBe('param');
     expect(value.error?.hint).toContain('站内搜索');
     expect(harness.urls).toHaveLength(0);
+    harness.dispose();
+  });
+
+  it('第三方网页没有点赞数时省略该字段，不兜底成 0（与 zhihu_search 行为一致）', async () => {
+    const external = {
+      Title: '某接单平台',
+      ContentText: '摘要',
+      Url: 'https://example.com/a',
+      AuthorName: '某站',
+    };
+    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [external] })));
+    const tool = createZhihuGlobalSearchTool(harness.deps);
+    const value = (await tool.execute({ query: 'crawler' }, execContext())) as SearchOutput;
+    expect(value.items).toHaveLength(1);
+    expect(value.items[0]).not.toHaveProperty('voteUpCount');
+    expect(value.items[0]?.contentType).toBe('');
     harness.dispose();
   });
 

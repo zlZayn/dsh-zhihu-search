@@ -27,7 +27,7 @@
 ---
 
 > [!NOTE]
-> **Built on the official Zhihu Open Platform API**, not web scraping. All search results include citable original links and community interaction data (upvotes/comments), ensuring every model response is verifiable.
+> **Built on the official Zhihu Open Platform API**, not web scraping. All search results include citable original links, and Zhihu's own results also carry their upvote counts, ensuring every model response is verifiable.
 
 Equips DSH with three Zhihu tools: in-site search, global web search, and Zhida direct answers — returning a list of citable sources instead of an unverifiable summary.
 

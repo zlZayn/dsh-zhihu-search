@@ -84,6 +84,16 @@ describe('renderSearch（模型可见层）', () => {
     expect(text).toContain('**点赞**: 42');
   });
 
+  it('点赞数缺失时整段省略，为 0 时照常渲染（「不知道」与「没人赞」是两回事）', () => {
+    const external = { title: '第三方页面', url: 'https://example.com/a', snippet: '摘要', author: '某站', contentType: 'Article' };
+    const withoutVotes = textOf(renderSearch({ ...okValue, items: [external] }));
+    expect(withoutVotes).not.toContain('点赞');
+    expect(withoutVotes).toContain('**作者**: 某站');
+
+    const zeroVotes = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, voteUpCount: 0 }] }));
+    expect(zeroVotes).toContain('**点赞**: 0');
+  });
+
   it('hasMore 为真时把「结果被截断」告诉模型（工具没有翻页参数）', () => {
     const text = textOf(renderSearch({ ...okValue, hasMore: true }));
     expect(text).toContain('结果未全部返回');

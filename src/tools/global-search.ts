@@ -44,7 +44,9 @@ function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number] | und
     url,
     snippet: sanitizeSnippet(typeof item.ContentText === 'string' ? item.ContentText : ''),
     author: sanitizeSnippet(typeof item.AuthorName === 'string' ? item.AuthorName : '', 60),
-    voteUpCount: typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? item.VoteUpCount : 0,
+    // 上游没报点赞数时整个键省略，不兜底成 0：全网的第三方网页没有这个字段，
+    // 写 0 等于告诉模型「这个页面没人赞」，而事实是「不知道」。
+    ...(typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? { voteUpCount: item.VoteUpCount } : {}),
     // ContentType 缺失时留空，不编造标签：实测第三方网页（如接单平台）就没有这个字段，
     // 兜底成 'Article' 会让模型把广告页当成知乎文章。
     contentType: typeof item.ContentType === 'string' ? item.ContentType : '',
@@ -92,7 +94,7 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
                 url: { type: 'string', required: true },
                 snippet: { type: 'string', required: true },
                 author: { type: 'string', required: true },
-                voteUpCount: { type: 'number', required: true },
+                voteUpCount: { type: 'number' },
                 contentType: { type: 'string', required: true },
               },
             },
