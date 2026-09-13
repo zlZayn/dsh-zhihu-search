@@ -10,7 +10,7 @@
 
 Zhihu for DSH: in-site search, global-index search and Zhida — three tools that return a citable list of sources instead of a summary you cannot check.
 
-![The "Zhihu Search" card in the plugin configuration page](https://raw.githubusercontent.com/zlZayn/dsh-zhihu-search/main/docs/images/settings-card_en.png)
+![The "Zhihu Search" card in the plugin configuration page](https://raw.githubusercontent.com/zlZayn/dsh-zhihu-search/main/assets/settings-card_en.png)
 
 *Sits alongside your other plugins in **Settings → Plugins → Plugin configuration**; the Access Secret is entered right there and takes effect immediately.*
 
@@ -21,7 +21,7 @@ Installing adds three tools to the model:
 | Tool | One line | Use it for |
 |---|---|---|
 | `zhihu_search` | Searches Zhihu's own questions and articles; sortable by votes / comments / time | Chinese experience, product reviews, industry discussion, engineering practice |
-| `zhihu_global_search` | Searches Zhihu's global web index; filterable by domain and time | Finding material on a specific site |
+| `zhihu_global_search` | Searches Zhihu's global web index; the results mix in some Zhihu content | Finding material on a specific site |
 | `zhihu_zhida` | Zhihu Zhida: a synthesized answer that pulls a topic together | Complex Chinese questions that need "retrieve, then summarize" |
 
 The three sections below are each tool's full parameter set and limits. The model only ever sees the semantic parameters in these tables — Zhihu's native string query syntax is compiled inside the plugin, so the model cannot get it wrong.
@@ -51,7 +51,7 @@ The three sections below are each tool's full parameter set and limits. The mode
 | `publishedBefore` | string | — | Only content published before this date, `YYYY-MM-DD`. |
 | `searchDb` | enum | `all` | `all` · `realtime` newest · `static` long-term index. |
 
-**Limits**: **there is no sorting parameter.** This endpoint ignores the sort field, so the plugin does not offer a knob that does nothing. **There is no pagination parameter either**: when `hasMore` is `true` the result says it is incomplete, telling the model to narrow the keywords or add filters and search again. `site` rejects `zhihu.com` and its subdomains — Zhihu refuses that request outright; use `zhihu_search` for Zhihu content.
+**Limits**: **there is no sorting parameter** — the endpoint ignores the sort field, so the plugin does not offer a knob that does nothing. **There is no pagination parameter either**: at most 20 results per call, and the server truncates anything larger. `site` rejects `zhihu.com` and its subdomains; Zhihu refuses that request outright. The results **mix in some Zhihu content**; to search Zhihu's own questions and articles specifically, use `zhihu_search`.
 
 ### `zhihu_zhida` — Zhida
 
