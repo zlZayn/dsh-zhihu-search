@@ -31,10 +31,12 @@ export interface ZhihuApiResponse<T> {
 }
 
 /**
- * 站内搜索（`GET /api/v1/content/zhihu_search`）的 `Data` 载荷。
+ * 搜索端点（`GET /api/v1/content/zhihu_search` 与 `.../global_search`）的 `Data` 载荷。
  *
- * 该接口在官方文档中**只接受 `Query` 与 `Count` 两个请求参数**——
- * 没有 SortBy，也没有 Filter。分页/排序过滤属于全网搜索（global_search），见 ARCHITECTURE。
+ * ⚠ 官方文档称站内搜索只接受 `Query` 与 `Count`，**实测不成立**：
+ * 它同样识别 `SortBy` 与 `Filter`（`Filter` 限 `publish_time`），
+ * 只是文档没写。两个端点的 `Filter` 语法互不兼容——
+ * 完整偏差见 ARCHITECTURE 的「与知乎官方文档的偏差」。
  */
 export interface ZhihuSearchData {
   /**
@@ -77,11 +79,12 @@ export interface ZhihuSearchItem {
   /** 秒级时间戳（发布时间或更新时间）。 */
   EditTime: number;
   /**
-   * ⚠ 类型待确认：官方文档在 zhihu_search 一节标注为 String，
-   * 在 global_search 一节又按 1/2/3/4 描述。此处暂按原设计保留 number。
-   * 该字段不进入 Canonical Output，故即便类型不符也不会污染模型上下文。
+   * ⚠ 取实测与文档的并集：站内搜索**实测返回字符串**（`"4"`），
+   * 官方文档又按 1/2/3/4 描述，全网搜索一侧尚未实测。
+   * 该字段不进入 Canonical Output，宽类型不会污染模型上下文；
+   * 将来若要读它，先对两个端点各测一次再收窄。
    */
-  AuthorityLevel: number;
+  AuthorityLevel: string | number;
 }
 
 /**

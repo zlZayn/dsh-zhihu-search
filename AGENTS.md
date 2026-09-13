@@ -21,6 +21,7 @@
 - 工具参数、默认值与上限 → [src/tools/](src/tools/) 各模块的常量，由 [test/tool.test.ts](test/tool.test.ts) 守护
 - 端点语法与实测偏差 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 构建产物的运行方式 → [docs/PUBLISHING.md](docs/PUBLISHING.md)
+- DSH 平台知识（插件装配、Remote API、设置卡片、i18n、工具契约）→ [DSH cookbook](https://github.com/deepseek-ai/deepseek-harness/tree/master/docs/cookbook)，每篇都有 `.zh.md` 中文版
 
 ## 常用命令
 
