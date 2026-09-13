@@ -8,8 +8,8 @@
 #
 # 幂等：重跑不会重复发布 —— 目标版本已在 npm 上时跳过 publish，只补齐 git 侧（提交 / tag / Release）。
 #
-# 认证：npm Trusted Publishing（OIDC）。secrets.NPM_TOKEN 仅作过渡期回退，
-# 确认 OIDC 路径跑通后吊销它（npm 于 2027-01 停止接受 bypass-2FA token 直接发布）。
+# 认证：npm Trusted Publishing（OIDC），全程不传任何 token。
+# npm 自 2027-01 起不再接受 bypass-2FA token 直接发布，故不留长期凭据。
 name: Release
 
 on:
@@ -90,11 +90,10 @@ jobs:
 
       - name: Publish to npm
         if: steps.check.outputs.published == 'false'
+        # 认证靠 OIDC：npm CLI 自行换取短期凭据。缺 id-token: write，或 npmjs.com 上的
+        # Trusted Publisher 与本 workflow 文件名对不上时，这里会以 ENEEDAUTH 失败。
+        # --provenance 在 OIDC 下是冗余的显式声明，留着当哨兵：环境产不出 provenance 就红。
         run: npm publish --provenance --access public
-        env:
-          # 过渡期回退：Trusted Publisher 生效前，OIDC 未授权时 npm CLI 回退到该 token。
-          # 吊销 NPM_TOKEN 后这两行可直接删除；--provenance 届时也变冗余（OIDC 发布自动生成 provenance）。
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push the release commit
         run: git push origin HEAD:main
