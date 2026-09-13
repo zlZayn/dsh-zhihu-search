@@ -37,7 +37,7 @@
 ## 待办
 
 - [ ] 提 `awesome-dsh-plugin` PR：条目已提交在 fork 分支 `add-dsh-zhihu-search`，等仓库满 1 天（本地 2026-09-14 01:19）后跑一条 `gh pr create` → [.agents/notes/2026-09-12-marketplace-submission.md](.agents/notes/2026-09-12-marketplace-submission.md)
-- [ ] 全网搜索的翻页：`hasMore` 已让模型知道结果被截断，但没有翻页参数去取 → 属 minor（新参数）
+- [ ] 全网搜索**有无**取下一批的参数未验证：`HasMore` 会为 true，但 `SearchHashId` 是请求标识、第三方项目也记「无 cursor」→ 要一次带凭据的实测才能定案 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
 
 ## 活跃坑（工具链与 DSH 平台）
