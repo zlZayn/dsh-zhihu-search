@@ -110,23 +110,21 @@ npm pack --dry-run
 
 ### 主路径：Trusted Publishing（OIDC）
 
-工作流已声明 `id-token: write`，npm CLI 自动检测 OIDC 环境并优先使用它，**不需要任何长期凭据**。
+工作流声明 `id-token: write` 与 `environment: github-release`，npm CLI 据此换取短期凭据，**全程不带任何 token**。v1.2.8 即由该路径发布。
 
 一次性配置（npmjs.com → 包 → Settings → Trusted Publisher → GitHub Actions）：
 
 - **Organization or user**：`zlZayn` —— 填 **GitHub 属主**，不是 npm 用户名。
 - **Repository**：`dsh-zhihu-search`；**Workflow filename**：`release.yml`（只填文件名，不含路径）。
+- **Environment name**：连接上显示的环境名（当前 `github-release`）**必须与 job 的 `environment:` 逐字一致**。
 - **Allowed actions**：必须显式勾上 `npm publish` —— 2026-09-03 之后新建的连接默认只给 `npm stage publish`。
-- 保存后确认页面出现「已连接」状态：向导末尾出现的恢复码不等于连接已建立。
-- npm 保存时不校验配置，填错只会在发布时以 `ENEEDAUTH` 暴露。
+- npm 保存时不校验配置，填错只在发布时暴露。
 
-验证一次发布成功后，把 Settings → Publishing access 收紧为「Require two-factor authentication and disallow tokens」，并吊销 `NPM_TOKEN`。
+排障：字段不符（属主 / 仓库 / workflow 文件名）通常报 `ENEEDAUTH`；**环境名不符实测报的是 `404 ... you do not have permission to access it`**，极易误读成权限问题 —— 先比对 `environment`，别按权限查。workflow 里的 `Dump the OIDC claims npm validates` 步骤只在发布失败时运行，打印 npm 校验时看到的声明。
 
-时间约束：npm 已于 2026-07-31 收回这类 token 的账户与包管理权限，**2027-01 起收回直接发布**（[公告](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)）。
+时间约束：npm 已于 2026-07-31 收回这类 token 的账户与包管理权限，**2027-01 起收回直接发布**（[公告](https://github.blog/changelog/2026-07-31-restricting-npm-bypass-2fa-granular-access-tokens/)），故本项目不留长期凭据。
 
-### 过渡期回退
-
-发布步骤仍带 `NODE_AUTH_TOKEN: secrets.NPM_TOKEN`：OIDC 未授权时 npm CLI 回退到 token。吊销该 secret 后，这一步的 `env` 两行与 `--provenance` 都可删（OIDC 发布自动生成 provenance）。
+发布稳定后按官方建议收紧：Settings → Publishing access 设为「Require two-factor authentication and disallow tokens」（只影响传统 token，不影响 Trusted Publisher）。
 
 ### 备选：本地发布
 

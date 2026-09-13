@@ -91,9 +91,19 @@ jobs:
           git add package.json package-lock.json
           git commit -m "chore: release ${{ steps.bump.outputs.version }}"
 
-      # 诊断（排障用，确认后即删）：打出 npm 校验 Trusted Publisher 时会看到的 OIDC 声明。
+      - name: Publish to npm
+        if: steps.check.outputs.published == 'false'
+        # 认证靠 OIDC：npm CLI 自行换取短期凭据，全程无 token。缺 id-token: write，
+        # 或 npmjs.com 上的 Trusted Publisher 与本 workflow 的仓库 / 文件名 / environment
+        # 对不上时，这一步会失败。
+        # --provenance 在 OIDC 下是冗余的显式声明，留着当哨兵：环境产不出 provenance 就红。
+        run: npm publish --provenance --access public
+
+      # 只在失败时跑：打印 npm 校验 Trusted Publisher 时看到的 OIDC 声明。
+      # 环境名不符这类问题实测报的是 404 而非 ENEEDAUTH，没有这份声明就只能猜。
       # 只打印解码后的 claim，不打印 token 本身。
-      - name: Show the identity npm will see
+      - name: Dump the OIDC claims npm validates
+        if: failure()
         run: |
           python3 - <<'PY'
           import base64, json, os, urllib.request
@@ -108,13 +118,6 @@ jobs:
           keys = ("aud", "sub", "repository", "repository_owner", "job_workflow_ref", "environment", "ref", "event_name")
           print(json.dumps({k: claims.get(k) for k in keys}, indent=2, ensure_ascii=False))
           PY
-
-      - name: Publish to npm
-        if: steps.check.outputs.published == 'false'
-        # 认证靠 OIDC：npm CLI 自行换取短期凭据。缺 id-token: write，或 npmjs.com 上的
-        # Trusted Publisher 与本 workflow 文件名对不上时，这里会以 ENEEDAUTH 失败。
-        # --provenance 在 OIDC 下是冗余的显式声明，留着当哨兵：环境产不出 provenance 就红。
-        run: npm publish --provenance --access public
 
       - name: Push the release commit
         run: git push origin HEAD:main

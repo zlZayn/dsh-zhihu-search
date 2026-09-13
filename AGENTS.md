@@ -29,7 +29,7 @@
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）
 - 发版：`gh workflow run release.yml -f tier=patch|minor|major` —— 唯一入口，档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定
 
-## 验证快照（2026-09-13 实跑）
+## 验证快照（2026-09-14 实跑）
 
 **会随每次改动漂移的数字一律不抄，指向自更新来源** —— 抄一次就要手动跟一次，本文件已经因此过时过两回。
 
@@ -40,11 +40,12 @@
 
 - 本机 `npm run build` / `npm run typecheck` / `npm test` 全绿
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
+- 发版链路：v1.2.8 首次由单一入口实跑 —— OIDC 发布、tag、GitHub Release 在一次运行内同步落地
 
 ## 待办
 
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
-- [ ] Trusted Publisher 在 npmjs.com 配好后跑一次发版验证 OIDC 路径，再吊销 `NPM_TOKEN` → [docs/PUBLISHING.md](docs/PUBLISHING.md)
+- [ ] 在 npmjs.com 吊销旧的 bypass-2FA token，并把包 Settings → Publishing access 收紧为「disallow tokens」（GitHub secret 已删；两处都做完才算真的没有长期凭据）
 
 ## 活跃坑（工具链与 DSH 平台）
 
@@ -63,7 +64,8 @@
 - 锁文件的 `resolved` 会被钉在生成时的 registry 上；国内镜像生成的锁文件不应提交
 - 两份 workflow 的 action 均已升 v7。v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底（`.npmrc` 引用 `${NODE_AUTH_TOKEN}`，而 `npm ci` 跑在带真 token 的 `npm publish` 之前）→ 2026-09-13 用 `workflow_dispatch` 在 PR 分支实跑验证过：`npm ci` 通过、publish 认证通过（仅因版本已存在被拒），无需为它留在 v4
 - action 版本漂移交给 [.github/dependabot.yml](.github/dependabot.yml)（每周一个 bump PR）；**PR 上的 CI 只跑 ci.yml，动 `release.yml` 的 PR 就算绿勾也不代表发布链路验过**；npm 生态没开，DSH 的 rc 依赖会变噪音
-- Trusted Publisher 的 owner 栏填 **GitHub 属主**（`zlZayn`），不是 npm 用户名；2026-09-03 之后新建的连接默认只给 `npm stage publish`，必须显式勾上 `npm publish` —— 填错不会在保存时报错，只在发布时以 `ENEEDAUTH` 暴露
+- Trusted Publisher 的 owner 栏填 **GitHub 属主**（`zlZayn`），不是 npm 用户名；2026-09-03 之后新建的连接默认只给 `npm stage publish`，必须显式勾上 `npm publish` —— 填错不会在保存时报错，只在发布时暴露
+- npm 连接上的 **Environment name**（本项目 `github-release`）会进 OIDC 校验：job 必须声明同名 `environment:`。不符时实测报 **`404 ... you do not have permission to access it`，而不是 `ENEEDAUTH`** —— 照权限方向查会白费功夫，先比对 environment
 
 ## 文档地图
 

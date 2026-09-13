@@ -28,4 +28,6 @@
 
 - 版本、tag、Release、npm 四者在一次运行内同步，不再有漂移空间。
 - 发布提交由 `GITHUB_TOKEN` 推送，不会再触发一轮 CI；发布工作流自身已跑 typecheck 与 test。
-- 未决：Trusted Publisher 需在 npmjs.com 手动配置一次（步骤见 [docs/PUBLISHING.md](../../docs/PUBLISHING.md)），验证通过后吊销 `NPM_TOKEN`。
+- Trusted Publisher 已在 npmjs.com 配好，v1.2.8 由该路径发布成功（OIDC 认证 + provenance）；`NPM_TOKEN` 的 GitHub secret 已删。
+- 连接上的 **Environment name** 会进 OIDC 校验：job 必须声明同名 `environment:`（本项目 `github-release`）。不符时实测报的是 `404 ... you do not have permission to access it`，不是 `ENEEDAUTH`。
+- 未决（人类动作）：在 npmjs.com 吊销旧 token 并把 Publishing access 收紧为「disallow tokens」。
