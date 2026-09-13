@@ -27,6 +27,19 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # 版本号写在两处：package.json 决定发布号，package-lock.json 决定 npm ci 装的树。
+      # 手工改前者会漏掉后者，所以在每次推送就拦，不必等到发 tag。
+      - name: Verify the lockfile version matches package.json
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          lock=$(node -p "require('./package-lock.json').version")
+          if [ "$pkg" != "$lock" ]; then
+            echo "::error::package-lock.json version $lock does not match package.json version $pkg"
+            echo "bump with: npm version <patch|minor|major> --no-git-tag-version"
+            exit 1
+          fi
+
       - run: npm run typecheck
 
       # `npm test` 自带 build：产物级测试（dist / client bundle）依赖 lib/ 已生成。

@@ -34,15 +34,22 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-      # tag 与 package.json 版本不一致时，发布的版本号会和 tag 对不上，
-      # 而 npm 不允许重发同一版本号 —— 所以这一关必须拦在 publish 之前。
-      - name: Verify the tag matches the package version
+      # 三处版本号必须一致：tag、package.json、package-lock.json。
+      # 前两者不一致会让发布的版本号与 tag 对不上，而后者的漂移说明 bump 漏了一处 ——
+      # npm 不允许重发同一版本号，所以这一关必须拦在 publish 之前。
+      - name: Verify the tag matches the package and lockfile versions
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           pkg=$(node -p "require('./package.json').version")
+          lock=$(node -p "require('./package-lock.json').version")
           tag="${GITHUB_REF_NAME#v}"
           if [ "$pkg" != "$tag" ]; then
             echo "::error::tag $tag does not match package.json version $pkg"
+            exit 1
+          fi
+          if [ "$lock" != "$pkg" ]; then
+            echo "::error::package-lock.json version $lock does not match package.json version $pkg"
+            echo "bump with: npm version <patch|minor|major> --no-git-tag-version"
             exit 1
           fi
           echo "publishing $pkg"

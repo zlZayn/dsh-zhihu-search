@@ -5,7 +5,7 @@
 ## 发布前检查
 
 1. 工作区干净：`git status` 无未提交改动。
-2. 版本号已按下方[版本号](#版本号)的判据定档。
+2. 版本号已按下方[版本号](#版本号)的问题链定档，并用 `npm version <tier> --no-git-tag-version` 同时写进 `package.json` 与 `package-lock.json`（只手改前者会漏掉后者）。
 3. `npm run typecheck && npm test` 全绿。
 4. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
 5. `cordis.patch.yml` 里**不含**任何凭据。
@@ -124,6 +124,8 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 - [release.yml](../.github/workflows/release.yml)：推 `v*` tag 发布。
 
 两者都用 `npm ci`：它严格按锁文件安装，锁文件与 `package.json` 不同步时直接失败 —— 这是我们要在 CI 里拦下的情况。
+
+两处还各自校验 `package.json` 与 `package-lock.json` 的**版本号**一致：日常 CI 在每次推送就拦，release 在 `publish` 前连同 tag 再拦一次。版本号写两处，漏一处不该等到发版才发现。
 
 ## 兼容性
 
