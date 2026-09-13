@@ -13,14 +13,13 @@
   <p>
     <a href="https://developer.zhihu.com/"><img src="https://img.shields.io/badge/Zhihu%20Open%20Platform-Official%20API-0084FF?style=flat&logo=zhihu&logoColor=white" alt="知乎开放平台官方 API"></a>
     <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DeepSeek%20Harness-Plugin-4176E6?style=flat" alt="DeepSeek Harness Plugin"></a>
-    <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-Auto%20Discovered-orange?style=flat" alt="dsh-plugin"></a>
   </p>
 
   <p>
     <a href="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml"><img src="https://github.com/zlZayn/dsh-zhihu-search/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/npm/v/dsh-zhihu-search.svg" alt="npm"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT 许可证"></a>
-    <a href="https://slsa.dev/"><img src="https://img.shields.io/badge/SLSA-Provenance-green?logo=slsa" alt="SLSA Provenance"></a>
+    <a href="https://www.npmjs.com/package/dsh-zhihu-search"><img src="https://img.shields.io/badge/SLSA-Provenance-green?logo=slsa" alt="SLSA Provenance"></a>
   </p>
 
   <p>
