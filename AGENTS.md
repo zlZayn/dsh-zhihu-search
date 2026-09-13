@@ -14,6 +14,7 @@
 - 对外可见行为变化，同一次改动内同步 [README.md](README.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)，冲突以中文为准
 - 决策理由 → [.agents/notes/](.agents/notes/)
+- 发版授权：patch / minor 按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定档后**直接发**；**major 必须先问人类**
 
 ## 事实来源（只查不抄）
 
@@ -45,7 +46,7 @@
 ## 待办
 
 - [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
-- [ ] 在 npmjs.com 吊销旧的 bypass-2FA token，并把包 Settings → Publishing access 收紧为「disallow tokens」（GitHub secret 已删；两处都做完才算真的没有长期凭据）
+- [ ] 把包 Settings → Publishing access 收紧为「disallow tokens」（旧 token 已在 npm 侧吊销、GitHub secret 已删，只差这一道兜底）
 
 ## 活跃坑（工具链与 DSH 平台）
 

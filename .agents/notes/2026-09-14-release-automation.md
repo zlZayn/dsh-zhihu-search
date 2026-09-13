@@ -13,8 +13,8 @@
 - 发版只有一个入口：`gh workflow run release.yml -f tier=patch|minor|major`。
 - 顺序全有或全无：先发布成功，才推 `main`、才建 tag 与 Release。
 - 幂等：目标版本已在 npm 上时跳过 publish，只补齐 git 侧，用于修复中断的运行。
-- 档位仍由人按 [docs/PUBLISHING.md](../../docs/PUBLISHING.md) 的问题链选定，major 需人类确认。
-- 认证走 Trusted Publishing（OIDC）；`NPM_TOKEN` 仅作过渡期回退，验证通过后吊销。
+- 档位按 [docs/PUBLISHING.md](../../docs/PUBLISHING.md) 的问题链选定：patch / minor 由维护 agent 定档后直接发，major 必须先问人类。
+- 认证走 Trusted Publishing（OIDC），不留任何长期凭据（过渡期回退已随 `NPM_TOKEN` 删除而移除）。
 - 发布命令留在 `release.yml` 这个文件名里：OIDC 按 workflow 文件名校验，换成别的文件名或包一层 `workflow_call` 都会对不上。
 
 ## 替代方案（强制）
@@ -30,4 +30,4 @@
 - 发布提交由 `GITHUB_TOKEN` 推送，不会再触发一轮 CI；发布工作流自身已跑 typecheck 与 test。
 - Trusted Publisher 已在 npmjs.com 配好，v1.2.8 由该路径发布成功（OIDC 认证 + provenance）；`NPM_TOKEN` 的 GitHub secret 已删。
 - 连接上的 **Environment name** 会进 OIDC 校验：job 必须声明同名 `environment:`（本项目 `github-release`）。不符时实测报的是 `404 ... you do not have permission to access it`，不是 `ENEEDAUTH`。
-- 未决（人类动作）：在 npmjs.com 吊销旧 token 并把 Publishing access 收紧为「disallow tokens」。
+- 未决（人类动作）：把包 Settings → Publishing access 收紧为「disallow tokens」（旧 token 已在 npm 侧吊销）。

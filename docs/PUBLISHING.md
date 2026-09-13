@@ -6,7 +6,7 @@
 
 只列需要人判断的项；构建、测试、两处版本号一致、工作区状态由工作流自己保证。
 
-1. 档位已按下方[版本号](#版本号)的问题链定好，**major 必须人类确认**。
+1. 档位按下方[版本号](#版本号)的问题链定：**patch / minor 由维护 agent 定档后直接发，major 必须先经人类确认**。
 2. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
 3. `cordis.patch.yml` 里**不含**任何凭据。
 
@@ -25,7 +25,7 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 - **先发布、后动远端**：publish 失败时远端不发生任何变化，tag 与 Release 也只可能在发布成功后创建。
 - **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
 - **手工推 tag 不会发布**：tag 由工作流创建，绕过上面的顺序没有意义。
-- **档位由人给**：`tier` 是入参，不从 commit 类型推断。
+- **档位由判定链定**：`tier` 是入参，不从 commit 类型推断；patch / minor 由维护 agent 直接发，major 需人类确认。
 
 ## 版本号
 
