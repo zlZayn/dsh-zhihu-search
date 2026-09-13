@@ -9,8 +9,7 @@
     "zhihu",
     "zhihu-api",
     "search",
-    "tool",
-    "crawler"
+    "tool"
   ],
   "license": "MIT",
   "repository": {
