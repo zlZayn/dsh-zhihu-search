@@ -60,8 +60,8 @@
 - 设计令牌只有 `--dsw-alias-*`，不存在 `--dsw-color-*` 系列
 - 本地用 `--legacy-peer-deps` 安装会让 `package-lock.json` 缺自动 peer，`npm ci` 随即失败；依赖变更后用 `npm install --registry=https://registry.npmjs.org/` 重建
 - 锁文件的 `resolved` 会被钉在生成时的 registry 上；国内镜像生成的锁文件不应提交
-- [ci.yml](.github/workflows/ci.yml) 的 action 已是 v7；**[release.yml](.github/workflows/release.yml) 的 `setup-node` 有意留在 v4** —— v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底，而它写的 `.npmrc` 引用 `${NODE_AUTH_TOKEN}`、`npm ci` 又跑在带真 token 的 `npm publish` 之前，升级前先用 `workflow_dispatch` 实跑验证
-- action 版本漂移交给 [.github/dependabot.yml](.github/dependabot.yml)（每周一个 bump PR，CI 先跑一遍）；npm 生态没开，DSH 的 rc 依赖会变噪音
+- 两份 workflow 的 action 均已升 v7。v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底（`.npmrc` 引用 `${NODE_AUTH_TOKEN}`，而 `npm ci` 跑在带真 token 的 `npm publish` 之前）→ 2026-09-13 用 `workflow_dispatch` 在 PR 分支实跑验证过：`npm ci` 通过、publish 认证通过（仅因版本已存在被拒），无需为它留在 v4
+- action 版本漂移交给 [.github/dependabot.yml](.github/dependabot.yml)（每周一个 bump PR）；**PR 上的 CI 只跑 ci.yml，动 `release.yml` 的 PR 就算绿勾也不代表发布链路验过**；npm 生态没开，DSH 的 rc 依赖会变噪音
 
 ## 文档地图
 
