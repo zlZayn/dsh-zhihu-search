@@ -27,9 +27,10 @@
 - 改 Canonical Output 字段 → 契约变更，同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「端点契约」、[tools/README.md](tools/README.md) 与两个搜索工具的 schema 一致性测试。
 - 改 `utils/errors.ts` 的分类或 `hint` 文案 → `error.kind` 与 `hint` 是对模型的契约，增删取值等于改契约，需同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「错误契约」并跑 `test/tool.test.ts`。
 - 改 `state.ts` 的 TTL、令牌桶或缓存键 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「缓存与限流」，跑 `test/state.test.ts`；缓存键必须用归一化参数加凭据来源标识。
+- 改工具描述 → 描述是模型择路与判断能力的唯一依据，按 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「工具描述约定」三槽改，并跑 `test/tool.test.ts`（描述一致性断言在此）。
 - 改呈现层 → 跑 `test/presentation.test.ts` 与 `test/redlines.test.ts`。
 - 改密钥解析优先级 → 契约变更，跑 `test/credentials.test.ts` 与 `test/auth.test.ts`，同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」；若环境变量名 `ZHIHU_ACCESS_SECRET` 变更，同时改根 [README.md](../README.md) 的那一句。
-- 改 `client/` → 必须 `npm run build`（`link:` 直接读 `lib/client.js`），跑 `test/client-bundle.test.ts`，并确认注册 key 与 `ZHIHU_SETTINGS_NAMESPACE` 一致。
+- 改 `client/` → 必须 `npm run build` 并跑 `test/client-bundle.test.ts`，确认注册 key 与 `ZHIHU_SETTINGS_NAMESPACE` 一致；浏览器读的是 **profile 里那份** `lib/client.js`，要随新版本装进 profile 才生效。
 - 新增模块或调整依赖方向 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」，并同步本文件的「文件索引」与 [AGENTS.md](AGENTS.md) 的约束。
 
 ## 已知限制

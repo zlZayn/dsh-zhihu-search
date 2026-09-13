@@ -49,9 +49,9 @@
 
 知乎 API 自身的反直觉处归 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，此处只记会咬人的工程陷阱。
 
-- `link:` 安装下 DSH 直接读 `lib/`：改完 `src/`（含浏览器半体）必须重新 build，否则跑的还是旧代码
+- 本机 web profile 装的是**版本化 registry 副本**（`~/.dsh/profiles/web/node_modules/dsh-zhihu-search`），不是 `link:` → 改完 `src/` 的生效链是 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>` → **host 半体要重启**，客户端半体由 `dsh-client-hmr` 就地换装
 - `dsh.profile.bundles` 只在启动时读取 → **首次挂载**新插件要重启，或走 `cordis.patch.yml` 的 patch 层
-- **升级已挂载的插件免重启**：`dsh-client-hmr`（`dsh-web-app` 的运行时依赖）轮询插件 bundle，被 `dsh plugin add` 改写即原地换装 → 发版后可直接 `dsh plugin --profile web add <pkg>@<ver>`，不必请人重启
+- `dsh-client-hmr`（`dsh-web-app` 的运行时依赖）只换**浏览器半体**：轮询客户端 bundle，被 `dsh plugin add` 改写即原地换装 → **host 半体换不了**：render、投影、工具描述改了都必须重启（2026-09-13 实测：装上新版不重启，模型看到的仍是旧版渲染）
 - 挂载用官方 CLI `dsh plugin --profile web add <path>`，它会顺带 reconcile `dsh.profile.bundles`；不要手改 `cordis.patch.yml`
 - 可用作值导入的外部模块只有 `PLATFORM_MODULES`（DSH `packages/client/web/src/platform.ts`）；超出该清单必须写 `dsh.client.inject` / `external`
 - `lib/client.js` 专供浏览器半体；host 模块不得命名 `src/client.ts`，否则被 esbuild 覆盖（[复盘](docs/postmortem/2026-09-12-client-js-path-collision.md)）
