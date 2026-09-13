@@ -57,7 +57,10 @@ export function renderSearch(value: SearchOutput): ContentBlock[] {
   const lines: string[] = [`找到 ${String(value.items.length)} 条关于 "${value.query}" 的知乎结果：`, ''];
   for (const item of value.items) {
     lines.push(`### [${escapeLinkText(item.title)}](${item.url})`);
-    lines.push(`**作者**: ${item.author || '匿名'} | **点赞**: ${String(item.voteUpCount)} | **类型**: ${item.contentType}`);
+    const meta = [`**作者**: ${item.author || '匿名'}`, `**点赞**: ${String(item.voteUpCount)}`];
+    // 类型缺失时整段省略，而不是渲染成空的「类型: 」。
+    if (item.contentType !== '') meta.push(`**类型**: ${item.contentType}`);
+    lines.push(meta.join(' | '));
     lines.push(`> ${item.snippet}`);
     lines.push('');
   }

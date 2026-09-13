@@ -45,7 +45,9 @@ function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number] | und
     snippet: sanitizeSnippet(typeof item.ContentText === 'string' ? item.ContentText : ''),
     author: sanitizeSnippet(typeof item.AuthorName === 'string' ? item.AuthorName : '', 60),
     voteUpCount: typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? item.VoteUpCount : 0,
-    contentType: typeof item.ContentType === 'string' && item.ContentType !== '' ? item.ContentType : 'Article',
+    // ContentType 缺失时留空，不编造标签：实测第三方网页（如接单平台）就没有这个字段，
+    // 兜底成 'Article' 会让模型把广告页当成知乎文章。
+    contentType: typeof item.ContentType === 'string' ? item.ContentType : '',
   };
 }
 

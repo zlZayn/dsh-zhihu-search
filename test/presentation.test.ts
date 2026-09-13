@@ -78,6 +78,12 @@ describe('renderSearch（模型可见层）', () => {
     expect(text).toContain('\\[入门\\]');
   });
 
+  it('内容类型缺失时整段省略，不编造标签（实测外部网页没有 ContentType）', () => {
+    const text = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, contentType: '' }] }));
+    expect(text).not.toContain('类型');
+    expect(text).toContain('**点赞**: 42');
+  });
+
   it('hasMore 为真时把「结果被截断」告诉模型（工具没有翻页参数）', () => {
     const text = textOf(renderSearch({ ...okValue, hasMore: true }));
     expect(text).toContain('结果未全部返回');
