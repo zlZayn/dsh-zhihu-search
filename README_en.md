@@ -139,6 +139,14 @@ Get the Access Secret from the [Zhihu Open Platform profile](https://developer.z
 
 If you would rather not keep the secret in settings, use the `ZHIHU_ACCESS_SECRET` environment variable. Or put a different name in the card's "Credential reference" to point at another environment variable or credential record.
 
+### Zhihu results only
+
+The card's "Hide native web search (web_search / web_fetch)" switch is off by default — the plugin does not quietly remove host capabilities. Turn it on and save, and the model no longer sees DSH's native `web_search` and `web_fetch`, leaving only the three Zhihu tools.
+
+- Applies from the **next model request**: no restart, no new window.
+- Agents derived from that one follow the same rule.
+- Visibility only: the tool-web plugin still loads, and switching it back off restores the tools.
+
 ## Security and boundaries
 
 - The Access Secret only travels between the settings UI, the credential scope and the environment: never logged, never in a cache key in clear text, never committed.

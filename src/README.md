@@ -4,7 +4,7 @@
 
 ## 文件索引
 
-- `index.ts`：插件入口。导出 `name` / `inject` / `Config` / `apply`，以及常量 `ZHIHU_SETTINGS_NAMESPACE` 与 `DEFAULT_ACCESS_SECRET_REF`；在 `ctx.effect()` 内创建客户端与状态并注册工具。被 DSH loader 加载。
+- `index.ts`：插件入口。导出 `name` / `inject` / `Config` / `apply`，以及常量 `ZHIHU_SETTINGS_NAMESPACE` 与 `DEFAULT_ACCESS_SECRET_REF`；在 `ctx.effect()` 内创建客户端与状态并注册工具；并观察 `agent/created` / `agent/disposed`，维护「隐藏原生网页工具」的 restriction。被 DSH loader 加载。
 - `transport.ts`：知乎传输层。鉴权、两个搜索与额度自检走 GET、chat 走 POST、SSE 解析、错误映射、可取消重试。被 `tools/` 与 `utils/errors.ts` 依赖。
 - `state.ts`：缓存与令牌桶，以及缓存键计算。被 `index.ts` 创建、被 `tools/` 使用。
 - `credentials.ts`：Access Secret 的解析优先级（凭据域 → 设置字面量 → 环境变量）。纯函数 + 注入来源，被 `index.ts` 使用。
@@ -38,6 +38,7 @@
 - 改密钥解析优先级 → 契约变更，跑 `test/credentials.test.ts` 与 `test/auth.test.ts`，同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」；若环境变量名 `ZHIHU_ACCESS_SECRET` 变更，同时改根 [README.md](../README.md) 的那一句。
 - 改 `client/` → 必须 `npm run build` 并跑 `test/client-bundle.test.ts`，确认注册 key 与 `ZHIHU_SETTINGS_NAMESPACE` 一致；浏览器读的是 **profile 里那份** `lib/client.js`，要随新版本装进 profile 才生效。
 - 新增模块或调整依赖方向 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」，并同步本文件的「文件索引」与 [AGENTS.md](AGENTS.md) 的约束。
+- 改「隐藏原生网页工具」的对账逻辑 → 跑 `test/plugin.test.ts` 的「隐藏原生网页工具」组；那条 **tool-web 不在场时不抛错** 的断言是 blocker 守卫（同步抛错会否决 agent 创建），不可删。设计约束见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「原生工具的可见性」。
 
 ## 已知限制
 

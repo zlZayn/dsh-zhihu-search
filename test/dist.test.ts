@@ -47,6 +47,7 @@ describe('编译后的 host 图可在 Node 中求值', () => {
       tools: { register: (d: { name: string }) => { registered.push(d.name); return () => undefined; } },
       settings: { installSection: () => undefined },
       inject: (_s: string[], cb: (c: unknown) => void) => { cb(ctx); },
+      on: () => () => undefined,
       get: () => undefined,
       effect: (fn: () => unknown) => { fn(); return { dispose: async () => undefined }; },
       logger: { warn: () => undefined },

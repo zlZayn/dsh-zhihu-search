@@ -17,7 +17,7 @@
  */
 
 import { useState, useSyncExternalStore, type CSSProperties } from 'react';
-import { IconChevronDownOutline14, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
+import { IconChevronDownOutline14, Switch, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { Context } from '@deepseek-ai/cordis';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client';
@@ -47,6 +47,9 @@ const SECRET_FIELD = 'accessSecret';
 /** 凭据引用名字段，对应 Host 侧 `Config.accessSecretRef`。 */
 const REF_FIELD = 'accessSecretRef';
 
+/** 隐藏原生网页搜索开关的字段名，对应 Host 侧 `Config.disableNativeWebSearch`。 */
+const HIDE_FIELD = 'disableNativeWebSearch';
+
 /** 拿密钥的地方；与根 README 用的是同一个链接名。 */
 const PROFILE_URL = 'https://developer.zhihu.com/profile';
 
@@ -57,6 +60,7 @@ type CardTranslate = TranslateNS<typeof LOCALE_NS>;
 interface ZhihuSection {
   accessSecret?: string;
   accessSecretRef?: string;
+  disableNativeWebSearch?: boolean;
 }
 
 /** 把不透明的 user 层收窄为可查键的对象。 */
@@ -150,6 +154,18 @@ const S: Record<string, CSSProperties> = {
     width: '100%',
   },
   hint: { margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary)' },
+  // 开关行：逐条对齐官方 SubagentModelSelectionCard.module.css 的 .toggleRow / .toggleLabel，
+  // 右侧放原生 `Switch`（同一个 ui-primitives 包），因此外观与官方卡片一致。
+  toggleRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: 'var(--dsw-alias-label-primary)',
+  },
+  toggleLabel: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 },
   // 说明句里的外链：只用卡片既有的语义令牌，颜色取自 ui-theme 的 --dsw-alias-link。
   // 卡片是纯内联样式、无法写 :hover，所以常驻下划线作为静态可点提示。
   link: {
@@ -226,6 +242,7 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [secret, setSecret] = useState('');
   const [refDraft, setRefDraft] = useState<string | undefined>(undefined);
+  const [hideDraft, setHideDraft] = useState<boolean | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState('');
 
@@ -235,12 +252,16 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
   const refText = refDraft ?? effectiveRef;
   const refOverridden = asRecord(snapshot.user)?.[REF_FIELD] !== undefined;
   const refDirty = refText !== effectiveRef;
-  const dirty = secret !== '' || refDirty;
+  const hideEffective = snapshot.value?.[HIDE_FIELD] === true;
+  const hideText = hideDraft ?? hideEffective;
+  const hideDirty = hideDraft !== undefined && hideDraft !== hideEffective;
+  const dirty = secret !== '' || refDirty || hideDirty;
   const blocked = !dirty || disabled;
 
   const discard = (): void => {
     setSecret('');
     setRefDraft(undefined);
+    setHideDraft(undefined);
     setFailed('');
   };
 
@@ -254,8 +275,10 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
         if (refText === '') await scope.unset(REF_FIELD);
         else await scope.set(REF_FIELD, refText);
       }
+      if (hideDirty) await scope.set(HIDE_FIELD, hideText);
       setSecret('');
       setRefDraft(undefined);
+      setHideDraft(undefined);
       setOpen(false);
     } catch (error) {
       setFailed(error instanceof Error ? error.message : String(error));
@@ -358,6 +381,21 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
                 }}
               />
               <p style={S.hint}>{t('refHint')}</p>
+            </div>
+
+            <div style={S.fieldDivider}>
+              <div style={S.toggleRow}>
+                <span style={S.toggleLabel}>{t('hideNativeWebLabel')}</span>
+                <Switch
+                  checked={hideText}
+                  label={t('hideNativeWebLabel')}
+                  disabled={disabled}
+                  onChange={(next) => {
+                    setHideDraft(next);
+                  }}
+                />
+              </div>
+              <p style={S.hint}>{t('hideNativeWebHint')}</p>
             </div>
 
             <div style={S.footer}>

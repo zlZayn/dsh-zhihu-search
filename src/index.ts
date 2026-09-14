@@ -12,6 +12,7 @@
 
 import type { Context } from '@deepseek-ai/cordis';
 import { credentialRef } from '@deepseek-ai/dsh-credentials';
+import type {} from '@deepseek-ai/dsh-agent';
 import type {} from '@deepseek-ai/dsh-settings';
 import z from '@deepseek-ai/schemastery';
 import { ZHIHU_BASE_URL, ZhihuClient } from './transport.js';
@@ -38,6 +39,29 @@ export const ZHIHU_SETTINGS_NAMESPACE = 'zhihu-search';
 
 /** 凭据引用的默认名，按 DSH 约定取环境变量名。 */
 export const DEFAULT_ACCESS_SECRET_REF = 'ZHIHU_ACCESS_SECRET';
+
+/**
+ * DSH 原生网页工具名（由 `@deepseek-ai/dsh-tool-web` 注册）。
+ *
+ * `tools.restrict()` 会按名字校验并**抛错**，而 `agent/created` 监听器里的同步异常
+ * 会否决 agent 创建（DSH `core/agent` 的注册表语义），所以使用前必须按真实注册表过滤。
+ */
+const NATIVE_WEB_TOOLS = ['web_search', 'web_fetch'] as const;
+
+/** agent 注册表在本模块用到的最小面（结构类型，不引入新的类型依赖）。 */
+interface AgentRegistryFace {
+  list(): ReadonlyArray<ScopedAgent>;
+}
+
+/** agent 的 scoped 上下文里本模块用到的最小面。 */
+interface ScopedAgent {
+  readonly id: string;
+  readonly ctx: {
+    readonly tools: {
+      restrict(filter: { deny: readonly string[] }): () => void;
+    };
+  };
+}
 
 /** 插件配置。 */
 export interface Config {
@@ -68,6 +92,13 @@ export interface Config {
   enableGlobalSearch?: boolean;
   /** 是否注册直答工具。 */
   enableZhida?: boolean;
+  /**
+   * 是否对模型隐藏 DSH 原生的 `web_search` / `web_fetch`。
+   *
+   * 默认 `false`：插件不擅自削宿主能力。打开后按 agent 生效，
+   * 且作用于该 agent 派生的子 agent（restriction 沿 scope 链继承）。
+   */
+  disableNativeWebSearch?: boolean;
 }
 
 /** 配置的运行时校验 schema；默认值同时是文档。 */
@@ -85,6 +116,7 @@ export const Config = z.object({
   enableSearch: z.boolean().default(true),
   enableGlobalSearch: z.boolean().default(true),
   enableZhida: z.boolean().default(true),
+  disableNativeWebSearch: z.boolean().default(false),
 });
 
 /** 凭据服务在本模块用到的最小面。 */
@@ -160,13 +192,87 @@ export function apply(ctx: Context, config: Config): void {
     return `ref:${section.accessSecretRef ?? DEFAULT_ACCESS_SECRET_REF}`;
   };
 
+  /** 一条告警通道；宿主 logger 缺失时静默 —— 诊断本身不该成为故障源。 */
+  const logger = (ctx as unknown as { logger?: { warn?: (message: string) => void } }).logger;
+  const warn = (message: string): void => {
+    logger?.warn?.(message);
+  };
+
   if ((config.accessSecret ?? '').trim() === '') {
     // 只告警不阻断：profile 必须能正常启动。
-    const logger = (ctx as unknown as { logger?: { warn?: (message: string) => void } }).logger;
-    logger?.warn?.(
+    warn(
       '[zhihu-search] 未配置 accessSecret，工具会注册但调用时返回鉴权错误。可在 DSH 设置 → 插件 → 知乎搜索 中填写。',
     );
   }
+
+  // ── 隐藏 DSH 原生网页工具 ──────────────────────────────────────────────
+  // restriction 挂在**agent 的 scope** 上，`tools.restrict()` 返回的正是撤销它自己
+  // 那一个；想撤销就必须持有它，所以这张表省不掉。restriction 本身随 agent scope
+  // 自动撤销，这里只是我们这一侧的账，用于「拨回开关」与「插件卸载」两个时机。
+  const restrictions = new Map<string, () => void>();
+
+  /** 本刻真实存在、可被 deny 的原生工具名 —— 名字不存在时 deny 会让 restrict 抛错。 */
+  const restrictableNativeTools = (): string[] =>
+    NATIVE_WEB_TOOLS.filter((toolName) => ctx.tools.get(toolName) !== undefined);
+
+  /**
+   * 给一个 agent 装上 restriction（已装或不需要装时是空操作）。
+   *
+   * 刻意吞掉异常：`agent/created` 监听器同步抛错会**否决 agent 创建并回滚**，
+   * 一个可选的界面开关不该有这种权力。
+   */
+  const installOn = (agent: ScopedAgent): void => {
+    if (current().disableNativeWebSearch !== true || restrictions.has(agent.id)) return;
+    const deny = restrictableNativeTools();
+    if (deny.length === 0) return;
+    try {
+      restrictions.set(agent.id, agent.ctx.tools.restrict({ deny }));
+    } catch (error) {
+      warn(`[zhihu-search] 隐藏原生网页工具失败（不影响其他功能）：${String(error)}`);
+    }
+  };
+
+  /** 摘掉一个 agent 上的 restriction。 */
+  const liftFrom = (agentId: string): void => {
+    const dispose = restrictions.get(agentId);
+    if (dispose === undefined) return;
+    restrictions.delete(agentId);
+    try {
+      dispose();
+    } catch {
+      // 撤销失败不该波及别处：账已经销了，scope 销毁时也会兜底清理。
+    }
+  };
+
+  /**
+   * 幂等对账：让每个 live agent 的 restriction 与当前配置一致。
+   *
+   * 三个时机共用它 —— agent 服务就绪、设置写入、以及新 agent 出现。
+   * 幂等是硬要求：保存 Access Secret 同样会触发 `onChange`。
+   */
+  const syncNativeWebTools = (): void => {
+    const registry = ctx.get('agents') as AgentRegistryFace | undefined;
+    if (registry === undefined) return;
+    const wanted = current().disableNativeWebSearch === true;
+    for (const agent of registry.list()) {
+      if (wanted) installOn(agent);
+      else liftFrom(agent.id);
+    }
+  };
+
+  // 新 agent 补装；销毁时销账（它的 scope 已随之撤销）。
+  ctx.on('agent/created', ({ agent }) => {
+    installOn(agent);
+  });
+  ctx.on('agent/disposed', ({ agent }) => {
+    restrictions.delete(agent.id);
+  });
+
+  // agent 服务就绪时补一次对账：正常启动顺序下 agent 晚于插件出现，
+  // HMR 换装时则可能已经有 live agent。
+  ctx.inject(['agents'], () => {
+    syncNativeWebTools();
+  });
 
   // 设置命名空间：让 Host 把这个 section 暴露给浏览器端的描述镜像，
   // 否则自带的「插件」设置页不会分派我们的卡片。
@@ -175,9 +281,26 @@ export function apply(ctx: Context, config: Config): void {
       setSource: (source) => {
         current = source;
       },
-      onChange: () => {},
+      // 写入后就地生效：可见集在**每次模型请求**时重算，因此下一次请求即采用新集合，
+      // 不需要新窗口。DSH 在 section attach/detach 时也会调它，所以这里必须幂等。
+      onChange: () => {
+        syncNativeWebTools();
+      },
     });
   });
+
+  // 插件卸载（含 HMR 换装）：撤掉我们装过的 restriction ——
+  // 它们挂在 agent 的 scope 上，不会随本插件卸载自动消失。
+  ctx.effect(() => () => {
+    for (const dispose of restrictions.values()) {
+      try {
+        dispose();
+      } catch {
+        // 同上：卸载路径不因单个撤销失败而中断。
+      }
+    }
+    restrictions.clear();
+  }, 'zhihu-search: native web tool restrictions');
 
   ctx.effect(() => {
     // 全部可变状态在此创建，随 effect 一起销毁。

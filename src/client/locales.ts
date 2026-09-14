@@ -36,6 +36,8 @@ export type ZhihuLocaleKey =
   | 'refOverridden'
   | 'reset'
   | 'refHint'
+  | 'hideNativeWebLabel'
+  | 'hideNativeWebHint'
   | 'discard'
   | 'save'
   | 'saving';
@@ -62,6 +64,8 @@ const zh: Record<ZhihuLocaleKey, string> = {
   refOverridden: '已覆盖',
   reset: '重置',
   refHint: '环境变量或凭据记录的名字；留空并保存会清掉覆盖，回落到默认的 ZHIHU_ACCESS_SECRET。',
+  hideNativeWebLabel: '隐藏原生网页搜索（web_search / web_fetch）',
+  hideNativeWebHint: '仅控制模型可见性，不影响 tool-web 插件本身状态。保存后从下一次模型请求起生效，无需重启。',
   discard: '放弃',
   save: '保存',
   saving: '保存中…',
@@ -83,6 +87,8 @@ const en: Record<ZhihuLocaleKey, string> = {
   refOverridden: 'Overridden',
   reset: 'Reset',
   refHint: 'Name of an environment variable or credential record. Saving it blank clears the override and falls back to ZHIHU_ACCESS_SECRET.',
+  hideNativeWebLabel: 'Hide native web search (web_search / web_fetch)',
+  hideNativeWebHint: 'Controls model visibility only — the tool-web plugin itself stays untouched. Applies from the next model request after saving; no restart needed.',
   discard: 'Discard',
   save: 'Save',
   saving: 'Saving…',
