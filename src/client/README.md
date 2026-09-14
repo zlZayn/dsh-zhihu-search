@@ -15,7 +15,7 @@
 - 说明行里的外链只用 `--dsw-alias-link` 令牌；卡片是纯内联样式、写不了 `:hover`，因此常驻下划线作为静态可点提示。
 - 底部：失败诊断 + 「放弃」+「保存」；保存成功且 Host 回读确认后才折叠。
 - 取值逐条抄自官方 `PluginCard.module.css` 与 `fields.module.css`，只用 `--dsw-alias-*` 令牌。
-- 开关行（「隐藏原生网页搜索」）用官方 `Switch`（同在 `ui-primitives`），行布局抄官方 `SubagentModelSelectionCard.module.css` 的 `.toggleRow` / `.toggleLabel`，外观因此与官方卡片同款。
+- 开关行（「隐藏原生网页搜索」）用官方 `Switch`（同在 `ui-primitives`），行布局抄官方 `SubagentModelSelectionCard.module.css` 的 `.toggleRow` / `.toggleLabel`，外观因此与官方卡片同款；其下再一行**状态行**随开关换文案（同官方写法），让用户不必从开关位置反推它做了什么。
 - 文案全部取自 [locales.ts](locales.ts) 的字典，组件不写死字符串。字典把命名空间合并进 `LocaleNamespaceMap`，key 拼错或漏一种语言都是**编译错误**。
 
 `Tag` 与折叠图标来自 `@deepseek-ai/dsh-client-ui-primitives`。它是外壳预置模块（`PLATFORM_MODULES`），不是别的插件，因此可以直接用，不需要 `dsh.client.inject` 边。

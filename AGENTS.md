@@ -42,6 +42,7 @@
 - 本机 `npm run build` / `npm run typecheck` / `npm test` 全绿
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
 - 发版链路：v1.2.8 首次由单一入口实跑 —— OIDC 发布、tag、GitHub Release 在一次运行内同步落地
+- 「隐藏原生网页工具」：v1.3.1 在真机 profile 上行为验证通过 —— 开关打开后模型的工具面失去 `web_search` / `web_fetch`，关闭即恢复
 
 ## 待办
 
