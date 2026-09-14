@@ -76,6 +76,7 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 - 更新截图与 README 展示 → Q1 否 Q3 否 → patch。
 - 新增可选开关（如「隐藏原生网页搜索」）→ 旧用法全部仍然正确，且能观察到新能力 → Q3 是 → minor。
 - 修复已发布功能里的逻辑缺陷（开关存了却不生效）→ 旧用法仍正确、只是真的开始工作 → Q1 否 Q3 否 → patch。
+- 补上漏声明的输出 schema 字段（宿主按 `additionalProperties: false` 校验，漏一处工具整体失败）→ 修复已发布缺陷 → patch；**发布后才发现**的回归另记[复盘](postmortem/2026-09-14-output-schema-drift.md)。
 
 ### 兜底与升级条款
 

@@ -28,6 +28,7 @@
 ## 常用命令
 
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
+- 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - 发版：`gh workflow run release.yml -f tier=patch|minor|major` —— 唯一入口，档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定
 
 ## 验证快照（2026-09-14 实跑）
@@ -43,11 +44,13 @@
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
 - 发版链路：v1.2.8 首次由单一入口实跑 —— OIDC 发布、tag、GitHub Release 在一次运行内同步落地
 - 「隐藏原生网页工具」：v1.3.1 在真机 profile 上行为验证通过 —— 开关打开后模型的工具面失去 `web_search` / `web_fetch`，关闭即恢复
-- 契约测试：v1.4.0 首次实跑（本机注入 Secret）全绿，约 15s / 16 次请求；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
+- 契约测试：v1.4.0 首次实跑（本机注入 Secret）全绿，约 15s / 16 次请求；密钥已配在仓库 Secrets，每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
+- 真机验收：v1.4.1 的对仓库产物已跑通（[scripts/acceptance.mjs](scripts/acceptance.mjs)）；profile 安装副本待 host 重启后复测
+- 事故：v1.4.0 的 P0（输出 schema 漂移）由真机验收第 1 条抓到，v1.4.1 修复 → [复盘](docs/postmortem/2026-09-14-output-schema-drift.md)
 
 ## 待办
 
-- [ ] 仓库加 `ZHIHU_ACCESS_SECRET`（Settings → Secrets and variables → Actions）：契约测试的燃料。**缺了 `contract.yml` 会按设计直接红**，不静默跳过 —— 这是刻意的，红一次就知道要去配。
+- [ ] host 重启后对 profile 里装的 1.4.1 复跑真机验收（`node scripts/acceptance.mjs`），并确认工具面 `zhihu_search` / `zhihu_global_search` 真机可用
 
 ## 活跃坑（工具链与 DSH 平台）
 

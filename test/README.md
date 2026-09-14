@@ -37,6 +37,8 @@
 ## 测试约定
 
 - 时间相关断言注入 `now`，不依赖真实时钟。
+- 验限流必须**换问题**：同一问题同一档位会命中插件缓存（毫秒返回），根本打不到平台 —— 实测第一次验收就是这样假通过的。
+- 真机验收用 [scripts/acceptance.mjs](../scripts/acceptance.mjs)：它直接 import 装好的产物，同时覆盖真实接口、宿主 `output.schema` 校验与模型可见文本。这三件事单元测试都够不到（v1.4.0 的 P0 正是漏在这条缝里）。
 - 断言「失败不入缓存」使用不被重试的错误码；`90001` 会被客户端自动重试，第一次调用实际成功。
 - 校验 `cordis.patch.yml` 前先滤掉注释行：注释会正当地提到被否决的写法。
 - `@deepseek-ai/*` 在 npm 的 `latest` 标签是过期版本；安装版本以 [package.json](../package.json) 的 `peerDependencies` 为准。
