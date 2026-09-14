@@ -32,7 +32,7 @@
 > [!NOTE]
 > **Built on the official Zhihu Open Platform API**, not web scraping. All search results include citable original links, and Zhihu's own results also carry their upvote counts, ensuring every model response is verifiable. Search results are text summaries only and do not include article images.
 
-Equips DSH with three Zhihu tools: in-site search, global web search, and Zhida direct answers — returning a list of citable sources instead of an unverifiable summary.
+Grounded search. Cited answers. Three Zhihu tools for DSH: in-site search, global web search, and Zhida direct answers — returning a list of citable sources instead of an unverifiable summary.
 
 <p align="center">
   <img src="assets/settings-card_en.png" alt="Zhihu Search card in the plugin settings" width="600">
