@@ -25,6 +25,13 @@ export interface ToolDeps {
    * 缓存键必须跟着换，否则换账号后仍会命中上一个账号的结果。
    */
   readonly credentialId: () => string;
+  /**
+   * 流式生成的读取预算（毫秒），由客户端按「配置值与默认值的较大者」算出。
+   *
+   * 直答工具用它推导自己的协作式预算：两者必须联动，否则用户调大流式预算后
+   * 会先被 DSH 的工具超时截断，错误形态从结构化错误退化成裸超时。
+   */
+  readonly streamTimeoutMs: number;
   /** 搜索类工具共用的本地令牌桶。 */
   readonly searchBucket: TokenBucket;
   /** 直答专用的本地令牌桶。 */

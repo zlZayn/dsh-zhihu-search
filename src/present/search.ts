@@ -16,6 +16,34 @@ import type { GenericCallView, ToolResult, WebSearchResultView, WebSource } from
 import type { JsonValue } from '@deepseek-ai/dsh-util-values';
 import type { SearchOutput } from '../types.js';
 
+/**
+ * 渲染模型可见文本时需要的调用上下文。
+ *
+ * 为什么参数要传进来：`minValue` 是「候选内筛选」而不是全库排序
+ * （见 [tools/search.ts](../tools/search.ts) 的 `FILTERED_CANDIDATE_COUNT`），
+ * 只有渲染层知道「这次带了下限」，才说得清「筛少了」与「知乎没有」的区别。
+ */
+export interface SearchRenderContext {
+  /** 本次请求的条数；用于判断结果是不是被下限筛少了。 */
+  readonly requestedCount?: number;
+  /** 生效的排序下限；有值即说明这次是候选内筛选。 */
+  readonly minValue?: number;
+}
+
+/**
+ * 把秒级时间戳渲染成 `YYYY-MM-DD`（UTC）。
+ *
+ * 纯函数：只读入参、不读时钟、不引入本地时区 —— 否则同一份会话日志在不同机器上
+ * 回放出的日期会不一样（红线 3）。
+ *
+ * @param seconds - 秒级 Unix 时间戳。
+ * @returns 日期字符串；无效输入返回空串，由调用方整段省略。
+ */
+function formatDate(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  return new Date(seconds * 1000).toISOString().slice(0, 10);
+}
+
 /** 搜索结果持久化的呈现元数据。 */
 export interface SearchMeta {
   /** 结构化来源。Markdown 无法无损承载它们，所以必须走 meta。 */
@@ -41,9 +69,10 @@ function escapeLinkText(input: string): string {
  * 混入 `card`/`sources` 之类的结构既浪费 token 又会误导模型。
  *
  * @param value - 工具的 Canonical Output。
+ * @param context - 本次调用的参数上下文（见 {@link SearchRenderContext}）。
  * @returns 单个文本块。
  */
-export function renderSearch(value: SearchOutput): ContentBlock[] {
+export function renderSearch(value: SearchOutput, context: SearchRenderContext = {}): ContentBlock[] {
   if (!value.ok) {
     const lines = [`❌ 搜索失败：${value.error?.message ?? '未知错误'}`];
     if (value.error?.hint !== undefined && value.error.hint !== '') lines.push(value.error.hint);
@@ -51,7 +80,12 @@ export function renderSearch(value: SearchOutput): ContentBlock[] {
   }
 
   if (value.items.length === 0) {
-    return [{ type: 'text', text: `未找到关于 "${value.query}" 的知乎内容。` }];
+    // 带下限时不能只说「未找到」：下限只筛本次候选，说成「知乎没有」就是错的结论。
+    const text =
+      context.minValue === undefined
+        ? `未找到关于 "${value.query}" 的知乎内容。`
+        : `未找到关于 "${value.query}" 的知乎内容。下限 ${String(context.minValue)} 只在本次检索到的候选中筛选，不代表知乎没有相关的高赞内容 —— 可放宽下限或换个关键词。`;
+    return [{ type: 'text', text }];
   }
 
   const lines: string[] = [`找到 ${String(value.items.length)} 条关于 "${value.query}" 的知乎结果：`, ''];
@@ -62,11 +96,28 @@ export function renderSearch(value: SearchOutput): ContentBlock[] {
     // 全网搜索会混进第三方网页：外站没有「知乎点赞」这回事，上游对它恒报 0，
     // 渲染出来就是把「不适用」说成「没人赞」——所以连同缺失一起整段省略。
     if (item.contentType !== '' && item.voteUpCount !== undefined) meta.push(`**点赞**: ${String(item.voteUpCount)}`);
+    // 评论数与点赞同源：外站没有「知乎评论」这回事，空类型时整段省略。
+    if (item.contentType !== '' && item.commentCount !== undefined) meta.push(`**评论**: ${String(item.commentCount)}`);
+    // 时间戳转日期，模型不必自己做时间戳算术；缺失时整段省略。
+    const date = item.editTime === undefined ? '' : formatDate(item.editTime);
+    if (date !== '') meta.push(`**时间**: ${date}`);
     // 类型缺失时整段省略，而不是渲染成空的「类型: 」。
     if (item.contentType !== '') meta.push(`**类型**: ${item.contentType}`);
     lines.push(meta.join(' | '));
     lines.push(`> ${item.snippet}`);
     lines.push('');
+  }
+  // 比请求的条数少：可能是候选本来就不够，也可能是被下限筛掉了。
+  // 不写出来，模型会把「筛掉了」读成「知乎只有这些」。
+  if (
+    context.minValue !== undefined &&
+    context.requestedCount !== undefined &&
+    value.items.length < context.requestedCount
+  ) {
+    lines.push(
+      `> 本次筛出 ${String(value.items.length)} 条（请求 ${String(context.requestedCount)} 条）：下限只在本次检索到的候选中生效，不是全库排序；要更多可放宽下限或换关键词。`,
+      '',
+    );
   }
   // hasMore 是模型唯一能据此改行为的信号：工具没有翻页参数，
   // 不写出来模型就会以为这就是全部结果。zhihu_search 的它恒为 false，因此不出现。

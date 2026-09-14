@@ -25,6 +25,44 @@ export const ZHIHU_SEARCH_TOOL = 'zhihu_search';
 const MAX_COUNT = 10;
 /** 未指定时使用的条数。 */
 const DEFAULT_COUNT = 5;
+
+/**
+ * 带下限筛选时使用的候选池大小。
+ *
+ * 为什么必须取**端点上限**而不是模型要的条数：知乎的 `SortBy` 区间只筛
+ * 「本次检索到的候选」（实测：同查询同下限，`count=3/5/10` 分别得到 1/1/3 条，
+ * 且结果恒为前 `count` 条的子集）。要的条数越少、候选越少，筛选就越容易把结果
+ * 筛空 —— 那是「知乎没有高赞内容」这类错误结论的来源。
+ * 取满上限后仍按模型要的条数截断，因此契约不变，只是不再白白丢掉候选。
+ */
+const FILTERED_CANDIDATE_COUNT = MAX_COUNT;
+
+/**
+ * 归一化模型请求的条数。
+ *
+ * `execute` 与 `render` 共用一份夹取逻辑：渲染层要用同一个数字判断
+ * 「结果是不是被下限筛少了」，两处各夹一次迟早会漂移。
+ *
+ * @param raw - 模型给的条数，未指定时用 {@link DEFAULT_COUNT}。
+ * @returns 落在 1..{@link MAX_COUNT} 的整数。
+ */
+function resolveRequestedCount(raw: number | undefined): number {
+  return Math.max(1, Math.min(Math.trunc(raw ?? DEFAULT_COUNT), MAX_COUNT));
+}
+
+/**
+ * 按本次请求的条数截断候选池的筛选结果。
+ *
+ * 缓存里存的必须是**完整候选池的筛选结果**：截断只发生在返回路径上，
+ * 否则 `count=3` 的调用会把 `count=10` 的缓存污染成 3 条。
+ *
+ * @param value - 候选池的筛选结果。
+ * @param requestedCount - 本次请求的条数。
+ * @returns 条目数不超过 `requestedCount` 的结果。
+ */
+function sliceItems(value: SearchOutput, requestedCount: number): SearchOutput {
+  return value.items.length <= requestedCount ? value : { ...value, items: value.items.slice(0, requestedCount) };
+}
 /** 协作式超时预算；超时必须早于 DSH 的外层截断，才能返回结构化错误。 */
 const TIMEOUT_MS = 15_000;
 
@@ -50,6 +88,9 @@ function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number] | und
     // 注意实测结论：上游**从未省略**该字段，外站网页也有这个键、值是占位的 0。
     // 省略分支是防伪造的兜底；外站那个 0 由渲染层决定不展示（present/search.ts）。
     ...(typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? { voteUpCount: item.VoteUpCount } : {}),
+    // 投影规则同上：上游没报就省略，绝不兜底成 0。
+    ...(typeof item.CommentCount === 'number' && Number.isFinite(item.CommentCount) ? { commentCount: item.CommentCount } : {}),
+    ...(typeof item.EditTime === 'number' && Number.isFinite(item.EditTime) ? { editTime: item.EditTime } : {}),
     // ContentType 缺失时留空，不编造标签：实测外站网页的类型是**空串**（字段在、值为空），
     // 兜底成 'Answer' 会让模型把一个陌生网页当成知乎回答。
     contentType: typeof item.ContentType === 'string' ? item.ContentType : '',
@@ -130,7 +171,8 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
           },
         },
       },
-      render: (_args, value) => renderSearch(value),
+      render: (args, value) =>
+        renderSearch(value, { requestedCount: resolveRequestedCount(args.count), minValue: args.minValue }),
       presentationMeta: (_args, value) => searchMetaFromValue(value),
     },
 
@@ -146,8 +188,7 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
       try {
         if (query === '') throw new CompileError('搜索关键词不能为空。');
 
-        const rawCount = args.count ?? DEFAULT_COUNT;
-        const count = Math.max(1, Math.min(Math.trunc(rawCount), MAX_COUNT));
+        const requestedCount = resolveRequestedCount(args.count);
         const sortField = args.sortField ?? 'default';
         const order = args.order ?? 'desc';
         const minValue = args.minValue;
@@ -166,12 +207,16 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
           'zhihu',
         );
 
-        // 缓存键必须用**归一化后**的参数：否则 count=99 与 count=10 会各占一个键。
-        const key = cacheKeyFor(deps, ZHIHU_SEARCH_TOOL, { query, count, sortBy, filter });
+        // 有下限时把候选池取满（理由见 FILTERED_CANDIDATE_COUNT）。
+        const poolCount = minValue === undefined ? requestedCount : Math.max(requestedCount, FILTERED_CANDIDATE_COUNT);
+
+        // 缓存键必须用**归一化后**的参数，且必须用候选池大小：
+        // 否则 count=3 与 count=10 会各占一个键，却发出两个内容相同的请求。
+        const key = cacheKeyFor(deps, ZHIHU_SEARCH_TOOL, { query, count: poolCount, sortBy, filter });
 
         // 缓存优先于限流：命中缓存不该消耗任何令牌，也不该消耗知乎额度。
         const cached = deps.cache.get(key);
-        if (cached !== undefined) return cached as SearchOutput;
+        if (cached !== undefined) return sliceItems(cached as SearchOutput, requestedCount);
 
         if (!deps.searchBucket.tryConsume()) {
           throw new LocalRateLimitError(
@@ -181,7 +226,7 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
         }
 
         const data = await deps.client.searchZhihu(
-          { query, count, ...(sortBy === undefined ? {} : { sortBy }), ...(filter === undefined ? {} : { filter }) },
+          { query, count: poolCount, ...(sortBy === undefined ? {} : { sortBy }), ...(filter === undefined ? {} : { filter }) },
           exec.signal,
         );
 
@@ -192,8 +237,9 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
         }
 
         const value: SearchOutput = { ok: true, query, items, hasMore: data.HasMore };
+        // 缓存完整池子，返回按本次条数截断 —— 顺序不可颠倒。
         deps.cache.set(key, value);
-        return value;
+        return sliceItems(value, requestedCount);
       } catch (error) {
         // 契约：execute 绝不 throw。任何失败都要变成结构化 Canonical Output。
         return { ok: false, query, items: [], hasMore: false, error: mapError(error) };

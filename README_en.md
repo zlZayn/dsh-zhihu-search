@@ -60,11 +60,11 @@ The three sections below are each tool's full parameter set and limits. The mode
 | `count` | integer | `5` | Number of results, 1–10. |
 | `sortField` | enum | `default` | `default` keeps relevance order; `voteUpCount` upvotes · `commentCount` comments · `editTime` last edit. |
 | `order` | enum | `desc` | `desc` or `asc`. Only applies when `sortField` is set. |
-| `minValue` | number | — | Inclusive lower bound on the sort field, **requires `sortField`**. With `sortField=voteUpCount` and `minValue=100` you get "only 100+ upvotes". |
+| `minValue` | number | — | Inclusive lower bound on the sort field, **requires `sortField`**, non-negative integer. With `sortField=voteUpCount` and `minValue=100` you get "only 100+ upvotes". |
 | `publishedAfter` | string | — | Only content published after this date, `YYYY-MM-DD`. |
 | `publishedBefore` | string | — | Only content published before this date, `YYYY-MM-DD`. |
 
-**Limits**: no domain filter — in-site results all come from Zhihu anyway; use `zhihu_global_search` to search a specific site. `count` caps at 10. `minValue` and a non-default `order` require `sortField`: without it the call is rejected with a correction hint rather than silently returning unfiltered results. **No pagination**: `hasMore` is always `false`; for more results change the keywords or the sort.
+**Limits**: no domain filter — in-site results all come from Zhihu anyway; use `zhihu_global_search` to search a specific site. `count` caps at 10. `minValue` and a non-default `order` require `sortField`: without it the call is rejected with a correction hint rather than silently returning unfiltered results. **No pagination**: `hasMore` is always `false`; for more results change the keywords or the sort. **The lower bound screens the candidates retrieved by this call** (Zhihu's range syntax filters within the retrieved candidates rather than sorting the whole corpus): when a lower bound is present the plugin fetches the largest candidate pool the endpoint allows, then trims to the count you asked for, and says so when the bound winnowed the list. An empty result still does not mean Zhihu has no highly upvoted content.
 
 ### `zhihu_global_search` — global web index search
 
@@ -72,12 +72,12 @@ The three sections below are each tool's full parameter set and limits. The mode
 |---|---|---|---|
 | `query` | string | **required** | Search keywords. |
 | `count` | integer | `8` | Number of results, 1–20 — wider than in-site. |
-| `site` | string | — | Only this domain, e.g. `github.com`. A full URL is reduced to its host. |
+| `site` | string | — | Only this domain, e.g. `github.com`. A full URL is reduced to its host, and a leading `www.` is dropped. |
 | `publishedAfter` | string | — | Only content published after this date, `YYYY-MM-DD`. |
 | `publishedBefore` | string | — | Only content published before this date, `YYYY-MM-DD`. |
 | `searchDb` | enum | `all` | `all` · `realtime` newest · `static` long-term index. |
 
-**Limits**: **there is no sorting parameter** — the endpoint ignores the sort field, so the plugin does not offer a knob that does nothing. **There is no pagination parameter either**: at most 20 results per call, and the server truncates anything larger. `site` rejects `zhihu.com` and its subdomains; Zhihu refuses that request outright. The results **mix in some Zhihu content**; to search Zhihu's own questions and articles specifically, use `zhihu_search`.
+**Limits**: the domain is matched **exactly**, so subdomains must be listed separately (`qq.com` does not reach pages on `news.qq.com`). **There is no sorting parameter** — the endpoint ignores the sort field, so the plugin does not offer a knob that does nothing. **There is no pagination parameter either**: at most 20 results per call, and the server truncates anything larger. `site` rejects `zhihu.com` and its subdomains; Zhihu refuses that request outright. The results **mix in some Zhihu content**; to search Zhihu's own questions and articles specifically, use `zhihu_search`.
 
 ### `zhihu_zhida` — Zhida
 
@@ -92,7 +92,7 @@ The three sections below are each tool's full parameter set and limits. The mode
 ## Capabilities
 
 - The three tools do not overlap: in-site for experience, global index for material, Zhida for synthesis — the model picks by question type.
-- Search returns structured source entries (title / URL / snippet / author / upvotes), every one carrying a URL, so results can be cited and checked.
+- Search returns structured source entries (title / URL / snippet / author / upvotes / comments / date), every one carrying a URL, so results can be cited and checked; comments and date line up one-to-one with the three `sortField` options, so the model can sort by what it can actually see.
 - Results render both as source cards and as plain Markdown, so they stay readable anywhere.
 
 ## Install
@@ -138,6 +138,13 @@ Get the Access Secret from the [Zhihu Open Platform profile](https://developer.z
 ### Use an environment variable instead
 
 If you would rather not keep the secret in settings, use the `ZHIHU_ACCESS_SECRET` environment variable. Or put a different name in the card's "Credential reference" to point at another environment variable or credential record.
+
+### Advanced: timeouts and limits
+
+Plugin options live in the `Config` of [src/index.ts](src/index.ts) (edit the plugin config in `cordis.patch.yml`). Two timeouts are worth knowing:
+
+- `timeoutMs` (default 15s): per-request budget for searches.
+- `streamTimeoutMs` (default 55s): budget for reading a whole Zhida stream; the Zhida tool's timeout follows it automatically. Raising the request timeout never shrinks it (the larger of the two wins), so this is the one to raise.
 
 ### Zhihu results only
 

@@ -29,8 +29,13 @@ const ZHIDA_MODEL_MAP = {
 /** 档位的模型可见取值。 */
 const ZHIDA_MODELS = ['fast', 'thinking', 'agent'] as const;
 
-/** 直答是流式生成，预算必须显著宽于搜索。 */
-const TIMEOUT_MS = 60_000;
+/**
+ * 工具协作式预算相对传输层流式预算的余量。
+ *
+ * 必须为正：DSH 在工具预算耗尽时截断调用，而我们要的是**传输层先超时**，
+ * 这样失败才能以 `{ok:false,error}` 的结构化形态回到模型，而不是一次裸超时。
+ */
+const TOOL_TIMEOUT_MARGIN_MS = 5_000;
 
 /**
  * 构造 `zhihu_zhida` 工具。
@@ -39,6 +44,8 @@ const TIMEOUT_MS = 60_000;
  * @returns 可直接注册的工具定义。
  */
 export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
+  // 预算跟着配置走：直答是流式生成，必须比搜索宽，且始终晚于传输层超时。
+  const timeoutMs = deps.streamTimeoutMs + TOOL_TIMEOUT_MARGIN_MS;
   return defineTool({
     name: ZHIHU_ZHIDA_TOOL,
     description:
@@ -87,7 +94,7 @@ export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
       render: (args, value) => renderZhida(value, args.includeReasoning ?? false),
     },
 
-    timeoutMs: TIMEOUT_MS,
+    timeoutMs,
     // 无父级状态，可并行；但本地令牌桶会限制实际并发。
     isConcurrencySafe: () => true,
     presentCall: (args) => presentZhidaCall(args),

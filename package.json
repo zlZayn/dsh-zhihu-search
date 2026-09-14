@@ -61,6 +61,7 @@
     "typecheck": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.client.json",
     "test": "npm run build && vitest run",
     "test:watch": "vitest",
+    "test:contract": "vitest run --config vitest.contract.config.ts",
     "prepare": "npm run build"
   },
   "peerDependencies": {

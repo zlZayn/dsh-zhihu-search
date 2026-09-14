@@ -49,9 +49,13 @@ export interface ZhihuSearchData {
    * ⚠ 实测**不是游标**：原样传回不改变结果（试过 SearchHashId / HashId / Cursor / Offset / Page / Start）。
    */
   SearchHashId?: string;
-  /** 无结果原因；有结果时为空串。 */
-  EmptyReason?: string;
-  /** 搜索结果条目。 */
+  /**
+   * 搜索结果条目。
+   *
+   * ⚠ 官方文档里的 `EmptyReason` 刻意不声明：实测它**只在 `Items` 为空时出现**，
+   * 取值恒为字符串「无相关内容」——有结果时字段整个缺席，被过滤空时也不区分原因。
+   * 零诊断价值，因此既不进类型也不透出（将来若它开始携带真实原因，再补测后加回）。
+   */
   Items?: ZhihuSearchItem[];
 }
 
@@ -134,6 +138,20 @@ export interface SearchOutput {
      * 它不代表「没人赞」。省略分支是防伪造的兜底，外站那个 0 不在渲染层展示。
      */
     voteUpCount?: number;
+    /**
+     * 评论数。规则与 {@link SearchOutput.items.voteUpCount} 相同：上游没报就整个键省略。
+     *
+     * 为什么要透出：`zhihu_search` 的 `sortField` 允许按评论数排序，
+     * 「能按它排却看不到它」会让模型无法核对，也无法向用户交代。
+     */
+    commentCount?: number;
+    /**
+     * 内容时间（秒级 Unix 时间戳；官方定义为发布时间或最后编辑时间）。
+     *
+     * 与 `sortField: 'editTime'` 对称：给了排序旋钮就必须给得出读数。
+     * 渲染层转成日期展示，不在这里做格式化（Canonical Output 只放纯数据）。
+     */
+    editTime?: number;
     contentType: string;
   }>;
   /**

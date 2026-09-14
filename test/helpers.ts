@@ -56,6 +56,8 @@ export function makeHarness(handler: FetchHandler): Harness {
       cache: state.cache,
       baseUrl: 'https://example.test',
       credentialId: () => 'test-secret',
+      // 与生产同源：工具预算按客户端**实际生效**的流式预算推导。
+      streamTimeoutMs: client.streamTimeoutMs,
       searchBucket: state.searchBucket,
       zhidaBucket: state.zhidaBucket,
     },

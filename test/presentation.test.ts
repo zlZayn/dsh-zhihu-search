@@ -100,6 +100,35 @@ describe('renderSearch（模型可见层）', () => {
     expect(zeroVotes).toContain('**点赞**: 0');
   });
 
+  it('带下限的空结果不写成「知乎没有」，而是说明下限只筛本次候选', () => {
+    const text = textOf(renderSearch({ ...okValue, items: [] }, { requestedCount: 5, minValue: 100 }));
+    expect(text).toContain('未找到');
+    expect(text).toContain('下限 100');
+    expect(text).toContain('不代表知乎没有');
+  });
+
+  it('筛后条数少于请求条数时说明「只筛本次候选」，避免被读成「知乎只有这些」', () => {
+    const text = textOf(renderSearch(okValue, { requestedCount: 5, minValue: 100 }));
+    expect(text).toContain('本次筛出 2 条');
+    expect(text).toContain('不是全库排序');
+  });
+
+  it('没带下限时不出现候选池提示（不制造噪音）', () => {
+    expect(textOf(renderSearch(okValue, { requestedCount: 5 }))).not.toContain('本次筛出');
+  });
+
+  it('渲染评论数与日期（UTC）；外站页面省略评论数但保留时间', () => {
+    const zhihu = { ...okValue.items[0]!, commentCount: 12, editTime: 1789291891 };
+    const text = textOf(renderSearch({ ...okValue, items: [zhihu] }));
+    expect(text).toContain('**评论**: 12');
+    expect(text).toContain('**时间**: 2026-09-13');
+
+    const external = { title: '外站', url: 'https://example.com/a', snippet: 's', author: '某站', contentType: '', commentCount: 0, editTime: 1789291891 };
+    const externalText = textOf(renderSearch({ ...okValue, items: [external] }));
+    expect(externalText).not.toContain('评论');
+    expect(externalText).toContain('**时间**: 2026-09-13');
+  });
+
   it('hasMore 为真时把「结果被截断」告诉模型（工具没有翻页参数）', () => {
     const text = textOf(renderSearch({ ...okValue, hasMore: true }));
     expect(text).toContain('结果未全部返回');

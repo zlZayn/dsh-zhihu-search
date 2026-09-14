@@ -76,6 +76,55 @@ describe('zhihu_search', () => {
     harness.dispose();
   });
 
+  it('带下限时把候选池取到端点上限，再按请求条数截断', async () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({
+      ...apiItem,
+      ContentID: String(i),
+      Url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
+      VoteUpCount: 100 + i,
+    }));
+    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: many })));
+    const value = (await tool.execute(
+      { query: 'RAG', count: 3, sortField: 'voteUpCount', minValue: 100 },
+      execContext(),
+    )) as SearchOutput;
+    // 区间只筛本次候选：条数要得越小，候选越少，越容易筛空 —— 所以候选池取端点上限。
+    expect(harness.urls[0]).toContain('Count=10');
+    // 但交给模型的仍然只有它要的条数。
+    expect(value.items).toHaveLength(3);
+    harness.dispose();
+  });
+
+  it('候选池缓存不被小 count 污染：count=3 之后 count=10 仍能拿满', async () => {
+    let calls = 0;
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      ...apiItem,
+      ContentID: String(i),
+      Url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
+    }));
+    const { tool, harness } = makeTool(async () => {
+      calls += 1;
+      return jsonResponse(envelope({ HasMore: false, Items: many }));
+    });
+    const small = (await tool.execute({ query: 'RAG', count: 3, sortField: 'voteUpCount', minValue: 1 }, execContext())) as SearchOutput;
+    const large = (await tool.execute({ query: 'RAG', count: 10, sortField: 'voteUpCount', minValue: 1 }, execContext())) as SearchOutput;
+    expect(small.items).toHaveLength(3);
+    expect(large.items).toHaveLength(8);
+    // 同一个候选池，因此只发一次请求：缓存的是池子，截断发生在返回路径。
+    expect(calls).toBe(1);
+    harness.dispose();
+  });
+
+  it('投影评论数与时间戳，让「按评论/按时间排」这两个旋钮有读数可核对', async () => {
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [{ ...apiItem, CommentCount: 9 }] })),
+    );
+    const value = (await tool.execute({ query: 'RAG' }, execContext())) as SearchOutput;
+    expect(value.items[0]?.commentCount).toBe(9);
+    expect(value.items[0]?.editTime).toBe(1_700_000_000);
+    harness.dispose();
+  });
+
   it('minValue 缺 sortField 时返回 param 错误，而不是静默下发未过滤查询', async () => {
     const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
     const value = (await tool.execute({ query: 'RAG', minValue: 100 }, execContext())) as SearchOutput;
@@ -366,6 +415,47 @@ describe('zhihu_zhida', () => {
     const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;
     expect(value.ok).toBe(false);
     expect(value.error?.kind).toBe('param');
+    harness.dispose();
+  });
+
+  it('流式中途失败不交付半截答案（官方文档定义的中途错误帧）', async () => {
+    const harness = makeHarness(async () =>
+      sseResponse([
+        'data: {"choices":[{"delta":{"content":"前面这段不该被交付"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"error"}],"error":{"message":"Internal server error","type":"server_error","code":"internal_error"}}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const tool = createZhihuZhidaTool(harness.deps);
+    const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;
+    expect(value.ok).toBe(false);
+    expect(value.answer).toBe('');
+    expect(value.error?.kind).toBe('server');
+    harness.dispose();
+  });
+
+  it('直答的错误 code 是字符串时也要分类：频率限制给 rate_limit 与可行动 hint', async () => {
+    // 实测形态：直答返回 OpenAI 兼容错误体，code 为字符串（不是数字错误码）。
+    const harness = makeHarness(async () =>
+      jsonResponse({ error: { message: 'rate limit exceeded', type: 'rate_limit_error', param: null, code: 'rate_limit_exceeded' } }, 429),
+    );
+    const tool = createZhihuZhidaTool(harness.deps);
+    const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;
+    expect(value.ok).toBe(false);
+    expect(value.error?.kind).toBe('rate_limit');
+    expect(value.error?.hint).toContain('稍等');
+    harness.dispose();
+  });
+
+  it('档位未授权（model_not_found）指向换档位，而不是退化成 unknown', async () => {
+    const harness = makeHarness(async () =>
+      jsonResponse({ error: { message: 'model not found', type: 'invalid_request_error', param: 'model', code: 'model_not_found' } }, 404),
+    );
+    const tool = createZhihuZhidaTool(harness.deps);
+    const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;
+    expect(value.ok).toBe(false);
+    expect(value.error?.kind).toBe('param');
+    expect(value.error?.hint).toContain('档位');
     harness.dispose();
   });
 });

@@ -1,0 +1,58 @@
+# 契约测试（API 防腐化）：盯住**知乎开放平台的行为指纹**，而不是我们的实现。
+#
+# 为什么不进日常 CI：它打真实接口、消耗每日配额（约 15 次/轮）。
+# 触发方式是每周一次 + 手动。红了意味着**上游契约变了**，处理顺序见 test/README.md：
+# 先重跑探针确认不是偶发 → 更新 docs/ARCHITECTURE.md 的「与知乎官方文档的偏差」
+# → 最后才改实现与断言。反过来做就会把「上游变了」写成「测试过时了」。
+name: Contract
+
+on:
+  schedule:
+    # 每周一 01:00 UTC（北京时间 09:00）。
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      # 与 ci.yml 一致：v7 的 action 自带 node24 运行时。
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # 密钥缺席必须**红**，不能静默跳过：跳过等于这套机制不存在。
+      # 契约测试文件里也有一条同名断言，两道一起拦。
+      - name: Require ZHIHU_ACCESS_SECRET
+        env:
+          SECRET: ${{ secrets.ZHIHU_ACCESS_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "::error::仓库未配置 ZHIHU_ACCESS_SECRET，契约测试无法运行"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Run contract tests against the live API
+        env:
+          ZHIHU_ACCESS_SECRET: ${{ secrets.ZHIHU_ACCESS_SECRET }}
+        run: npm run test:contract
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## 契约测试"
+            echo ""
+            echo "盯住的上游指纹：站内搜索（Count 上限 10 / 区间只筛本次候选 / 未记载的 Filter=publish_time / SearchHashId 非游标 / EmptyReason 常量），"
+            echo "全网搜索（Count 上限 20 / host 整串精确匹配 / host!= 可用 / SortBy 被忽略 / 外站空类型与占位 0 赞）。"
+            echo ""
+            echo "红了怎么办：先重跑探针确认不是偶发，再更新 docs/ARCHITECTURE.md 的「与知乎官方文档的偏差」，最后才改实现与断言。"
+          } >> "$GITHUB_STEP_SUMMARY"

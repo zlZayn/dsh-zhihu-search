@@ -15,7 +15,7 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials';
 import type {} from '@deepseek-ai/dsh-agent';
 import type {} from '@deepseek-ai/dsh-settings';
 import z from '@deepseek-ai/schemastery';
-import { ZHIHU_BASE_URL, ZhihuClient } from './transport.js';
+import { DEFAULT_STREAM_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, ZHIHU_BASE_URL, ZhihuClient } from './transport.js';
 import { resolveAccessSecret as resolveAccessSecretFrom } from './credentials.js';
 import { createState } from './state.js';
 import type { ToolDeps } from './tools/deps.js';
@@ -89,8 +89,15 @@ export interface Config {
   accessSecretRef?: string;
   /** 覆盖接入域名，便于指向沙箱或代理。 */
   baseUrl?: string;
-  /** 单次 HTTP 请求的超时预算（毫秒）。 */
+  /** 单次 HTTP 请求的超时预算（毫秒）。搜索走它。 */
   timeoutMs?: number;
+  /**
+   * 流式生成（直答）整轮读取的超时预算（毫秒）。
+   *
+   * 与 {@link Config.timeoutMs} 取较大者，因此调大它才有效、调小它不会把生成压回搜索级预算。
+   * 直答工具的协作式预算自动跟着它走（见 `tools/zhida.ts`）。
+   */
+  streamTimeoutMs?: number;
   /** 搜索结果缓存存活时长（毫秒）。 */
   cacheTtlMs?: number;
   /** 搜索结果缓存条目上限。 */
@@ -121,7 +128,8 @@ export const Config = z.object({
   accessSecret: z.string().role('secret'),
   accessSecretRef: z.string().role('credential-ref').default(DEFAULT_ACCESS_SECRET_REF),
   baseUrl: z.string().default(ZHIHU_BASE_URL),
-  timeoutMs: z.natural().default(15_000),
+  timeoutMs: z.natural().default(DEFAULT_TIMEOUT_MS),
+  streamTimeoutMs: z.natural().default(DEFAULT_STREAM_TIMEOUT_MS),
   cacheTtlMs: z.natural().default(600_000),
   cacheMaxEntries: z.natural().default(200),
   searchPerMinute: z.natural().default(60),
@@ -162,13 +170,15 @@ function assertPositiveInteger(key: string, value: number | undefined): void {
  */
 export function apply(ctx: Context, config: Config): void {
   assertPositiveInteger('timeoutMs', config.timeoutMs);
+  assertPositiveInteger('streamTimeoutMs', config.streamTimeoutMs);
   assertPositiveInteger('cacheTtlMs', config.cacheTtlMs);
   assertPositiveInteger('cacheMaxEntries', config.cacheMaxEntries);
   assertPositiveInteger('searchPerMinute', config.searchPerMinute);
   assertPositiveInteger('zhidaPerMinute', config.zhidaPerMinute);
 
   const baseUrl = config.baseUrl ?? ZHIHU_BASE_URL;
-  const timeoutMs = config.timeoutMs ?? 15_000;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const streamTimeoutMs = config.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS;
 
   // 权威 section 的读取器。设置界面写入后，Host 通过 setSource 换掉它，
   // 因此在途与后续调用都会看到新值，无需重启。
@@ -352,13 +362,15 @@ export function apply(ctx: Context, config: Config): void {
       searchPerMinute: config.searchPerMinute ?? 60,
       zhidaPerMinute: config.zhidaPerMinute ?? 10,
     });
-    const client = new ZhihuClient({ resolveAccessSecret, baseUrl, timeoutMs });
+    const client = new ZhihuClient({ resolveAccessSecret, baseUrl, timeoutMs, streamTimeoutMs });
 
     const deps: ToolDeps = {
       client,
       cache: state.cache,
       baseUrl,
       credentialId,
+      // 工具预算按客户端实际生效的值推导：配置被 max() 抬高时，工具预算跟着抬。
+      streamTimeoutMs: client.streamTimeoutMs,
       searchBucket: state.searchBucket,
       zhidaBucket: state.zhidaBucket,
     };

@@ -58,6 +58,22 @@ describe('compileSortBy', () => {
   it('对非法下限抛 CompileError 而不是静默产出坏字符串', () => {
     expect(() => compileSortBy({ sortField: 'voteUpCount', minValue: Number.NaN })).toThrow(CompileError);
   });
+
+  it('拒绝负数下限 —— 知乎只收非负整数，本地拦下才给得出可据以纠正的 hint', () => {
+    // 实测：服务端报 `SortBy bounds must be nonnegative integers`，
+    // 而 10001 的通用 hint 讲的是 Filter/域名过滤，与模型的真实错误无关。
+    try {
+      compileSortBy({ sortField: 'voteUpCount', minValue: -5 });
+      expect.unreachable('应当抛出 CompileError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(CompileError);
+      expect((error as CompileError).hint).toContain('非负');
+    }
+  });
+
+  it('拒绝超出安全整数范围的下限，避免生成 1e+21 这类非法字面量', () => {
+    expect(() => compileSortBy({ sortField: 'voteUpCount', minValue: 1e21 })).toThrow(CompileError);
+  });
 });
 
 describe('compileFilter', () => {
@@ -79,6 +95,11 @@ describe('compileFilter', () => {
 
   it('站内搜索作用域下允许 publish_time', () => {
     expect(compileFilter({ publishedAfter: '2024-01-01' }, 'zhihu')).toBe('publish_time>=1704067200');
+  });
+
+  it('剥掉开头的 www. —— host 是整串精确匹配，留着它会让查询静默返回 0 条', () => {
+    expect(compileFilter({ site: 'www.github.com' })).toBe('host=="github.com"');
+    expect(compileFilter({ site: 'https://www.github.com/a/b' })).toBe('host=="github.com"');
   });
 
   it('把整条 URL 归一化成主机名', () => {

@@ -38,8 +38,17 @@ const SSE_DONE_SENTINEL = '[DONE]';
 /** 服务端错误重试前的退避时长。 */
 const RETRY_BACKOFF_MS = 400;
 
-/** 默认单次请求超时。 */
-const DEFAULT_TIMEOUT_MS = 15_000;
+/** 单次请求超时的默认值；同时是插件 Config 里 `timeoutMs` 的默认值来源。 */
+export const DEFAULT_TIMEOUT_MS = 15_000;
+
+/**
+ * 流式生成（直答）读取预算的默认值；同时是插件 Config 里 `streamTimeoutMs` 的默认值来源。
+ *
+ * 搜索是「一问一答」，15s 足够；直答是**生成**，整轮读取必须比请求超时宽得多，
+ * 否则修好定时器释放时机之后，反而会把正常进行的长回答切掉。
+ * 55s 是默认值而非硬编码上限：用户可在 Config 调大，但**不会**低于请求超时（取两者较大者）。
+ */
+export const DEFAULT_STREAM_TIMEOUT_MS = 55_000;
 
 // ===========================================================================
 // 错误
@@ -91,7 +100,7 @@ function mapPlatformError(code: number, message: string): ZhihuClientError {
     case 10001:
       return new ZhihuClientError('param', text, {
         code,
-        hint: '参数不被知乎接受。站内搜索只支持 Filter 的 publish_time，host 仅全网搜索支持且拒绝知乎域名。',
+        hint: '知乎拒绝了本次参数。若错误提到 SortBy，请检查排序字段与下限取值；站内搜索的 Filter 只支持 publish_time，域名过滤仅全网搜索支持。',
       });
     case 20001:
       return new ZhihuClientError('auth', text, {
@@ -170,7 +179,12 @@ function withTimeout(signal: AbortSignal | undefined, timeoutMs: number): TimedS
   }
 
   const timer = setTimeout(() => {
-    controller.abort(new Error('zhihu request timeout'));
+    // 中止原因必须是带分类的错误：fetch 会以它拒绝，于是超时不会被误报成 TLS/网络故障。
+    controller.abort(
+      new ZhihuClientError('timeout', `知乎请求超过 ${String(timeoutMs)}ms 未完成。`, {
+        hint: '网络或知乎侧响应过慢，请稍后重试；直答的长回答需要更宽的预算。',
+      }),
+    );
   }, timeoutMs);
   // 不因一个未决定时器阻止进程退出。
   timer.unref();
@@ -320,6 +334,67 @@ export interface ZhihuChatChunk {
   readonly content?: string;
   /** 思维链增量。知乎直答会先吐它，再吐正文。 */
   readonly reasoningContent?: string;
+  /** 该帧声明的结束原因；`error` 表示这一轮以失败告终。 */
+  readonly finishReason?: string;
+  /** 中途失败帧解析出的错误；有值时调用方必须终止整轮。 */
+  readonly error?: ZhihuClientError;
+}
+
+/**
+ * 把直答（OpenAI 兼容）错误体分类为客户端错误。
+ *
+ * ⚠ 不能复用信封错误码那条分支：直答成功时不含 `Code`，失败时的 `code` 是
+ * **字符串**（如 `model_not_found`、`rate_limit_exceeded`），另有 `type` 字段。
+ * 只认数字会把「频率限制」「档位未授权」一律压成 `unknown` —— 实测：
+ * 直答返回 `rate limit exceeded` 时插件给出的是 `kind=unknown` 且无 hint，
+ * 模型据此无法判断该等待、该换档位，还是该改 Secret。
+ *
+ * @param failure - 响应里的 `error` 体；畸形（含 `undefined`）时返回 `undefined`。
+ * @param status - HTTP 状态码，作为分类的兜底证据。
+ * @returns 已分类的错误；没有可用错误体时返回 `undefined`。
+ */
+export function classifyChatFailure(failure: unknown, status?: number): ZhihuClientError | undefined {
+  if (typeof failure !== 'object' || failure === null) return undefined;
+  const record = failure as { message?: unknown; type?: unknown; code?: unknown };
+  const message =
+    typeof record.message === 'string' && record.message.trim() !== '' ? record.message : '知乎直答返回错误。';
+  const codeText = typeof record.code === 'string' ? record.code : '';
+  const typeText = typeof record.type === 'string' ? record.type : '';
+  const hay = `${typeText} ${codeText} ${message}`.toLowerCase();
+  const numericCode = typeof record.code === 'number' ? record.code : undefined;
+  const codeField = numericCode === undefined ? {} : { code: numericCode };
+
+  if (status === 429 || /rate.?limit|too many requests|quota|30001/.test(hay)) {
+    return new ZhihuClientError('rate_limit', message, {
+      ...codeField,
+      hint: '知乎直答触发频率限制。稍等片刻再试，或降低调用频率。',
+    });
+  }
+  if (status === 401 || status === 403 || /unauthor|authentication|forbidden|invalid.?api.?key|20001/.test(hay)) {
+    return new ZhihuClientError('auth', message, {
+      ...codeField,
+      hint: '鉴权失败。若 Secret 正确，请检查本机系统时间（知乎要求时间差 < 10 分钟）。',
+    });
+  }
+  if (
+    status === 400 ||
+    status === 404 ||
+    /model_not_found|model.*not.*(found|exist)|permission|invalid_request|missing_required_parameter|unsupported|10001/.test(
+      hay,
+    )
+  ) {
+    return new ZhihuClientError('param', message, {
+      ...codeField,
+      hint: '请求不被知乎直答接受。若与档位有关，换成 fast 或 thinking 再试；档位是否可用取决于账号授权。',
+    });
+  }
+  if ((status ?? 0) >= 500 || /server_error|internal|overload|unavailable|temporar|90001/.test(hay)) {
+    return new ZhihuClientError('server', message, {
+      ...codeField,
+      hint: '知乎服务端错误，请稍后重试。',
+    });
+  }
+  return new ZhihuClientError('unknown', message, codeField);
 }
 
 /**
@@ -328,6 +403,10 @@ export interface ZhihuChatChunk {
  * 容错优先：非 JSON、缺 `choices`、`delta` 为空对象都返回 `undefined`，
  * 绝不 throw。理由是流式过程中偶尔会混入非内容事件，
  * 为此中断整轮回答的代价远大于丢掉一个空增量。
+ *
+ * ⚠ 但 `finish_reason: "error"` 与顶层 `error` 体不是「非内容事件」：
+ * 官方文档定义的中途失败帧正是这个形态，忽略它会把**半截回答当成完整答案**。
+ * 因此这里把失败解析成 `error` 字段，由 {@link ZhihuClient.chat} 终止整轮。
  *
  * @param payload - {@link parseSSEStream} 产出的载荷原文。
  * @returns 增量；无可提取内容时返回 `undefined`。
@@ -342,17 +421,30 @@ export function deltaFromPayload(payload: string): ZhihuChatChunk | undefined {
   if (typeof envelope !== 'object' || envelope === null) return undefined;
   const choices = (envelope as { choices?: unknown }).choices;
   if (!Array.isArray(choices) || choices.length === 0) return undefined;
-  const first = choices[0] as { delta?: unknown } | undefined;
+  const first = choices[0] as { delta?: unknown; finish_reason?: unknown } | undefined;
   const delta = first?.delta;
-  if (typeof delta !== 'object' || delta === null) return undefined;
+  const finishReason =
+    typeof first?.finish_reason === 'string' && first.finish_reason !== '' ? first.finish_reason : undefined;
+  const failure = classifyChatFailure((envelope as { error?: unknown }).error);
+  const error =
+    failure ??
+    (finishReason === 'error'
+      ? new ZhihuClientError('server', '知乎直答在流式返回中途失败。', {
+          hint: '已收到的内容不完整，请重试。',
+        })
+      : undefined);
 
-  const record = delta as { content?: unknown; reasoning_content?: unknown };
-  const chunk: { content?: string; reasoningContent?: string } = {};
-  if (typeof record.content === 'string' && record.content !== '') chunk.content = record.content;
-  if (typeof record.reasoning_content === 'string' && record.reasoning_content !== '') {
-    chunk.reasoningContent = record.reasoning_content;
+  const chunk: { content?: string; reasoningContent?: string; finishReason?: string; error?: ZhihuClientError } = {};
+  if (typeof delta === 'object' && delta !== null) {
+    const record = delta as { content?: unknown; reasoning_content?: unknown };
+    if (typeof record.content === 'string' && record.content !== '') chunk.content = record.content;
+    if (typeof record.reasoning_content === 'string' && record.reasoning_content !== '') {
+      chunk.reasoningContent = record.reasoning_content;
+    }
   }
-  return chunk.content === undefined && chunk.reasoningContent === undefined ? undefined : chunk;
+  if (finishReason !== undefined) chunk.finishReason = finishReason;
+  if (error !== undefined) chunk.error = error;
+  return Object.keys(chunk).length === 0 ? undefined : chunk;
 }
 
 /** 直答完整结果。 */
@@ -386,6 +478,13 @@ export interface ZhihuClientConfig {
   readonly baseUrl?: string;
   /** 单次请求超时；应显著小于工具声明的 `timeoutMs`，把重试预算留在外面。 */
   readonly timeoutMs?: number;
+  /**
+   * 流式生成（直答）整轮读取的预算。
+   *
+   * 与 {@link ZhihuClientConfig.timeoutMs} 取**较大者**：调大请求超时永远只会放宽流式预算，
+   * 不会把生成压回搜索级的短预算里去。默认 {@link DEFAULT_STREAM_TIMEOUT_MS}。
+   */
+  readonly streamTimeoutMs?: number;
   /** 注入 fetch 实现，测试用。 */
   readonly fetchImpl?: typeof fetch;
 }
@@ -428,7 +527,13 @@ export class ZhihuClient {
   readonly #config: ZhihuClientConfig;
   readonly #baseUrl: string;
   readonly #timeoutMs: number;
+  readonly #streamTimeoutMs: number;
   readonly #fetch: typeof fetch;
+
+  /** 实际生效的流式读取预算（已与请求超时取较大者），供工具推导自己的协作式预算。 */
+  get streamTimeoutMs(): number {
+    return this.#streamTimeoutMs;
+  }
 
   constructor(config: ZhihuClientConfig) {
     // ⚠ 刻意**不在构造期**校验凭据。
@@ -438,6 +543,8 @@ export class ZhihuClient {
     this.#config = config;
     this.#baseUrl = config.baseUrl ?? ZHIHU_BASE_URL;
     this.#timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    // 「默认值与配置值的较大者」：弹性交给这里，调用方不必关心两者的相对大小。
+    this.#streamTimeoutMs = Math.max(config.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS, this.#timeoutMs);
     this.#fetch = config.fetchImpl ?? fetch;
   }
 
@@ -561,7 +668,7 @@ export class ZhihuClient {
       signal,
       1,
     );
-    return { HasMore: data?.HasMore ?? false, Items: data?.Items ?? [], SearchHashId: data?.SearchHashId, EmptyReason: data?.EmptyReason };
+    return { HasMore: data?.HasMore ?? false, Items: data?.Items ?? [], SearchHashId: data?.SearchHashId };
   }
 
   /**
@@ -577,7 +684,7 @@ export class ZhihuClient {
       signal,
       1,
     );
-    return { HasMore: data?.HasMore ?? false, Items: data?.Items ?? [], SearchHashId: data?.SearchHashId, EmptyReason: data?.EmptyReason };
+    return { HasMore: data?.HasMore ?? false, Items: data?.Items ?? [], SearchHashId: data?.SearchHashId };
   }
 
   /** 查询每日额度；实测不消耗业务额度，可用于自检。 */
@@ -594,7 +701,7 @@ export class ZhihuClient {
    * @throws ZhihuClientError 当响应不是事件流（即错误体或非流式结果）时。
    */
   async openChatStream(request: ZhihuChatRequest, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
-    const timed = withTimeout(signal, this.#timeoutMs);
+    const timed = withTimeout(signal, this.#streamTimeoutMs);
     let response: Response;
     try {
       response = await this.#fetch(`${this.#baseUrl}${ENDPOINT_CHAT_COMPLETIONS}`, {
@@ -604,31 +711,57 @@ export class ZhihuClient {
         signal: timed.signal,
       });
     } catch (error) {
-      throw toClientError(error, signal);
-    } finally {
-      // 注意：此处只释放定时器；流式读取的超时由调用方通过 signal 控制。
       timed.dispose();
+      throw toClientError(error, signal);
     }
 
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.includes('text/event-stream') || response.body === null) {
       // 直答失败时返回的是 JSON 错误体而非事件流，必须在这里转成结构化错误。
+      timed.dispose();
       const text = await response.text();
       throw this.#chatErrorFrom(text, response.status);
     }
-    return response.body;
+
+    // ⚠ 定时器与调用方 signal 的转发必须活到**流结束**，不能在拿到响应头时就释放：
+    // 提前释放会让响应头之后的读取既没有本地超时，也不再响应取消 ——
+    // 卡死的连接只能等对端关闭（实测：释放监听器后 abort 不再到达 fetch）。
+    const reader = response.body.getReader();
+    let released = false;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      timed.dispose();
+    };
+
+    return new ReadableStream<Uint8Array>({
+      async pull(controller): Promise<void> {
+        try {
+          const chunk = await reader.read();
+          if (chunk.done === true) {
+            release();
+            controller.close();
+            return;
+          }
+          if (chunk.value !== undefined) controller.enqueue(chunk.value);
+        } catch (error) {
+          release();
+          controller.error(error);
+        }
+      },
+      async cancel(reason): Promise<void> {
+        release();
+        await reader.cancel(reason).catch(() => undefined);
+      },
+    });
   }
 
   /** 把直答的非流式响应体解析为错误或非流式结果。 */
   #chatErrorFrom(text: string, status: number): ZhihuClientError {
     try {
       const parsed = JSON.parse(text) as Partial<ZhihuChatError>;
-      const failure = parsed.error;
-      if (typeof failure === 'object' && failure !== null) {
-        const message = typeof failure.message === 'string' ? failure.message : '知乎直答返回错误。';
-        const code = typeof failure.code === 'number' ? failure.code : undefined;
-        return new ZhihuClientError('unknown', message, { code });
-      }
+      const classified = classifyChatFailure(parsed.error, status);
+      if (classified !== undefined) return classified;
     } catch {
       // 落到下面的通用分支。
     }
@@ -645,11 +778,18 @@ export class ZhihuClient {
     const stream = await this.openChatStream(request, signal);
     let content = '';
     let reasoningContent = '';
-    for await (const payload of parseSSEStream(stream)) {
-      const chunk = deltaFromPayload(payload);
-      if (chunk === undefined) continue;
-      if (chunk.content !== undefined) content += chunk.content;
-      if (chunk.reasoningContent !== undefined) reasoningContent += chunk.reasoningContent;
+    try {
+      for await (const payload of parseSSEStream(stream)) {
+        const chunk = deltaFromPayload(payload);
+        if (chunk === undefined) continue;
+        // 中途失败帧必须终止整轮：半截回答被当成完整答案，比直接失败糟得多。
+        if (chunk.error !== undefined) throw chunk.error;
+        if (chunk.content !== undefined) content += chunk.content;
+        if (chunk.reasoningContent !== undefined) reasoningContent += chunk.reasoningContent;
+      }
+    } catch (error) {
+      // 读取期失败（超时中止、调用方取消、连接中断）也要带分类，不能以裸异常冒泡。
+      throw toClientError(error, signal);
     }
     return { content, reasoningContent };
   }

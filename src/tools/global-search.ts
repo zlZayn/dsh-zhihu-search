@@ -48,6 +48,9 @@ function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number] | und
     // 注意实测结论：上游**从未省略**该字段，外站网页也有这个键、值是占位的 0。
     // 省略分支是防伪造的兜底；外站那个 0 由渲染层决定不展示（present/search.ts）。
     ...(typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? { voteUpCount: item.VoteUpCount } : {}),
+    // 投影规则同上：上游没报就省略，绝不兜底成 0（外站的 0 是占位值，由渲染层决定不展示）。
+    ...(typeof item.CommentCount === 'number' && Number.isFinite(item.CommentCount) ? { commentCount: item.CommentCount } : {}),
+    ...(typeof item.EditTime === 'number' && Number.isFinite(item.EditTime) ? { editTime: item.EditTime } : {}),
     // ContentType 缺失时留空，不编造标签：实测第三方网页（如接单平台）的类型是**空串**
     // （字段在、值为空），兜底成 'Article' 会让模型把广告页当成知乎文章。
     contentType: typeof item.ContentType === 'string' ? item.ContentType : '',
@@ -72,7 +75,10 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
     parameters: {
       query: { type: 'string', required: true, description: '搜索关键词。' },
       count: { type: 'integer', description: `返回条数，1–${String(MAX_COUNT)}，默认 ${String(DEFAULT_COUNT)}。`, default: DEFAULT_COUNT },
-      site: { type: 'string', description: '只搜索该域名，例如 github.com；传完整 URL 也会被自动剥成域名。不支持知乎域名。' },
+      site: {
+        type: 'string',
+        description: '只搜索该域名，例如 github.com；传完整 URL 会被剥成主机名并去掉开头的 www.。域名是精确匹配（子站要单独写），不支持知乎域名。',
+      },
       publishedAfter: { type: 'string', description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。' },
       publishedBefore: { type: 'string', description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。' },
       searchDb: { type: 'string', enum: ['all', 'realtime', 'static'], description: '索引库，默认 all。realtime 偏最新，static 偏长期收录。', default: 'all' },

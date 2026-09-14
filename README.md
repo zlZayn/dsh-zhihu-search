@@ -60,11 +60,11 @@
 | `count` | integer | `5` | 返回条数，1–10。 |
 | `sortField` | enum | `default` | `default` 沿用相关性排序；`voteUpCount` 点赞数 · `commentCount` 评论数 · `editTime` 更新时间。 |
 | `order` | enum | `desc` | `desc` 降序 · `asc` 升序。仅在指定了 `sortField` 时生效。 |
-| `minValue` | number | — | 排序字段的下限（含），**必须配合 `sortField`**。配 `sortField=voteUpCount` + `minValue=100` 即「只要点赞数 ≥ 100」。 |
+| `minValue` | number | — | 排序字段的下限（含），**必须配合 `sortField`**，取非负整数。配 `sortField=voteUpCount` + `minValue=100` 即「只要点赞数 ≥ 100」。 |
 | `publishedAfter` | string | — | 只要该日期之后发布的内容，格式 `YYYY-MM-DD`。 |
 | `publishedBefore` | string | — | 只要该日期之前发布的内容，格式 `YYYY-MM-DD`。 |
 
-**边界**：不支持按站点域名过滤——站内结果本来就全来自知乎，要按站点找资料请用 `zhihu_global_search`。`count` 上限 10。`minValue` 与非默认 `order` 必须配合 `sortField`：缺了会被拒绝并给出改正提示，而不是静默返回未过滤的结果。**没有翻页**：`hasMore` 恒为 `false`，要更多结果请换关键词或换排序。
+**边界**：不支持按站点域名过滤——站内结果本来就全来自知乎，要按站点找资料请用 `zhihu_global_search`。`count` 上限 10。`minValue` 与非默认 `order` 必须配合 `sortField`：缺了会被拒绝并给出改正提示，而不是静默返回未过滤的结果。**没有翻页**：`hasMore` 恒为 `false`，要更多结果请换关键词或换排序。**下限筛的是本次检索到的候选**（知乎的区间语法是候选内筛选，不是全库排序）：插件在有下限时会自动按端点上限取候选、再按你要的条数截断，筛少时也会在结果里说明。空结果仍不等于知乎没有高赞内容。
 
 ### `zhihu_global_search` —— 全网索引检索
 
@@ -72,12 +72,12 @@
 |---|---|---|---|
 | `query` | string | **必填** | 搜索关键词。 |
 | `count` | integer | `8` | 返回条数，1–20，比站内宽。 |
-| `site` | string | — | 只搜该域名，例如 `github.com`。传完整 URL 会被自动剥成主机名。 |
+| `site` | string | — | 只搜该域名，例如 `github.com`。传完整 URL 会被剥成主机名并去掉开头的 `www.`。 |
 | `publishedAfter` | string | — | 只要该日期之后发布的内容，格式 `YYYY-MM-DD`。 |
 | `publishedBefore` | string | — | 只要该日期之前发布的内容，格式 `YYYY-MM-DD`。 |
 | `searchDb` | enum | `all` | `all` 全部 · `realtime` 偏最新 · `static` 偏长期收录。 |
 
-**边界**：**没有排序参数**——该端点会忽略排序字段，与其给模型一个转不动的旋钮，不如不给。**也没有翻页参数**：单次最多 20 条，超出由服务端截断。`site` 不接受 `zhihu.com` 及其子域，知乎会直接拒绝该请求。结果里**会混入知乎站内内容**；要专搜知乎的问答和文章，用 `zhihu_search`。
+**边界**：域名是**精确匹配**，子站要单独写（`qq.com` 取不到 `news.qq.com` 的页面）。**没有排序参数**——该端点会忽略排序字段，与其给模型一个转不动的旋钮，不如不给。**也没有翻页参数**：单次最多 20 条，超出由服务端截断。`site` 不接受 `zhihu.com` 及其子域，知乎会直接拒绝该请求。结果里**会混入知乎站内内容**；要专搜知乎的问答和文章，用 `zhihu_search`。
 
 ### `zhihu_zhida` —— 直答
 
@@ -92,7 +92,7 @@
 ## 能力
 
 - 三个工具职责不重叠：站内捞经验、全网捞资料、直答做综合，模型按问题类型自行选择。
-- 搜索返回结构化来源条目（标题 / 链接 / 摘要 / 作者 / 点赞数），每条都带 URL，可直接引用核对。
+- 搜索返回结构化来源条目（标题 / 链接 / 摘要 / 作者 / 点赞数 / 评论数 / 时间），每条都带 URL，可直接引用核对；评论数与时间与 `sortField` 的三个排序档位一一对应，模型排得出也看得见。
 - 结果同时渲染为来源卡片与纯 Markdown，任何界面都能读。
 
 ## 安装
@@ -138,6 +138,13 @@ Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/pr
 ### 用环境变量代替
 
 不想把密钥存在设置里时，改用环境变量 `ZHIHU_ACCESS_SECRET`；或在卡片的「凭据引用名」里填别的名字，指向另一个环境变量或凭据记录。
+
+### 进阶：超时与限额
+
+插件配置项以 [src/index.ts](src/index.ts) 的 `Config` 为唯一来源（改 `cordis.patch.yml` 里的插件配置即可）。两个超时项值得知道：
+
+- `timeoutMs`（默认 15 秒）：搜索类请求的单次预算。
+- `streamTimeoutMs`（默认 55 秒）：直答整轮读取的预算，直答工具的超时自动跟着它走。调大请求超时不会缩小它（取两者较大者），所以调大它才有效。
 
 ### 只用知乎检索
 

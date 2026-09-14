@@ -73,7 +73,23 @@ export function compileSortBy(spec: SortBySpec): string | undefined {
   if (typeof min !== 'number' || !Number.isFinite(min)) {
     throw new CompileError('minValue 必须是有限数字。', '例如 minValue: 100 表示「点赞数不少于 100」。');
   }
-  return `${mapped}:${order}:(${String(Math.trunc(min))},)`;
+  const bound = Math.trunc(min);
+  // 知乎的边界是**非负 int64**。实测传 -5 会回 `SortBy bounds must be nonnegative integers`，
+  // 而服务端 10001 的通用 hint 讲的是 Filter/域名过滤，与模型的真实错误无关 ——
+  // 本地拦下才给得出可据以纠正的提示（项目自己的「错误契约」要求）。
+  if (bound < 0) {
+    throw new CompileError(
+      'minValue 不能为负数。',
+      '点赞数与评论数都是非负整数，例如 minValue: 100 表示「不少于 100」。',
+    );
+  }
+  if (bound > Number.MAX_SAFE_INTEGER) {
+    throw new CompileError(
+      `minValue 超出可表示范围：${String(min)}`,
+      `请给出不大于 ${String(Number.MAX_SAFE_INTEGER)} 的整数。`,
+    );
+  }
+  return `${mapped}:${order}:(${String(bound)},)`;
 }
 
 /**
@@ -215,13 +231,17 @@ export function compileFilter(spec: FilterSpec, scope: FilterScope = 'global'): 
  *
  * 模型可能传 `github.com`，也可能传整个 `https://github.com/a/b`；
  * 后者直接拼进 Filter 会形成非法表达式，所以这里统一剥成主机名。
+ *
+ * ⚠ 一并剥掉开头的 `www.`：知乎的 `host` 过滤是**整串精确匹配**
+ * （实测 `host=="qq.com"` 取不到 `news.qq.com` 的页面），
+ * 留着 `www.` 只会让「直觉上该有结果」的查询静默返回 0 条。
  */
 function normalizeHost(input: string): string {
   const raw = input.trim();
   const withoutScheme = raw.replace(/^https?:\/\//i, '');
   const host = withoutScheme.split('/')[0] ?? '';
   const withoutPort = host.split(':')[0] ?? '';
-  const cleaned = withoutPort.toLowerCase();
+  const cleaned = withoutPort.toLowerCase().replace(/^www\./, '');
   if (cleaned === '') throw new CompileError(`无法解析站点：${input}`, '请传域名，例如 github.com。');
   return cleaned;
 }

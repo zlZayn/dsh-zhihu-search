@@ -5,7 +5,7 @@
 
 ## 文件索引
 
-- `search.ts`：搜索类工具共用。导出 `renderSearch`、`searchMetaFromValue`、`searchMetaFromResult`、`presentSearchCall`、`presentSearchResult` 与 `SearchMeta` 类型。被 `tools/search.ts` 与 `tools/global-search.ts` 依赖。
+- `search.ts`：搜索类工具共用。导出 `renderSearch`（第二参数是本次调用的 `SearchRenderContext`：条数与下限，用来把「被下限筛少」与「知乎没有」说清楚）、`searchMetaFromValue`、`searchMetaFromResult`、`presentSearchCall`、`presentSearchResult` 与 `SearchMeta` / `SearchRenderContext` 类型。被 `tools/search.ts` 与 `tools/global-search.ts` 依赖。
 - `zhida.ts`：直答专用。导出 `renderZhida`、`presentZhidaCall`、`presentZhidaResult` —— **刻意不声明 `presentationMeta`**：直答没有可持久化的结构化元数据，为此凑一个空壳只会把「三者严格分离」变成形式主义。
 
 ## 变更影响路由

@@ -5,8 +5,8 @@
  * 而且偶发，靠人工测试几乎抓不到。这里把它钉死成回归守卫。
  */
 
-import { describe, expect, it } from 'vitest';
-import { deltaFromPayload, parseSSEStream } from '../src/transport.js';
+import { describe, expect, it, vi } from 'vitest';
+import { ZhihuClient, ZhihuClientError, deltaFromPayload, parseSSEStream } from '../src/transport.js';
 
 /** 用任意字符串片段构造一个字节流。 */
 function streamOf(chunks: ReadonlyArray<string | Uint8Array>): ReadableStream<Uint8Array> {
@@ -84,6 +84,105 @@ describe('deltaFromPayload', () => {
     for (const bad of ['not json', '', '{}', '{"choices":[]}', '{"choices":[{}]}', 'null']) {
       expect(() => deltaFromPayload(bad)).not.toThrow();
       expect(deltaFromPayload(bad)).toBeUndefined();
+    }
+  });
+
+  it('提取 finish_reason，正常结束不产生错误', () => {
+    expect(deltaFromPayload('{"choices":[{"delta":{},"finish_reason":"stop"}]}')).toEqual({ finishReason: 'stop' });
+  });
+
+  it('官方文档的中途失败帧解析为带分类的错误，而不是被当成空增量丢掉', () => {
+    const payload = JSON.stringify({
+      id: 'chatcmpl-x',
+      object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+      error: { message: 'Internal server error', type: 'server_error', code: 'internal_error' },
+    });
+    const chunk = deltaFromPayload(payload);
+    expect(chunk?.error).toBeInstanceOf(ZhihuClientError);
+    expect(chunk?.error?.kind).toBe('server');
+    expect(chunk?.finishReason).toBe('error');
+  });
+
+  it('只有 finish_reason=error、没有 error 体时也判失败', () => {
+    expect(deltaFromPayload('{"choices":[{"delta":{},"finish_reason":"error"}]}')?.error?.kind).toBe('server');
+  });
+});
+
+describe('ZhihuClient.chat —— 流生命周期', () => {
+  const sseHeaders = { 'content-type': 'text/event-stream' };
+  const request = { model: 'zhida-thinking-1p5', messages: [{ role: 'user', content: 'q' }] };
+
+  /** 构造一个「响应头立刻返回、响应体受 signal 控制」的 fetch 替身，模拟真实 fetch 的中止语义。 */
+  function streamingFetch(): typeof fetch {
+    return (async (_input: string, init?: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => {
+            // 真实 fetch 以 abort 原因（reason）拒绝响应体，这里如实复刻。
+            controller.error(init.signal?.reason ?? new DOMException('aborted', 'AbortError'));
+          });
+        },
+      });
+      return new Response(body, { status: 200, headers: sseHeaders });
+    }) as unknown as typeof fetch;
+  }
+
+  it('中途失败帧让整轮失败，而不是交付半截答案', async () => {
+    const body = [
+      'data: {"choices":[{"delta":{"content":"前半段"}}]}\n\n',
+      'data: {"choices":[{"delta":{},"finish_reason":"error"}],"error":{"message":"Internal server error","type":"server_error","code":"internal_error"}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+    const client = new ZhihuClient({
+      accessSecret: 's',
+      baseUrl: 'https://example.test',
+      fetchImpl: (async () => new Response(body, { status: 200, headers: sseHeaders })) as unknown as typeof fetch,
+    });
+    await expect(client.chat(request)).rejects.toMatchObject({ kind: 'server' });
+  });
+
+  it('响应头之后调用方取消仍能中断读取', async () => {
+    const controller = new AbortController();
+    const client = new ZhihuClient({ accessSecret: 's', baseUrl: 'https://example.test', fetchImpl: streamingFetch() });
+    const pending = client.chat(request, controller.signal);
+    setTimeout(() => controller.abort(), 30);
+    await expect(pending).rejects.toMatchObject({ kind: 'aborted' });
+  });
+
+  it('仍在推进的流不会被配置里的短请求超时切掉（流式预算独立）', async () => {
+    const encoder = new TextEncoder();
+    const client = new ZhihuClient({
+      accessSecret: 's',
+      baseUrl: 'https://example.test',
+      // 搜索用 40ms；若流式也用这个值，下面的流必然被切。
+      timeoutMs: 40,
+      fetchImpl: (async () => {
+        const body = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"答"}}]}\n\n'));
+            await new Promise((resolve) => setTimeout(resolve, 120));
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          },
+        });
+        return new Response(body, { status: 200, headers: sseHeaders });
+      }) as unknown as typeof fetch,
+    });
+    await expect(client.chat(request)).resolves.toEqual({ content: '答', reasoningContent: '' });
+  });
+
+  it('响应头之后仍受本地超时约束（不再无限等待）', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = new ZhihuClient({ accessSecret: 's', baseUrl: 'https://example.test', fetchImpl: streamingFetch() });
+      const pending = client.chat(request);
+      const assertion = expect(pending).rejects.toMatchObject({ kind: 'timeout' });
+      // 流式预算远大于搜索（默认 55s），快进过去即可，无需真等。
+      await vi.advanceTimersByTimeAsync(60_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
     }
   });
 });
