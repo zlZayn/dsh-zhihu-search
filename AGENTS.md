@@ -44,13 +44,13 @@
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
 - 发版链路：v1.2.8 首次由单一入口实跑 —— OIDC 发布、tag、GitHub Release 在一次运行内同步落地
 - 「隐藏原生网页工具」：v1.3.1 在真机 profile 上行为验证通过 —— 开关打开后模型的工具面失去 `web_search` / `web_fetch`，关闭即恢复
-- 契约测试：v1.4.0 首次实跑（本机注入 Secret）全绿，约 15s / 16 次请求；密钥已配在仓库 Secrets，每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
-- 真机验收：v1.4.1 的对仓库产物已跑通（[scripts/acceptance.mjs](scripts/acceptance.mjs)）；profile 安装副本待 host 重启后复测
+- 契约测试：本机与 GitHub Actions 都实跑通过（后者由 repo secret `ZHIHU_ACCESS_SECRET` 供燃料，约 38s）；每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
+- 真机验收：v1.4.1 升级 + host 重启后在 profile 安装副本上跑通 —— [scripts/acceptance.mjs](scripts/acceptance.mjs) 9/9 全绿（扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本），工具面 `zhihu_search` / `zhihu_global_search` 同参数复验一致
 - 事故：v1.4.0 的 P0（输出 schema 漂移）由真机验收第 1 条抓到，v1.4.1 修复 → [复盘](docs/postmortem/2026-09-14-output-schema-drift.md)
 
 ## 待办
 
-- [ ] host 重启后对 profile 里装的 1.4.1 复跑真机验收（`node scripts/acceptance.mjs`），并确认工具面 `zhihu_search` / `zhihu_global_search` 真机可用
+- （无）
 
 ## 活跃坑（工具链与 DSH 平台）
 
