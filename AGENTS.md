@@ -19,7 +19,7 @@
 ## 事实来源（只查不抄）
 
 - 版本号、依赖、宿主兼容性 → [package.json](package.json)
-- 工具参数、默认值与上限 → [src/tools/](src/tools/) 各模块的常量，由 [test/tool.test.ts](test/tool.test.ts) 守护
+- 工具参数、默认值与上限 → [src/tools/](src/tools/) 的常量与 [src/transport.ts](src/transport.ts) 的端点契约常量（上限只住后者，工具层取别名），由 [test/tool.test.ts](test/tool.test.ts) 守护
 - 端点语法与实测偏差 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 构建产物的运行方式 → [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - DSH 平台知识（插件装配、Remote API、设置卡片、i18n、工具契约）→ [DSH cookbook](https://github.com/deepseek-ai/deepseek-harness/tree/master/docs/cookbook)，每篇都有 `.zh.md` 中文版
@@ -81,6 +81,7 @@
 
 - 架构设计 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 发布流程 → [docs/PUBLISHING.md](docs/PUBLISHING.md)
+- 事故复盘 → [docs/postmortem/](docs/postmortem/)
 - 源码手册 → [src/README.md](src/README.md)
 - 工具层 → [src/tools/README.md](src/tools/README.md)
 - 编译器与文本清洗 → [src/utils/README.md](src/utils/README.md)

@@ -17,13 +17,18 @@ import { sanitizeSnippet, stripTrackingParams } from '../utils/text.js';
 import { LocalRateLimitError } from '../state.js';
 import { presentSearchCall, presentSearchResult, renderSearch, searchMetaFromValue } from '../present/search.js';
 import type { SearchOutput, ZhihuSearchItem } from '../types.js';
+import { GLOBAL_SEARCH_MAX_COUNT } from '../transport.js';
 import { cacheKeyFor, type ToolDeps } from './deps.js';
 
 /** 工具名。 */
 export const ZHIHU_GLOBAL_SEARCH_TOOL = 'zhihu_global_search';
 
-/** 全网搜索的 `Count` 上限（实测：比站内搜索宽，可达 20）。 */
-const MAX_COUNT = 20;
+/**
+ * 全网搜索的 `Count` 上限（实测：比站内搜索宽，可达 20）。
+ *
+ * 与站内搜索同理：数字只住在传输层的端点契约常量里，这里取别名。
+ */
+const MAX_COUNT = GLOBAL_SEARCH_MAX_COUNT;
 /** 未指定时使用的条数。 */
 const DEFAULT_COUNT = 8;
 /** 协作式超时预算。 */

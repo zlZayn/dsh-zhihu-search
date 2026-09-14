@@ -43,7 +43,7 @@
 
 ## 已知限制
 
-- 直答的流式读取有**自己的预算**：`STREAM_TIMEOUT_MS`（55s）与配置的 `timeoutMs` 取较大者，定时器与调用方 `signal` 的转发都随流结束才释放 —— 超时与取消在响应头之后同样生效。搜索类请求仍用配置的 `timeoutMs`（默认 15s）。当前工具一次性消费完整流（`chat()` 拼完再返回）；边流边回传 UI 需要直接暴露 `openChatStream`。
+- 直答的流式读取有**自己的预算**：Config 的 `streamTimeoutMs`（默认值来自 `transport.ts` 的 `DEFAULT_STREAM_TIMEOUT_MS`，55s），与 `timeoutMs` 取较大者；定时器与调用方 `signal` 的转发都随流结束才释放 —— 超时与取消在响应头之后同样生效。搜索类请求仍用配置的 `timeoutMs`（默认 `DEFAULT_TIMEOUT_MS`，15s）。当前工具一次性消费完整流（`chat()` 拼完再返回）；边流边回传 UI 需要直接暴露 `openChatStream`。
 - `global_search` 的 `SortBy` 被端点忽略（**实测多次**，连非法字段名也照回 `code=0`），故未向该工具暴露排序参数。
 
 ## 参考

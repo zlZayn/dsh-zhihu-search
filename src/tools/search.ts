@@ -16,13 +16,19 @@ import { sanitizeSnippet, stripTrackingParams } from '../utils/text.js';
 import { LocalRateLimitError } from '../state.js';
 import { presentSearchCall, presentSearchResult, renderSearch, searchMetaFromValue } from '../present/search.js';
 import type { SearchOutput, ZhihuSearchItem } from '../types.js';
+import { ZHIHU_SEARCH_MAX_COUNT } from '../transport.js';
 import { cacheKeyFor, type ToolDeps } from './deps.js';
 
 /** 工具名。 */
 export const ZHIHU_SEARCH_TOOL = 'zhihu_search';
 
-/** 站内搜索的 `Count` 上限（实测：超出由服务端截断）。 */
-const MAX_COUNT = 10;
+/**
+ * 站内搜索的 `Count` 上限（实测：超出由服务端截断）。
+ *
+ * 单一来源是传输层的端点契约常量（它同时负责发请求前夹取），这里只是别名 ——
+ * 同一个上游事实在两层各写一个数字，改一处漏一处就会让描述与实际行为不一致。
+ */
+const MAX_COUNT = ZHIHU_SEARCH_MAX_COUNT;
 /** 未指定时使用的条数。 */
 const DEFAULT_COUNT = 5;
 
