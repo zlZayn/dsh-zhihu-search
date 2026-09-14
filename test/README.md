@@ -12,7 +12,7 @@
 - [credentials.test.ts](credentials.test.ts)：密钥解析优先级与空白串处理。对应 [src/credentials.ts](../src/credentials.ts)。
 - [auth.test.ts](auth.test.ts)：字面量与凭据服务的取用顺序、逐请求重取、缺密钥的失败形态。对应 [src/transport.ts](../src/transport.ts)。
 - [quota.test.ts](quota.test.ts)：额度自检端点的路径、鉴权头与失败形态。对应 [src/transport.ts](../src/transport.ts)。
-- [presentation.test.ts](presentation.test.ts)：呈现层纯度。对应 [src/present/](../src/present/)。
+- [presentation.test.ts](presentation.test.ts)：呈现层纯度，以及**模型可见文本的四条诚实不变量**（到顶必说 / 来源构成分流 / 空态条件限定 / 到顶与「筛少」互斥）。对应 [src/present/](../src/present/)。
 - [tool.test.ts](tool.test.ts)：工具端到端，覆盖投影、参数编译、缓存、错误映射、SSE 拼接，以及**宿主同一套 `output.schema` 校验**（三个工具的成功值与失败值 + 一条反向控制）。对应 [src/tools/](../src/tools/)。
 - [plugin.test.ts](plugin.test.ts)：`apply` 装配、设置命名空间注册、配置默认值与 schema 角色、开关裁剪、effect 释放，以及「隐藏原生网页工具」的对账（**原生工具不在场时不抛错的 blocker 守卫**、热切换、幂等、卸载撤销）。替身只提供免 inject 的 `get('tools')`，并像真实注册表那样对未知名字抛错。对应 [src/index.ts](../src/index.ts)。
 - [native-web-tools.test.ts](native-web-tools.test.ts)：同一能力的**实现级**回归 —— 用真实 `dsh-tools` 注册表与真实 `dsh-scope` 链复现 web profile 拓扑（原生工具住在 **preset 的 standing scope** 里），钉住「全局视图看不到它们」「agent scope 上必须走 `get('tools')` 而非属性访问」两条平台事实。

@@ -15,4 +15,5 @@
 ## 参考
 
 - 三层分离的设计理由 → 见 [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) 的「不可破坏的约束」
+- 模型可见文本怎么写才算诚实 → 见同一文档的「模型可见文本的诚实性」
 - 使用约束与工作偏好 → 见 [AGENTS.md](AGENTS.md)

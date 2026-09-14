@@ -167,4 +167,6 @@ Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/pr
 
 ## 贡献
 
+设计取向：工具参数与返回文本首先是**给模型用的 API**，其次才是给人读的文档 —— 写法规范见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「工具描述约定」与「模型可见文本的诚实性」。
+
 维护者文档地图见 [AGENTS.md](AGENTS.md)；不变的设计约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；发布流程见 [docs/PUBLISHING.md](docs/PUBLISHING.md)。

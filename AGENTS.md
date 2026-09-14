@@ -47,6 +47,7 @@
 - 契约测试：本机与 GitHub Actions 都实跑通过（后者由 repo secret `ZHIHU_ACCESS_SECRET` 供燃料，约 38s）；每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
 - 真机验收：v1.4.1 升级 + host 重启后在 profile 安装副本上跑通 —— [scripts/acceptance.mjs](scripts/acceptance.mjs) 9/9 全绿（扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本），工具面 `zhihu_search` / `zhihu_global_search` 同参数复验一致
 - 发版守卫：实跑验证过 —— 只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
+- 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定三条不变量在 v1.5.1 落地，由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
 - 事故：v1.4.0 的 P0（输出 schema 漂移）由真机验收第 1 条抓到，v1.4.1 修复 → [复盘](docs/postmortem/2026-09-14-output-schema-drift.md)
 
 ## 待办
