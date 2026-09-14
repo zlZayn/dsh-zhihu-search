@@ -155,6 +155,7 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 - `package.json` 的 `repository.url` 必须指向真实仓库，否则 npm 拒绝 provenance 或页面上没有源链接。
 - 所有 `@deepseek-ai/*` 保持在 `peerDependencies` 与 `devDependencies`，**不得**进 `dependencies` —— 见 [ARCHITECTURE.md](ARCHITECTURE.md) 的「不可破坏的约束」。
 - `package-lock.json` 的 `resolved` 必须指向 `registry.npmjs.org`。锁文件若由国内镜像生成，CI 会去镜像取包（供应链隐患），且 `npm ci` 可能因 peer 未同步而失败。
+- 依赖变更后用 `npm install --registry=https://registry.npmjs.org/` 重建锁文件：本地用 `--legacy-peer-deps` 安装会让 `package-lock.json` 缺自动 peer，`npm ci` 随即失败。
 
 ## CI
 
@@ -166,6 +167,9 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 两者都校验 `package.json` 与 `package-lock.json` 的**版本号**一致：ci.yml 在每次推送就拦，release.yml 在 bump 之前再拦一次。版本号写两处，漏一处不该等到发版才发现。
 
 发版提交由 `GITHUB_TOKEN` 推送，因此不会再触发一轮 ci.yml；发布工作流自身已跑过 typecheck 与 test。
+
+- 两份 workflow 的 action 均已升 v7：v7 移除了 dummy `NODE_AUTH_TOKEN` 兜底（`.npmrc` 引用 `${NODE_AUTH_TOKEN}`，而 `npm ci` 跑在带真 token 的 `npm publish` 之前）—— 2026-09-13 在 PR 分支用 `workflow_dispatch` 实跑验证过，无需为它退回 v4。
+- action 版本漂移交给 [dependabot.yml](../.github/dependabot.yml)（每周一个 bump PR）。**PR 上的 CI 只跑 ci.yml：动 `release.yml` 的 PR 就算绿勾也不代表发布链路验过** —— 改发布链必须手动 dispatch 实跑。
 
 ## 兼容性
 
