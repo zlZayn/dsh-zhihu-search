@@ -18,14 +18,15 @@
 gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run workflow
 ```
 
-一次运行按顺序做完：校验触发分支是 `main` → `npm ci` / typecheck / test → 拦两处版本号漂移 → `npm version <tier> --no-git-tag-version`（同时写两处）→ 提交 `chore: release vX.Y.Z` → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
+一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移 → `npm version <tier> --no-git-tag-version`（同时写两处）→ 提交 `chore: release vX.Y.Z` → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
 
-四条设计约束：
+五条设计约束：
 
 - **先发布、后动远端**：publish 失败时远端不发生任何变化，tag 与 Release 也只可能在发布成功后创建。
 - **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
 - **手工推 tag 不会发布**：tag 由工作流创建，绕过上面的顺序没有意义。
 - **档位由判定链定**：`tier` 是入参，不从 commit 类型推断；patch / minor 由维护 agent 直接发，major 需人类确认。
+- **不发无行为变更的版本**：bump 之前先比「上个 tag..HEAD」的改动清单，只剩非产物改动就红；`force` 是唯一的越过方式，且要说明理由。
 
 ## 版本号
 
@@ -50,7 +51,9 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 
 按顺序问，**第一个「是」即定档**：
 
-- **Q0**：改动是否进入发布产物（[package.json](../package.json) 的 `files` 清单内）？否 → 不发版，结束。
+- **Q0**：改动是否改变**已发布产物的行为**（工具参数与描述、渲染文本、配置、导出面、构建产物）？否 → **不发版**，改动搭下次发布的车。
+  - 判据是**行为**，不是文件路径：纯文档 / 测试 / CI / 工具脚本，以及**行为等价的内部重构**（端点常量换来源、改名、等价重写）都属于「否」。
+  - 机器只判得了一半：`scripts/release-guard.mjs` 按路径拦下「上个 tag 以来全是非产物改动」的区间（见[发版](#发版)）；行为等价的重构它看不出，由回答 Q0 的人或 agent 负责。
 - **Q1**：是否存在「在旧版上行为正确」的使用者，升级后行为变错或失败？是 → major。
 - **Q2**：使用者是否必须改变自己的用法（调用、配置或依赖声明）才能继续正确工作？是 → major。
 - **Q3**：使用者能否观察到「以前做不到的事现在能做到」？是 → minor。
@@ -61,7 +64,9 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 本项目真实判例，每条注明套用哪一问。**只增不删**；与问题链冲突时以问题链为准，并把该条标注为「已 supersede」。
 
 - 只动 `docs/`、`test/`、CI、[.agents/](../.agents/) → Q0 否 → 不发版，搭下次发布的车。
-- 源码注释随 `lib/types.d.ts` 进入产物 → Q0 是 → 按性质定档，通常 patch。
+- ~~源码注释随 `lib/types.d.ts` 进入产物 → Q0 是 → patch~~ **已 supersede**：注释不构成行为，按现行 Q0 归「否」→ 不发版。
+- 纯文档 / 测试 / CI / 工具脚本改动 → Q0 否 → **不发版**；`release-guard.mjs` 会直接拦下，确需发版时勾 `force`。
+- 行为等价的内部重构（端点常量换来源、函数改名、等价重写）→ Q0 否 → **不发版**；守卫按路径判不出这类改动，靠 Q0 回答。
 - 删除编造值（内容类型兜底成「回答」、点赞数缺失时假报 0）→ Q1 否（没有人能正确依赖一个编造值）→ patch。
 - 输出 schema **收紧**（改名字、换类型、删字段、可选变必填）→ Q2 是 → major。
 - 参数改名或删除 → Q2 是 → major。
@@ -101,6 +106,9 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 npm run build
 npm pack --dry-run
 ```
+
+需要证明 npm 上的产物与本地已验证的一致时：下载该版本的 tarball、解包，与仓库 `lib/` 逐文件比对 SHA-256 —— 一致即「发布产物 == 已验证产物」。
+不必对裸包再跑一遍验收：包的 peer 依赖由宿主提供，裸包本来就跑不起来。
 
 ## 构建链的两个事实
 

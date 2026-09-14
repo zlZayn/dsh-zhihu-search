@@ -8,6 +8,9 @@
 #
 # 幂等：重跑不会重复发布 —— 目标版本已在 npm 上时跳过 publish，只补齐 git 侧（提交 / tag / Release）。
 #
+# 防噪音：bump 之前先跑 scripts/release-guard.mjs —— 上个 tag 以来若只剩非产物改动
+# （文档 / 测试 / CI / 工具脚本），说明没有可发布的行为变化，直接红。确需发版用 force 输入越过。
+#
 # 认证：npm Trusted Publishing（OIDC），全程不传任何 token。
 # npm 自 2027-01 起不再接受 bypass-2FA token 直接发布，故不留长期凭据。
 name: Release
@@ -20,6 +23,10 @@ on:
         type: choice
         required: true
         options: [patch, minor, major]
+      force:
+        description: '越过「无行为变更不发版」守卫（仅在确需为文档/工具类改动发版时勾选）'
+        type: boolean
+        default: false
 
 permissions:
   contents: write # 推提交、建 tag 与 GitHub Release
@@ -51,6 +58,25 @@ jobs:
           node-version-file: .node-version
           registry-url: https://registry.npmjs.org
           cache: npm
+
+      # 上个 tag 到 HEAD 之间若只剩非产物改动（文档 / 测试 / CI / 工具脚本），
+      # 说明没有可发布的行为变化：按 docs/PUBLISHING.md 的 Q0 不该发版。
+      # 只判路径；行为等价的内部改动由 Q0 由人回答，确需发版时勾 force。
+      - name: Guard against release noise
+        if: inputs.force != true
+        run: |
+          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          if [ -z "$base" ]; then
+            echo "没有历史 tag：首次发布不受守卫约束。"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$base..HEAD")
+          if [ -z "$changed" ]; then
+            echo "::error::自 $base 以来没有任何改动，没有可发布的内容。"
+            exit 1
+          fi
+          echo "区间 $base..HEAD 的改动："
+          printf '%s\n' "$changed" | node scripts/release-guard.mjs
 
       - run: npm ci
       - run: npm run typecheck
