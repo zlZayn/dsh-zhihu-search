@@ -169,6 +169,8 @@
 - 工具输出有**三份副本**：`types.ts` 的 Canonical 类型、投影层的对象字面量、`output.schema`。
   前两份由 TypeScript 与单测照看，第三份**只被宿主照看**（`additionalProperties: false`）——
   前两份对了它不对，**整个调用被判非法**。v1.4.0 的回归正是如此，见[复盘](postmortem/2026-09-14-output-schema-drift.md)。
+- **判定输入的语义必须与判定条件一致**：到顶判定要比的是模型**原始**请求条数；接线时传了夹取后的值（恒 ≤ 上限），条件永远为假、提示成了死代码 —— v1.5.1 的回归，见[复盘](postmortem/2026-09-14-dead-code-cap-note.md)。**判定函数与它的输入来源分离时，单测覆盖函数不等于覆盖接线**：必须补一条「execute → render」的接线级用例。
+- **宿主参数 schema 是开放的**：DSH 的值 schema DSL 不接受 `additionalProperties: false`（实测报 `must be a value schema object`），未知键会被静默丢弃 —— 因此每个工具都要用 `assertKnownParams` 本地白名单拦截，否则模型传 `page=2` 拿到第一页却以为翻页成功。
 - 字节流用 `TextDecoder({stream: true})` 解码；逐 chunk 解码会把跨边界的汉字变成 U+FFFD，且偶发。
 - 标题可能含 `]` 与换行，进入 Markdown 链接前需转义。
 - 无时区信息的日期按 UTC 解释；否则同一输入在不同机器产生不同缓存键。

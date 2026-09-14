@@ -10,7 +10,7 @@
  */
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools';
-import { CompileError, compileFilter, compileSortBy, SORT_FIELDS } from '../utils/compiler.js';
+import { assertKnownParams, CompileError, compileFilter, compileSortBy, SORT_FIELDS } from '../utils/compiler.js';
 import { mapError } from '../utils/errors.js';
 import { sanitizeSnippet, stripTrackingParams } from '../utils/text.js';
 import { LocalRateLimitError } from '../state.js';
@@ -44,16 +44,26 @@ const DEFAULT_COUNT = 5;
 const FILTERED_CANDIDATE_COUNT = MAX_COUNT;
 
 /**
- * 归一化模型请求的条数。
+ * 模型**原始**请求的条数：只取下界与整数，**不按端点上限夹取**。
  *
- * `execute` 与 `render` 共用一份夹取逻辑：渲染层要用同一个数字判断
- * 「结果是不是被下限筛少了」，两处各夹一次迟早会漂移。
+ * 渲染层要用它判断「是不是请求得比端点允许的还多」—— 传夹取后的值会让
+ * `requestedCount > maxCount` 恒为假，到顶提示变成永不触发的死代码（v1.5.1 的回归）。
  *
  * @param raw - 模型给的条数，未指定时用 {@link DEFAULT_COUNT}。
+ * @returns 不小于 1 的整数（可能大于 {@link MAX_COUNT}）。
+ */
+function rawRequestedCount(raw: number | undefined): number {
+  return Math.max(1, Math.trunc(raw ?? DEFAULT_COUNT));
+}
+
+/**
+ * 实际请求用的条数：在原始请求值之上再按端点上限夹取。
+ *
+ * @param raw - 模型给的条数。
  * @returns 落在 1..{@link MAX_COUNT} 的整数。
  */
 function resolveRequestedCount(raw: number | undefined): number {
-  return Math.max(1, Math.min(Math.trunc(raw ?? DEFAULT_COUNT), MAX_COUNT));
+  return Math.min(rawRequestedCount(raw), MAX_COUNT);
 }
 
 /**
@@ -69,6 +79,16 @@ function resolveRequestedCount(raw: number | undefined): number {
 function sliceItems(value: SearchOutput, requestedCount: number): SearchOutput {
   return value.items.length <= requestedCount ? value : { ...value, items: value.items.slice(0, requestedCount) };
 }
+/**
+ * 参数白名单。
+ *
+ * 为什么要有它：DSH 的参数 schema 是**开放**的（值 schema DSL 不接受
+ * `additionalProperties: false`），未知键会被静默丢弃 —— 模型传 `page=2`
+ * 会拿到第一页却以为翻页成功。校验放本地，schema 里不加散文。
+ * 与参数定义的一致性由 `test/tool.test.ts` 断言守着，避免两处漂移。
+ */
+const PARAM_NAMES = ['query', 'count', 'sortField', 'order', 'minValue', 'publishedAfter', 'publishedBefore'] as const;
+
 /** 协作式超时预算；超时必须早于 DSH 的外层截断，才能返回结构化错误。 */
 const TIMEOUT_MS = 15_000;
 
@@ -190,7 +210,8 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
       },
       render: (args, value) =>
         renderSearch(value, {
-          requestedCount: resolveRequestedCount(args.count),
+          // 必须传**原始**请求值：传夹取后的值会让到顶提示永远不触发。
+          requestedCount: rawRequestedCount(args.count),
           minValue: args.minValue,
           maxCount: MAX_COUNT,
           filtered:
@@ -210,6 +231,7 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
       const query = args.query.trim();
 
       try {
+        assertKnownParams(args as Record<string, unknown>, PARAM_NAMES);
         if (query === '') throw new CompileError('搜索关键词不能为空。');
 
         const requestedCount = resolveRequestedCount(args.count);

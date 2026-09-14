@@ -227,6 +227,28 @@ export function compileFilter(spec: FilterSpec, scope: FilterScope = 'global'): 
 }
 
 /**
+ * 拒绝模型自造的参数。
+ *
+ * 为什么必须在本地拦：宿主给的参数 schema 是**开放**的 —— 值 schema DSL 不接受
+ * `additionalProperties: false`（实测报 `must be a value schema object`），
+ * 因此未知键会被静默忽略。模型传 `page=2` 会拿到第一页却以为翻页成功，
+ * 属于「静默的错误答案」，比报错糟得多。
+ *
+ * @param args - 模型传入的参数对象。
+ * @param allowed - 该工具声明的参数名；由调用方从自己的参数定义推导，避免两处漂移。
+ * @throws CompileError 当出现未声明的键时。
+ */
+export function assertKnownParams(args: Record<string, unknown>, allowed: readonly string[]): void {
+  const known = new Set(allowed);
+  const unknown = Object.keys(args).filter((key) => !known.has(key));
+  if (unknown.length === 0) return;
+  throw new CompileError(
+    `不认识这些参数：${unknown.join('、')}。`,
+    `本工具的参数只有 ${allowed.join(' / ')}；没有翻页 / 游标参数（page、offset、cursor 之类一律不接受），单次检索上限即为全部结果。`,
+  );
+}
+
+/**
  * 把用户给的站点值归一化为主机名。
  *
  * 模型可能传 `github.com`，也可能传整个 `https://github.com/a/b`；

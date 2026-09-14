@@ -140,6 +140,15 @@ describe('renderSearch（模型可见层）', () => {
     expect(text).toContain('（2 条）');
   });
 
+  it('count=20 且回满 10 条时必须给出到顶提示（回归：请求值要传原始的，不能传夹取后的）', () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      ...okValue.items[0]!,
+      url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
+    }));
+    const text = textOf(renderSearch({ ...okValue, items: ten }, { requestedCount: 20, maxCount: 10 }));
+    expect(text).toContain('达到本工具的单次检索上限');
+  });
+
   it('没到上限时不出现上限提示（本来就没有更多，不是被截断）', () => {
     const text = textOf(renderSearch(okValue, { requestedCount: 50, maxCount: 10 }));
     expect(text).not.toContain('单次检索上限');

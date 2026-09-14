@@ -8,7 +8,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CompileError, compileFilter, compileSortBy, isZhihuDomain, toUnixSeconds } from '../src/utils/compiler.js';
+import {
+  assertKnownParams,
+  CompileError,
+  compileFilter,
+  compileSortBy,
+  isZhihuDomain,
+  toUnixSeconds,
+} from '../src/utils/compiler.js';
 
 describe('compileSortBy', () => {
   it('编译字段 + 默认降序 + 下限', () => {
@@ -138,6 +145,27 @@ describe('toUnixSeconds', () => {
     expect(() => toUnixSeconds('不是日期')).toThrow(CompileError);
     expect(() => toUnixSeconds('')).toThrow(CompileError);
     expect(() => toUnixSeconds(-5)).toThrow(CompileError);
+  });
+});
+
+describe('assertKnownParams（参数白名单）', () => {
+  it('放行已声明的参数', () => {
+    expect(() => assertKnownParams({ query: 'x', count: 3 }, ['query', 'count'])).not.toThrow();
+  });
+
+  it('拒绝未知参数，并在 hint 里点名可用参数与「没有翻页」', () => {
+    // 宿主参数 schema 是开放的（DSL 不接受 additionalProperties: false），
+    // 未知键会被静默丢弃 —— 这一层是模型「翻页幻觉」的唯一拦截点。
+    try {
+      assertKnownParams({ query: 'x', page: 2, cursor: 'abc' }, ['query', 'count']);
+      expect.unreachable('应当抛出 CompileError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(CompileError);
+      expect((error as CompileError).message).toContain('page');
+      expect((error as CompileError).message).toContain('cursor');
+      expect((error as CompileError).hint).toContain('没有翻页');
+      expect((error as CompileError).hint).toContain('query / count');
+    }
   });
 });
 

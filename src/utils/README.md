@@ -4,7 +4,7 @@
 
 ## 文件索引
 
-- `compiler.ts`：语义化参数 → 知乎 `SortBy`/`Filter` 字符串。导出函数 `compileSortBy` / `compileFilter` / `toUnixSeconds` / `isZhihuDomain`，常量 `SORT_FIELDS`（字段白名单）与 `SORT_FIELD_MAP`，类型 `SortField` / `SortOrder` / `SortBySpec` / `FilterScope` / `FilterSpec`，以及 `CompileError`。`compileFilter` 的 scope 默认 `global`，站内必须显式传 `'zhihu'`。被 `tools/` 依赖。
+- `compiler.ts`：语义化参数 → 知乎 `SortBy`/`Filter` 字符串。导出函数 `compileSortBy` / `compileFilter` / `toUnixSeconds` / `isZhihuDomain` / `assertKnownParams`（参数白名单），常量 `SORT_FIELDS`（字段白名单）与 `SORT_FIELD_MAP`，类型 `SortField` / `SortOrder` / `SortBySpec` / `FilterScope` / `FilterSpec`，以及 `CompileError`。`compileFilter` 的 scope 默认 `global`，站内必须显式传 `'zhihu'`。被 `tools/` 依赖。
 - `text.ts`：剥高亮标签、解码实体、截断摘要、剥 URL 跟踪参数。导出 `sanitizeSnippet`、`stripTrackingParams`、`decodeEntities`、`MAX_SNIPPET_CHARS`。被 `tools/` 依赖。
 - `errors.ts`：任意异常 → Canonical Error。导出 `mapError` 与 `CanonicalError` 接口。这是 `utils/` 里唯一有内部值导入的文件：从 `transport.ts`、`state.ts`、`compiler.ts` 取错误类做 `instanceof` 判定。被 `tools/` 依赖。
 

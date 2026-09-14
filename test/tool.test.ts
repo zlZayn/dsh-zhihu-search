@@ -27,6 +27,28 @@ const apiItem = {
   AuthorityLevel: 4,
 };
 
+/**
+ * 取模型可见的渲染文本。
+ *
+ * `render` 的值参数带索引签名（`{[key: string]: JsonValue}`），直接传 Canonical Output
+ * 类型不兼容，因此在测试里统一走这个薄封装。
+ *
+ * @param tool - 任意工具定义。
+ * @param args - 已校验的工具参数。
+ * @param value - Canonical Output。
+ * @returns 渲染后的纯文本。
+ */
+function renderText(
+  tool: { output: { render: (args: never, value: never) => Array<{ type: string; text?: string }> } },
+  args: unknown,
+  value: unknown,
+): string {
+  return tool.output
+    .render(args as never, value as never)
+    .map((block) => block.text ?? '')
+    .join('\n');
+}
+
 describe('zhihu_search', () => {
   const makeTool = (handler: Parameters<typeof makeHarness>[0]) => {
     const harness = makeHarness(handler);
@@ -159,6 +181,47 @@ describe('zhihu_search', () => {
     expect(value.ok).toBe(false);
     expect(value.error?.kind).toBe('auth');
     expect(value.error?.hint).toContain('10 分钟');
+    harness.dispose();
+  });
+
+  it('请求超过端点上限且回满时，渲染文本给出到顶提示（接线必须传原始请求值）', async () => {
+    // v1.5.1 的回归：render 收到的是夹取后的 requestedCount（≤ maxCount），
+    // 于是 `requestedCount > maxCount` 恒为假，到顶提示成了永不触发的死代码。
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      ...apiItem,
+      ContentID: String(i),
+      Url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
+    }));
+    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: ten })));
+    const args = { query: 'RAG', count: 20 };
+    const value = (await tool.execute(args, execContext())) as SearchOutput;
+    expect(value.items).toHaveLength(10);
+    expect(renderText(tool, args, value)).toContain('达到本工具的单次检索上限');
+    harness.dispose();
+  });
+
+  it('未知参数（page / cursor 之类）本地拒绝，且一次请求都不发', async () => {
+    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const value = (await tool.execute(
+      { query: 'RAG', page: 2 } as unknown as { query: string },
+      execContext(),
+    )) as SearchOutput;
+    expect(value.ok).toBe(false);
+    expect(value.error?.kind).toBe('param');
+    expect(value.error?.message).toContain('page');
+    expect(value.error?.hint).toContain('没有翻页');
+    expect(harness.urls).toHaveLength(0);
+    harness.dispose();
+  });
+
+  it('白名单与参数定义一致：拒绝时列出的可用参数 == schema 声明（防两处漂移）', async () => {
+    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const declared = Object.keys((tool.parameters as { properties: Record<string, unknown> }).properties);
+    const value = (await tool.execute(
+      { query: 'RAG', nonsense: 1 } as unknown as { query: string },
+      execContext(),
+    )) as SearchOutput;
+    expect(value.error?.hint).toContain(declared.join(' / '));
     harness.dispose();
   });
 
@@ -422,6 +485,35 @@ describe('zhihu_global_search', () => {
     const tool = createZhihuGlobalSearchTool(harness.deps);
     await tool.execute({ query: 'x', count: 500 }, execContext());
     expect(harness.urls[0]).toContain('Count=20');
+    harness.dispose();
+  });
+
+  it('请求超过端点上限且回满时给出到顶提示（全网上限 20，接线传原始请求值）', async () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      ...apiItem,
+      ContentID: String(i),
+      Url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
+    }));
+    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: many })));
+    const tool = createZhihuGlobalSearchTool(harness.deps);
+    const args = { query: 'RAG', count: 30 };
+    const value = (await tool.execute(args, execContext())) as SearchOutput;
+    expect(value.items).toHaveLength(20);
+    expect(renderText(tool, args, value)).toContain('达到本工具的单次检索上限');
+    harness.dispose();
+  });
+
+  it('未知参数（page 之类）本地拒绝，且一次请求都不发', async () => {
+    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const tool = createZhihuGlobalSearchTool(harness.deps);
+    const value = (await tool.execute(
+      { query: 'RAG', page: 2 } as unknown as { query: string },
+      execContext(),
+    )) as SearchOutput;
+    expect(value.ok).toBe(false);
+    expect(value.error?.kind).toBe('param');
+    expect(value.error?.hint).toContain('没有翻页');
+    expect(harness.urls).toHaveLength(0);
     harness.dispose();
   });
 
