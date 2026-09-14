@@ -119,6 +119,12 @@
 
 **结果形态槽要写明模型实际拿得到什么**，拿不到的也要点名 —— 两个搜索工具因此写明「结果不含图片」。不写，模型就会向用户承诺一张它看不到的图。
 
+**为什么结果形态槽是硬要求**：函数调用模式下宿主只把 `{name, description, parameters}` 发给模型（DSH 的 `dsh-llm-deepseek` 与 `dsh-llm-pi-ai` 两个 provider 都是如此），`output.schema` **不进上下文**；只有 code runtime（PTC）模式才由它生成 `interface ToolOutputMap`。所以描述在首次调用前是模型唯一的预期来源，写漏了就只能靠第一次结果现学。
+
+**参数说明里的字面语义必须等于物理行为**。已固化的反例：[src/tools/search.ts](../src/tools/search.ts) 的 `minValue` 曾写作「只要点赞数 ≥ 100 的结果」，而上游的区间只筛**本次检索到的候选** —— 模型据此会说出「知乎只有 3 篇高赞文章」。宁可写长，不可写偏。
+
+**参数耦合只能落在描述里**：DSH 的值 schema DSL **拒绝** `minimum` / `maximum` / `dependentRequired`（实测报 `not supported by the value schema DSL`），因此 `order` / `minValue` 用 `[依赖 sortField]` 前缀标注，**并由 `execute` 本地拦截** —— 不合法组合不发请求，回 `kind: 'param'` 带可据以纠正的 hint。
+
 ## 原生工具的可见性
 
 「隐藏原生网页搜索」开关用 `tools.restrict()` 把 DSH 的 `web_search` / `web_fetch` 从**该 agent 的可见集**里摘掉 —— 不是执行期拦截，被 deny 的工具与不存在无法区分。

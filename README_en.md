@@ -60,7 +60,7 @@ The three sections below are each tool's full parameter set and limits. The mode
 | `count` | integer | `5` | Number of results, 1–10. |
 | `sortField` | enum | `default` | `default` keeps relevance order; `voteUpCount` upvotes · `commentCount` comments · `editTime` time (published or last edited). |
 | `order` | enum | `desc` | `desc` or `asc`. Only applies when `sortField` is set. |
-| `minValue` | number | — | Inclusive lower bound on the sort field, **requires `sortField`**, non-negative integer. With `sortField=voteUpCount` and `minValue=100` you get "only 100+ upvotes". |
+| `minValue` | number | — | Inclusive lower bound on the sort field, **requires `sortField`**, non-negative integer. **It screens the candidates retrieved by this call only**: when few qualify you get fewer than `count` — that does not mean Zhihu has no highly upvoted content. |
 | `publishedAfter` | string | — | Only content published after this date, `YYYY-MM-DD`. |
 | `publishedBefore` | string | — | Only content published before this date, `YYYY-MM-DD`. |
 

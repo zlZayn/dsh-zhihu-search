@@ -60,7 +60,7 @@
 | `count` | integer | `5` | 返回条数，1–10。 |
 | `sortField` | enum | `default` | `default` 沿用相关性排序；`voteUpCount` 点赞数 · `commentCount` 评论数 · `editTime` 时间（发布或最后编辑）。 |
 | `order` | enum | `desc` | `desc` 降序 · `asc` 升序。仅在指定了 `sortField` 时生效。 |
-| `minValue` | number | — | 排序字段的下限（含），**必须配合 `sortField`**，取非负整数。配 `sortField=voteUpCount` + `minValue=100` 即「只要点赞数 ≥ 100」。 |
+| `minValue` | number | — | 排序字段的下限（含），**必须配合 `sortField`**，取非负整数。**只筛本次检索到的候选**：达标项少时返回条数会少于 `count`，不代表知乎没有高赞内容。 |
 | `publishedAfter` | string | — | 只要该日期之后发布的内容，格式 `YYYY-MM-DD`。 |
 | `publishedBefore` | string | — | 只要该日期之前发布的内容，格式 `YYYY-MM-DD`。 |
 

@@ -113,10 +113,12 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
   return defineTool({
     name: ZHIHU_SEARCH_TOOL,
     description:
-      '知乎站内搜索：检索知乎的问答与文章，可筛出高赞、多评论或近期更新的内容，也支持限定发布时间。' +
+      '知乎站内搜索：检索知乎的问答与文章，可按点赞数、评论数或时间排序，也能按发布时间限定范围。' +
       '适合中文经验、产品评测、行业讨论、技术实践。' +
       '要搜知乎站外某个网站上的资料改用 zhihu_global_search；要一段成体系的解释而不是来源列表改用 zhihu_zhida。' +
-      '只返回文字摘要与原始链接，结果不含图片。',
+      // 结果形态槽必须「剧透」：函数调用模式下宿主只发 name/description/parameters，
+      // output.schema 不进上下文，模型在首次调用前无从知道拿得到什么、拿不到什么。
+      '结果含标题、链接、摘要、作者、点赞数、评论数与时间，不含图片；没有翻页参数。',
 
     // 语义化参数：模型永远不会看到 SortBy / Filter 的字符串语法。
     parameters: {
@@ -125,18 +127,22 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
       sortField: {
         type: 'string',
         enum: SORT_FIELDS,
-        description: '排序字段。default 表示沿用知乎相关性排序；其余按该指标排序。',
+        description: '排序字段。default 沿用知乎相关性排序；voteUpCount 点赞数 · commentCount 评论数 · editTime 时间（发布或最后编辑，由上游决定）。',
         default: 'default',
       },
+      // 参数耦合只能写在描述里：DSH 的值 schema DSL 拒绝 dependentRequired / minimum / maximum
+      // （实测报 "not supported by the value schema DSL"），因此用 [依赖 X] 前缀标注，
+      // 真正的拦截在 execute 本地完成（CompileError，不发请求）。
       order: {
         type: 'string',
         enum: ['desc', 'asc'],
-        description: '排序方向，默认 desc（降序）。仅在指定了 sortField 时生效。',
+        description: '[依赖 sortField] 排序方向，默认 desc（降序）。不给 sortField 时只接受默认值 desc。',
         default: 'desc',
       },
       minValue: {
         type: 'number',
-        description: '排序字段的下限（含），必须配合 sortField 使用。例如 sortField=voteUpCount 且 minValue=100 表示只要点赞数 ≥ 100 的结果。',
+        description:
+          '[依赖 sortField] 排序字段的下限（含）。它只筛本次检索到的候选，不是全库过滤：达标项不足时返回条数会少于 count —— 放宽下限或换关键词，不要据此断定知乎没有高赞内容。',
       },
       publishedAfter: { type: 'string', description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。' },
       publishedBefore: { type: 'string', description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。' },

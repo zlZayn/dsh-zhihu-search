@@ -275,11 +275,38 @@ describe('zhihu_search', () => {
     harness.dispose();
   });
 
-  it('两个搜索工具的描述都写明结果只有文字、不含图片', async () => {
+  it('两个搜索工具的描述都写明结果形态：拿到什么、拿不到什么、没有翻页', async () => {
     const harness = makeHarness(async () => jsonResponse(envelope({})));
-    // 模型拿不到图，描述就必须说清楚：否则它会向用户承诺一张它看不到的图。
+    // 函数调用模式下宿主只发 name/description/parameters，output.schema 不进上下文 ——
+    // 描述在首次调用前是模型唯一的预期来源，所以「剧透」是契约，不是修辞。
     for (const tool of [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps)]) {
-      expect(tool.description).toContain('不含图片');
+      expect(tool.description, tool.name).toContain('不含图片');
+      expect(tool.description, tool.name).toContain('没有翻页参数');
+      expect(tool.description, tool.name).toContain('结果含');
+    }
+    harness.dispose();
+  });
+
+  it('minValue 的说明写明「只筛本次候选」，不写成全库过滤', async () => {
+    const harness = makeHarness(async () => jsonResponse(envelope({})));
+    const search = createZhihuSearchTool(harness.deps) as unknown as {
+      parameters: { properties: Record<string, { description?: string }> };
+    };
+    const description = search.parameters.properties['minValue']?.description ?? '';
+    // 实测：区间只筛「本次检索到的候选」。写成「只要点赞数 ≥ 100 的结果」会让模型
+    // 把候选内筛选读成全库过滤，进而说出「知乎只有 3 篇高赞文章」这类错误结论。
+    expect(description).toContain('候选');
+    expect(description).toContain('不是全库过滤');
+    harness.dispose();
+  });
+
+  it('参数耦合在描述里显式标注（DSH 的 schema DSL 不支持 dependentRequired）', async () => {
+    const harness = makeHarness(async () => jsonResponse(envelope({})));
+    const search = createZhihuSearchTool(harness.deps) as unknown as {
+      parameters: { properties: Record<string, { description?: string }> };
+    };
+    for (const name of ['order', 'minValue']) {
+      expect(search.parameters.properties[name]?.description, name).toContain('[依赖 sortField]');
     }
     harness.dispose();
   });

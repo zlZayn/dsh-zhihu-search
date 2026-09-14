@@ -74,8 +74,9 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
     description:
       '知乎全网索引搜索：检索知乎索引收录的公开网页，结果里会混入部分知乎站内内容。' +
       '适合按站点域名或发布时间找资料；要专搜知乎的问答和文章、且要更贴题的排序，用 zhihu_search。' +
-      `单次最多 ${String(MAX_COUNT)} 条且没有翻页参数；域名过滤不接受知乎域名。` +
-      '只返回文字摘要与原始链接，结果不含图片。',
+      // 不重复 count / site 的取值（那两处归参数说明，schema 每次都随描述进上下文）；
+      // 结果形态槽只写模型拿得到什么、拿不到什么。
+      '结果含标题、链接、摘要、作者与时间，知乎来源另带点赞数与评论数，不含图片；没有翻页参数。',
 
     parameters: {
       query: { type: 'string', required: true, description: '搜索关键词。' },
