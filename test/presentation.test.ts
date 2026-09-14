@@ -100,11 +100,55 @@ describe('renderSearch（模型可见层）', () => {
     expect(zeroVotes).toContain('**点赞**: 0');
   });
 
-  it('带下限的空结果不写成「知乎没有」，而是说明下限只筛本次候选', () => {
-    const text = textOf(renderSearch({ ...okValue, items: [] }, { requestedCount: 5, minValue: 100 }));
-    expect(text).toContain('未找到');
+  it('带下限的空结果：首句就带条件限定，并说明下限只筛本次候选', () => {
+    const text = textOf(renderSearch({ ...okValue, items: [] }, { requestedCount: 5, minValue: 100, filtered: true }));
+    expect(text).toContain('当前筛选条件下未命中');
+    expect(text).not.toContain('未找到');
     expect(text).toContain('下限 100');
     expect(text).toContain('不代表知乎没有');
+  });
+
+  it('无筛选条件的空结果仍写「未找到」', () => {
+    const text = textOf(renderSearch({ ...okValue, items: [] }, { filtered: false }));
+    expect(text).toContain('未找到');
+    expect(text).not.toContain('当前筛选条件下未命中');
+  });
+
+  it('全网空态说的是「全网内容」，不是「知乎内容」', () => {
+    expect(textOf(renderSearch({ ...okValue, items: [] }, { scope: 'global' }))).toContain('全网内容');
+  });
+
+  it('全网头部按来源构成分流：纯站外 / 混合 / 纯站内', () => {
+    const zhihu = okValue.items[0]!;
+    const external = { title: '第三方页面', url: 'https://example.com/a', snippet: '摘要', author: '某站', contentType: '' };
+
+    expect(textOf(renderSearch({ ...okValue, items: [external] }, { scope: 'global' }))).toContain(
+      '的全网结果（纯站外来源）',
+    );
+    expect(textOf(renderSearch({ ...okValue, items: [zhihu, external] }, { scope: 'global' }))).toContain(
+      '的全网结果（含 1 条知乎站内）',
+    );
+    expect(textOf(renderSearch(okValue, { scope: 'global' }))).toContain('的知乎结果');
+    // 站内工具不区分来源，措辞与从前一致。
+    expect(textOf(renderSearch(okValue))).toContain('的知乎结果');
+  });
+
+  it('请求超过端点上限且正好回满时，显式说明「达到单次检索上限」', () => {
+    // 两条结果 + 上限 2 + 请求 50 → 是被上限截断，不是「只有两条」。
+    const text = textOf(renderSearch(okValue, { requestedCount: 50, maxCount: 2 }));
+    expect(text).toContain('达到本工具的单次检索上限');
+    expect(text).toContain('（2 条）');
+  });
+
+  it('没到上限时不出现上限提示（本来就没有更多，不是被截断）', () => {
+    const text = textOf(renderSearch(okValue, { requestedCount: 50, maxCount: 10 }));
+    expect(text).not.toContain('单次检索上限');
+  });
+
+  it('到顶与「被下限筛少」互斥，不出现两句互相打架的提示', () => {
+    const text = textOf(renderSearch(okValue, { requestedCount: 50, maxCount: 2, minValue: 100 }));
+    expect(text).toContain('单次检索上限');
+    expect(text).not.toContain('本次筛出');
   });
 
   it('筛后条数少于请求条数时说明「只筛本次候选」，避免被读成「知乎只有这些」', () => {

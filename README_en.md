@@ -93,6 +93,7 @@ The three sections below are each tool's full parameter set and limits. The mode
 
 - The three tools do not overlap: in-site for experience, global index for material, Zhida for synthesis — the model picks by question type.
 - Search returns structured source entries (title / URL / snippet / author / upvotes / comments / date), every one carrying a URL, so results can be cited and checked.
+- The result text states its own boundaries: hitting the per-call cap, mixing in external pages, or a filter winnowing the candidates are all spelled out, so the tool's limits are not mistaken for the world's.
 - Results render both as source cards and as plain Markdown, so they stay readable anywhere.
 
 ## Install

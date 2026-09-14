@@ -189,7 +189,14 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
         },
       },
       render: (args, value) =>
-        renderSearch(value, { requestedCount: resolveRequestedCount(args.count), minValue: args.minValue }),
+        renderSearch(value, {
+          requestedCount: resolveRequestedCount(args.count),
+          minValue: args.minValue,
+          maxCount: MAX_COUNT,
+          filtered:
+            args.minValue !== undefined || args.publishedAfter !== undefined || args.publishedBefore !== undefined,
+          scope: 'zhihu',
+        }),
       presentationMeta: (_args, value) => searchMetaFromValue(value),
     },
 

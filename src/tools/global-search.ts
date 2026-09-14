@@ -31,6 +31,19 @@ export const ZHIHU_GLOBAL_SEARCH_TOOL = 'zhihu_global_search';
 const MAX_COUNT = GLOBAL_SEARCH_MAX_COUNT;
 /** 未指定时使用的条数。 */
 const DEFAULT_COUNT = 8;
+
+/**
+ * 归一化模型请求的条数。
+ *
+ * `execute` 与 `render` 共用：渲染层要用同一个数字判断
+ * 「是不是被单次上限截断了」，两处各夹一次迟早会漂移。
+ *
+ * @param raw - 模型给的条数，未指定时用 {@link DEFAULT_COUNT}。
+ * @returns 落在 1..{@link MAX_COUNT} 的整数。
+ */
+function resolveRequestedCount(raw: number | undefined): number {
+  return Math.max(1, Math.min(Math.trunc(raw ?? DEFAULT_COUNT), MAX_COUNT));
+}
 /** 协作式超时预算。 */
 const TIMEOUT_MS = 20_000;
 
@@ -130,7 +143,17 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
           },
         },
       },
-      render: (_args, value) => renderSearch(value),
+      render: (args, value) =>
+        renderSearch(value, {
+          requestedCount: resolveRequestedCount(args.count),
+          maxCount: MAX_COUNT,
+          filtered:
+            args.site !== undefined ||
+            args.publishedAfter !== undefined ||
+            args.publishedBefore !== undefined ||
+            (args.searchDb !== undefined && args.searchDb !== 'all'),
+          scope: 'global',
+        }),
       presentationMeta: (_args, value) => searchMetaFromValue(value),
     },
 
@@ -145,8 +168,7 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
       try {
         if (query === '') throw new CompileError('搜索关键词不能为空。');
 
-        const rawCount = args.count ?? DEFAULT_COUNT;
-        const count = Math.max(1, Math.min(Math.trunc(rawCount), MAX_COUNT));
+        const count = resolveRequestedCount(args.count);
 
         // 全网作用域：允许 host；编译器会拦下知乎域名并给出「请用站内搜索」的提示。
         const filter = compileFilter(

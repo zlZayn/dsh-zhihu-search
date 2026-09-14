@@ -24,10 +24,37 @@ import type { SearchOutput } from '../types.js';
  * 只有渲染层知道「这次带了下限」，才说得清「筛少了」与「知乎没有」的区别。
  */
 export interface SearchRenderContext {
-  /** 本次请求的条数；用于判断结果是不是被下限筛少了。 */
+  /** 本次请求的条数；用于判断结果是不是被下限筛少了、或被单次上限截断了。 */
   readonly requestedCount?: number;
   /** 生效的排序下限；有值即说明这次是候选内筛选。 */
   readonly minValue?: number;
+  /** 本工具的端点上限（站内 10 / 全网 20）；用来把「被上限截断」与「筛掉了」分开说。 */
+  readonly maxCount?: number;
+  /** 本次是否带了筛选条件（下限 / 时间窗 / 域名 / 索引库）；决定空态首句的措辞。 */
+  readonly filtered?: boolean;
+  /** 结果来源：站内工具的结果全是知乎内容；全网工具会混入外站页面。 */
+  readonly scope?: 'zhihu' | 'global';
+}
+
+/**
+ * 生成头部文案：来源构成不同，措辞就不同。
+ *
+ * 全网搜索会混入外站页面（实测一次查询 10 条里只有 1 条来自知乎），
+ * 笼统写「知乎结果」会让模型把 github 的条目也当成知乎内容引用。
+ *
+ * @param value - 成功的搜索结果。
+ * @param context - 调用上下文；`scope` 决定是否区分来源。
+ * @returns 头部一句（不含末尾冒号）。
+ */
+function headerFor(value: SearchOutput, context: SearchRenderContext): string {
+  const total = value.items.length;
+  const base = `找到 ${String(total)} 条关于 "${value.query}"`;
+  if (context.scope !== 'global') return `${base} 的知乎结果`;
+  // 空串 ContentType 即外站页面 —— 该判据由契约测试盯着（contract-live-global-search）。
+  const zhihuCount = value.items.filter((item) => item.contentType !== '').length;
+  if (zhihuCount === 0) return `${base} 的全网结果（纯站外来源）`;
+  if (zhihuCount === total) return `${base} 的知乎结果`;
+  return `${base} 的全网结果（含 ${String(zhihuCount)} 条知乎站内）`;
 }
 
 /**
@@ -79,16 +106,23 @@ export function renderSearch(value: SearchOutput, context: SearchRenderContext =
     return [{ type: 'text', text: lines.join('\n') }];
   }
 
+  const scopeNoun = context.scope === 'global' ? '全网内容' : '知乎内容';
+
   if (value.items.length === 0) {
-    // 带下限时不能只说「未找到」：下限只筛本次候选，说成「知乎没有」就是错的结论。
-    const text =
+    // 首句必须自带条件限定：一律写「未找到」会把「被筛掉了」说成「不存在」，
+    // 那是首因效应下最难纠正的一类误导。
+    const head =
+      context.filtered === true
+        ? `当前筛选条件下未命中关于 "${value.query}" 的${scopeNoun}。`
+        : `未找到关于 "${value.query}" 的${scopeNoun}。`;
+    const tail =
       context.minValue === undefined
-        ? `未找到关于 "${value.query}" 的知乎内容。`
-        : `未找到关于 "${value.query}" 的知乎内容。下限 ${String(context.minValue)} 只在本次检索到的候选中筛选，不代表知乎没有相关的高赞内容 —— 可放宽下限或换个关键词。`;
-    return [{ type: 'text', text }];
+        ? ''
+        : `下限 ${String(context.minValue)} 只在本次检索到的候选中筛选，不代表知乎没有相关的高赞内容。`;
+    return [{ type: 'text', text: head + tail }];
   }
 
-  const lines: string[] = [`找到 ${String(value.items.length)} 条关于 "${value.query}" 的知乎结果：`, ''];
+  const lines: string[] = [`${headerFor(value, context)}：`, ''];
   for (const item of value.items) {
     lines.push(`### [${escapeLinkText(item.title)}](${item.url})`);
     const meta = [`**作者**: ${item.author || '匿名'}`];
@@ -107,9 +141,22 @@ export function renderSearch(value: SearchOutput, context: SearchRenderContext =
     lines.push(`> ${item.snippet}`);
     lines.push('');
   }
+  // 到顶：请求超过端点上限、且返回条数正好等于上限 —— 说明是被单次上限截断的，
+  // 不是「全网只有这么多」。不写出来，模型会把上限当成全集。
+  const capped =
+    context.maxCount !== undefined &&
+    context.requestedCount !== undefined &&
+    context.requestedCount > context.maxCount &&
+    value.items.length === context.maxCount;
+
   // 比请求的条数少：可能是候选本来就不够，也可能是被下限筛掉了。
   // 不写出来，模型会把「筛掉了」读成「知乎只有这些」。
-  if (
+  if (capped) {
+    lines.push(
+      `> 已返回 ${String(value.items.length)} 条，达到本工具的单次检索上限（${String(context.maxCount)} 条）。要更多，请换关键词或收窄条件后重搜。`,
+      '',
+    );
+  } else if (
     context.minValue !== undefined &&
     context.requestedCount !== undefined &&
     value.items.length < context.requestedCount
