@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { validateJsonSchemaValue, type JsonSchemaNode } from '@deepseek-ai/dsh-tools';
 import { createZhihuGlobalSearchTool } from '../src/tools/global-search.js';
 import { createZhihuSearchTool } from '../src/tools/search.js';
 import { createZhihuZhidaTool } from '../src/tools/zhida.js';
@@ -288,6 +289,64 @@ describe('zhihu_search', () => {
     const local = createZhihuSearchTool(harness.deps);
     const global = createZhihuGlobalSearchTool(harness.deps);
     expect(local.output.schema).toEqual(global.output.schema);
+    harness.dispose();
+  });
+});
+
+describe('Canonical Output 必须通过自己声明的 output schema', () => {
+  // 宿主就是这么校验的（output.schema 是 additionalProperties: false）：
+  // 投影层多带一个未声明的键，**整个调用就被判非法**。
+  // v1.4.0 正是这样：类型与投影都加了 commentCount / editTime，schema 却漏了，
+  // 于是两个搜索工具只要有结果就整体失败 —— 而当时的测试直接读 execute() 的返回值，
+  // 从不走 schema 校验，所以全绿放行。这组用例就是补上那道缺口。
+  const schemaOf = (tool: { output: { schema: unknown } }): JsonSchemaNode => tool.output.schema as JsonSchemaNode;
+
+  it('两个搜索工具的成功值都合法（结果带齐上游字段）', async () => {
+    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [apiItem] })));
+    for (const tool of [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps)]) {
+      const value = await tool.execute({ query: 'RAG' }, execContext());
+      expect(validateJsonSchemaValue(schemaOf(tool), value), tool.name).toEqual([]);
+    }
+    harness.dispose();
+  });
+
+  it('两个搜索工具的失败值也合法（错误面同样要过校验）', async () => {
+    const harness = makeHarness(async () => jsonResponse({ Code: 20001, Message: 'auth failed', Data: null }));
+    for (const tool of [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps)]) {
+      const value = await tool.execute({ query: 'RAG' }, execContext());
+      expect(validateJsonSchemaValue(schemaOf(tool), value), tool.name).toEqual([]);
+    }
+    harness.dispose();
+  });
+
+  it('直答的成功值与失败值都合法', async () => {
+    const okHarness = makeHarness(async () =>
+      sseResponse(['data: {"choices":[{"delta":{"content":"答"}}]}\n\n', 'data: [DONE]\n\n']),
+    );
+    const okTool = createZhihuZhidaTool(okHarness.deps);
+    const okValue = await okTool.execute({ question: 'q' }, execContext());
+    expect(validateJsonSchemaValue(schemaOf(okTool), okValue)).toEqual([]);
+    okHarness.dispose();
+
+    const failHarness = makeHarness(async () =>
+      jsonResponse({ error: { message: 'boom', type: 'server_error', code: 'internal_error' } }, 500),
+    );
+    const failTool = createZhihuZhidaTool(failHarness.deps);
+    const failValue = await failTool.execute({ question: 'q' }, execContext());
+    expect(validateJsonSchemaValue(schemaOf(failTool), failValue)).toEqual([]);
+    failHarness.dispose();
+  });
+
+  it('守卫本身有效：多一个未声明字段必须被判非法（否则这组用例是空的）', async () => {
+    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const tool = createZhihuSearchTool(harness.deps);
+    const value = {
+      ok: true,
+      query: 'q',
+      items: [{ title: 't', url: 'https://a', snippet: 's', author: 'a', contentType: 'Answer', bogus: 1 }],
+      hasMore: false,
+    };
+    expect(validateJsonSchemaValue(schemaOf(tool), value).length).toBeGreaterThan(0);
     harness.dispose();
   });
 });

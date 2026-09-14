@@ -151,6 +151,9 @@
 
 ### 本实现（我们自己的坑）
 
+- 工具输出有**三份副本**：`types.ts` 的 Canonical 类型、投影层的对象字面量、`output.schema`。
+  前两份由 TypeScript 与单测照看，第三份**只被宿主照看**（`additionalProperties: false`）——
+  前两份对了它不对，**整个调用被判非法**。v1.4.0 的回归正是如此，见[复盘](postmortem/2026-09-14-output-schema-drift.md)。
 - 字节流用 `TextDecoder({stream: true})` 解码；逐 chunk 解码会把跨边界的汉字变成 U+FFFD，且偶发。
 - 标题可能含 `]` 与换行，进入 Markdown 链接前需转义。
 - 无时区信息的日期按 UTC 解释；否则同一输入在不同机器产生不同缓存键。

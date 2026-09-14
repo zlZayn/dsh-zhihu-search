@@ -155,6 +155,11 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
                 snippet: { type: 'string', required: true },
                 author: { type: 'string', required: true },
                 voteUpCount: { type: 'number' },
+                // ⚠ 可选字段也必须在这里声明：output.schema 是 additionalProperties: false，
+                // **宿主按它校验工具返回值** —— 投影了却没声明 = 整个调用被判非法
+                // （v1.4.0 就是这样让所有搜索调用失败的，回归守卫见 test/tool.test.ts）。
+                commentCount: { type: 'number' },
+                editTime: { type: 'number' },
                 contentType: { type: 'string', required: true },
               },
             },

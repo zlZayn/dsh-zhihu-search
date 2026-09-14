@@ -60,6 +60,7 @@
 - 可用作值导入的外部模块只有 `PLATFORM_MODULES`（DSH `packages/client/web/src/platform.ts`）；超出该清单必须写 `dsh.client.inject` / `external`
 - `lib/client.js` 专供浏览器半体；host 模块不得命名 `src/client.ts`，否则被 esbuild 覆盖（[复盘](docs/postmortem/2026-09-12-client-js-path-collision.md)）
 - 测试默认从 `src/` 导入，**不跑编译图**；产物级回归靠 `test/dist.test.ts`
+- 改工具输出字段必须**同时**改三处：Canonical 类型、投影层、`output.schema`。宿主按最后一份校验（`additionalProperties: false`），漏一处 = 整个工具调用失败（v1.4.0 的 P0，见[复盘](docs/postmortem/2026-09-14-output-schema-drift.md)）；`test/tool.test.ts` 的 schema 校验用例是守卫
 - **契约测试红了 ≠ 测试过时**：先重跑探针，再改 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的偏差表，最后才动实现与断言（顺序见 [test/README.md](test/README.md)）。它每周一由 `contract.yml` 跑，密钥是 repo secret `ZHIHU_ACCESS_SECRET`（缺席直接红，不静默跳过）；本地跑之前先确认配额够——一轮约 16 次请求
 - **`agent/created` 监听器里同步抛错会否决 agent 创建并回滚**（只有 Promise 拒绝降级为 warn，DSH `core/agent` 实测）→ 该钩子里任何可能抛错的动作都要 try/catch
 - 原生网页工具（`web_search` / `web_fetch`）**不在全局层**：web profile 关掉了 base 的全局 `tool-web` 行，改由 **agent preset 的 standing scope** 注册 → 用根上下文的全局视图（`ctx.tools.get(name)`）去判断它们是否存在，**永远得到"不存在"**（v1.3.0 就这样静默失效，见[复盘](docs/postmortem/2026-09-14-hidden-tool-restriction-noop.md)）
