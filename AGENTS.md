@@ -33,22 +33,12 @@
 
 ## 验证快照（2026-09-14 实跑）
 
-**会随每次改动漂移的数字一律不抄，指向自更新来源** —— 抄一次就要手动跟一次，本文件已经因此过时过两回。
+数字与版本一律看自更新来源（理由见「[文档网络与自更新](#文档网络与自更新)」）：测试与类型检查 → [Actions](https://github.com/zlZayn/dsh-zhihu-search/actions)，发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)。下面只记不随数字漂移的定性结论；更早轮次的真机验证见 [.agents/notes/](.agents/notes/) 与 `git log`。
 
-- 测试与类型检查 → [Actions](https://github.com/zlZayn/dsh-zhihu-search/actions)，每次推送自更新
-- 发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)，badge 自更新
-
-只留下不随数字漂移的定性结论：
-
-- 本机 `npm run build` / `npm run typecheck` / `npm test` 全绿
-- 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
-- 发版链路：v1.2.8 首次由单一入口实跑 —— OIDC 发布、tag、GitHub Release 在一次运行内同步落地
-- 「隐藏原生网页工具」：v1.3.1 在真机 profile 上行为验证通过 —— 开关打开后模型的工具面失去 `web_search` / `web_fetch`，关闭即恢复
-- 契约测试：本机与 GitHub Actions 都实跑通过（后者由 repo secret `ZHIHU_ACCESS_SECRET` 供燃料，约 38s）；每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
-- 真机验收：v1.4.1 升级 + host 重启后在 profile 安装副本上跑通 —— [scripts/acceptance.mjs](scripts/acceptance.mjs) 9/9 全绿（扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本），工具面 `zhihu_search` / `zhihu_global_search` 同参数复验一致
-- 发版守卫：实跑验证过 —— 只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
-- 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定三条不变量在 v1.5.1 落地，由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
-- 事故：v1.4.0 的 P0（输出 schema 漂移）由真机验收第 1 条抓到，v1.4.1 修复 → [复盘](docs/postmortem/2026-09-14-output-schema-drift.md)
+- 契约测试：本机与 GitHub Actions 都实跑通过（后者由 repo secret `ZHIHU_ACCESS_SECRET` 供燃料）；每周一由 [contract.yml](.github/workflows/contract.yml) 跑；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
+- 真机验收：[scripts/acceptance.mjs](scripts/acceptance.mjs) 覆盖扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本；升级 + host 重启后在 profile 安装副本上跑通，工具面同参数复验一致
+- 发版守卫：只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
+- 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
 
 ## 待办
 
@@ -66,10 +56,11 @@
 
 ## 文档网络与自更新
 
-一条事实只有一个 home，其余位置一律链接：根 README 讲门面（给访客），本文件讲规则与仪表盘，子目录双件分讲「有什么 / 改哪」（README）与「在这里要怎么干」（AGENTS.md，进入该目录时自动注入），[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 讲不变的设计与防错，[.agents/notes/](.agents/notes/) 讲为什么，[docs/PUBLISHING.md](docs/PUBLISHING.md) 讲怎么发。
+维护成本几乎全在「同步」上；下面五条把它压到最低 —— 从任何一处都能顺着链接找到该改的地方。
 
-- **能自证的就不抄**：测试与类型检查 → Actions；发布版本 → npm badge；产物一致性 → 哈希比对。文档只留指针，不留会漂移的快照数字。
-- **能落成校验的就不写散文**：五条红线 → 测试；发版噪音 → [release-guard](scripts/release-guard.mjs)；上游契约 → [contract.yml](.github/workflows/contract.yml)；文档链接与换行 → 校验脚本。
+- **一条事实只有一个 home**：根 README 讲门面（给访客），本文件讲规则与仪表盘；子目录双件分讲「有什么 / 改哪」（README）与「在这里要怎么干」（AGENTS.md，进入该目录时自动注入）；[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 讲不变的设计与防错，[.agents/notes/](.agents/notes/) 讲为什么，[docs/PUBLISHING.md](docs/PUBLISHING.md) 讲怎么发。别处一律链接，不复制。
+- **能自证的不抄（自更新）**：凡是有「会自己更新的来源」的事实就指向它 —— 测试与类型检查 → [Actions](https://github.com/zlZayn/dsh-zhihu-search/actions)，发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)，产物一致性 → 哈希比对。抄一次数字就要手动跟一次（本文件已经因此过时过两回），所以只留指针与不随数字漂移的定性结论。
+- **能落成校验的不写散文**：五条红线 → 测试；发版噪音 → [release-guard](scripts/release-guard.mjs)；上游契约 → [contract.yml](.github/workflows/contract.yml)；文档链接与换行 → 校验脚本。机器判得了的规则，就别指望人记得。
 - **改一处要查得到同步点**：每个子目录 README 的「变更影响路由」是同步清单的入口；新增或改名文件后必须回填，否则下一个人只能靠运气。
 - **坑按作用域分流**：跨模块、踩了整条链就崩的留在本文件；模块内的下放到对应子目录 `AGENTS.md`，本文件不重复。
 
