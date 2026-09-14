@@ -43,10 +43,11 @@
 - 装入运行中的 web profile；设置面板出现卡片；经 DSH 工具管线实调 `zhihu_search` / `zhihu_global_search` 返回真实结果
 - 发版链路：v1.2.8 首次由单一入口实跑 —— OIDC 发布、tag、GitHub Release 在一次运行内同步落地
 - 「隐藏原生网页工具」：v1.3.1 在真机 profile 上行为验证通过 —— 开关打开后模型的工具面失去 `web_search` / `web_fetch`，关闭即恢复
+- 契约测试：v1.4.0 首次实跑（本机注入 Secret）全绿，约 15s / 16 次请求；日常 `npm test` 不含 live 探针，只多一份底座的离线自检
 
 ## 待办
 
-- [ ] 直答流式读取无本地超时 → [src/README.md](src/README.md)
+- [ ] 仓库加 `ZHIHU_ACCESS_SECRET`（Settings → Secrets and variables → Actions）：契约测试的燃料。**缺了 `contract.yml` 会按设计直接红**，不静默跳过 —— 这是刻意的，红一次就知道要去配。
 
 ## 活跃坑（工具链与 DSH 平台）
 
