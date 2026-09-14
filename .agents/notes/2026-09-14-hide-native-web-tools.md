@@ -12,7 +12,8 @@
 - 三个时机共用一个幂等对账：`agent/created` 给新 agent 装、`agent/disposed` 销账、设置写入触发的 `onChange` 覆盖 live agent。
 - 开关默认 `false`；作用域全域（含子 agent，restriction 沿 scope 链继承）。
 - 热切换：可见集在**每次模型请求**时重算，所以拨动后下一次请求即生效，不需要新窗口。
-- 装之前先按注册表过滤工具名，并整段 try/catch —— `restrict()` 对未知名字抛错，而 `agent/created` 里的同步异常会否决 agent 创建。
+- 取注册表用**免 inject 的 `agent.ctx.get('tools')`**（属性访问 `agent.ctx.tools` 会抛 `without inject`）；逐个名字单独装、单独 catch —— `restrict()` 自己按该 agent 的 scope 链校验名字，因此不必先看全局视图（那正是 v1.3.0 的失效原因，见[复盘](../../docs/postmortem/2026-09-14-hidden-tool-restriction-noop.md)）。
+- 只吞两种预期失败（无工具服务、名字不在链上）：`agent/created` 里的同步异常会否决 agent 创建，但意外错误也必须吞掉 —— 静默失效就是 v1.3.0 的教训，因此靠回归测试守，而不是靠日志。
 
 ## 替代方案（强制）
 

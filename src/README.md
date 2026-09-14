@@ -38,6 +38,7 @@
 - 改密钥解析优先级 → 契约变更，跑 `test/credentials.test.ts` 与 `test/auth.test.ts`，同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」；若环境变量名 `ZHIHU_ACCESS_SECRET` 变更，同时改根 [README.md](../README.md) 的那一句。
 - 改 `client/` → 必须 `npm run build` 并跑 `test/client-bundle.test.ts`，确认注册 key 与 `ZHIHU_SETTINGS_NAMESPACE` 一致；浏览器读的是 **profile 里那份** `lib/client.js`，要随新版本装进 profile 才生效。
 - 新增模块或调整依赖方向 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」，并同步本文件的「文件索引」与 [AGENTS.md](AGENTS.md) 的约束。
+- 改「隐藏原生网页工具」的对账逻辑 → 跑 `test/plugin.test.ts` 与 `test/native-web-tools.test.ts`。两条硬约束别踩：原生工具住在 **preset 的 standing scope**（全局视图看不到它），且 agent scope 上取注册表必须用 `agent.ctx.get('tools')` 而非属性访问 → [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「原生工具的可见性」。
 - 改「隐藏原生网页工具」的对账逻辑 → 跑 `test/plugin.test.ts` 的「隐藏原生网页工具」组；那条 **tool-web 不在场时不抛错** 的断言是 blocker 守卫（同步抛错会否决 agent 创建），不可删。设计约束见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「原生工具的可见性」。
 
 ## 已知限制

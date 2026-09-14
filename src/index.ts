@@ -43,8 +43,10 @@ export const DEFAULT_ACCESS_SECRET_REF = 'ZHIHU_ACCESS_SECRET';
 /**
  * DSH 原生网页工具名（由 `@deepseek-ai/dsh-tool-web` 注册）。
  *
- * `tools.restrict()` 会按名字校验并**抛错**，而 `agent/created` 监听器里的同步异常
- * 会否决 agent 创建（DSH `core/agent` 的注册表语义），所以使用前必须按真实注册表过滤。
+ * 注意它们并不住在全局层：web profile 关掉了 base bundle 的全局 `tool-web` 行
+ * （DSH `bundle/web-app/cordis.patch.yml:470`），改由 **agent preset 的 standing scope**
+ * 注册，agent 的 scope 再挂到那一层下面。因此**根上下文的全局视图看不到这两个名字** ——
+ * 「它们存在吗」只能站在某个 agent 的 scope 链上问。
  */
 const NATIVE_WEB_TOOLS = ['web_search', 'web_fetch'] as const;
 
@@ -57,10 +59,21 @@ interface AgentRegistryFace {
 interface ScopedAgent {
   readonly id: string;
   readonly ctx: {
-    readonly tools: {
-      restrict(filter: { deny: readonly string[] }): () => void;
-    };
+    /**
+     * 刻意用免 inject 的 `get`，而不是 `ctx.tools` 属性访问。
+     *
+     * 属性代理要求**该上下文自己**声明过 `tools` 依赖，而 agent scope 的依赖面
+     * 由它的铸造者决定、不由本插件决定 —— 实测属性访问会抛
+     * `cannot get property "tools" without inject`，而 `get('tools')` 拿到的是
+     * 同一个 agent-scope 绑定的注册表，`restrict()` 在其上正常工作。
+     */
+    get(name: string): unknown;
   };
+}
+
+/** agent scope 上的工具注册表，本模块只用这一个方法。 */
+interface ScopedToolsFace {
+  restrict(filter: { deny: readonly string[] }): () => void;
 }
 
 /** 插件配置。 */
@@ -211,25 +224,54 @@ export function apply(ctx: Context, config: Config): void {
   // 自动撤销，这里只是我们这一侧的账，用于「拨回开关」与「插件卸载」两个时机。
   const restrictions = new Map<string, () => void>();
 
-  /** 本刻真实存在、可被 deny 的原生工具名 —— 名字不存在时 deny 会让 restrict 抛错。 */
-  const restrictableNativeTools = (): string[] =>
-    NATIVE_WEB_TOOLS.filter((toolName) => ctx.tools.get(toolName) !== undefined);
+  /**
+   * 取某个 agent scope 上的工具注册表。
+   *
+   * 用 `ctx.get` 而不是 `ctx.tools`：后者要求 agent scope 自己声明过 `tools` 依赖
+   * （见 {@link ScopedAgent}），实测会抛错并被下面的 catch 吞成"静默无效"。
+   *
+   * @param agent - 目标 agent。
+   * @returns 该 scope 的注册表面，或该 scope 没有工具服务时的 undefined。
+   */
+  const toolsFor = (agent: ScopedAgent): ScopedToolsFace | undefined => {
+    const tools = agent.ctx.get('tools') as Partial<ScopedToolsFace> | undefined;
+    return typeof tools?.restrict === 'function' ? (tools as ScopedToolsFace) : undefined;
+  };
 
   /**
-   * 给一个 agent 装上 restriction（已装或不需要装时是空操作）。
+   * 给一个 agent 装上 restriction（不需要装、或已装时是空操作）。
    *
-   * 刻意吞掉异常：`agent/created` 监听器同步抛错会**否决 agent 创建并回滚**，
-   * 一个可选的界面开关不该有这种权力。
+   * 三步顺序不能换：
+   * 1. 开关为假、或这个 agent 已经装过 → 直接返回。这是幂等点：`onChange` 会被**任意**
+   *    设置写入触发（保存 Access Secret 同样算）。
+   * 2. 逐个名字单独装、单独 catch。原生工具注册在 agent preset 的 standing scope 上，
+   *    根上下文的全局视图看不到它们，所以「先问全局视图有没有、再决定装不装」会静默
+   *    什么都不做（v1.3.0 的实际故障）。`restrict()` 自己按**该 agent 的 scope 链**校验
+   *    名字：存在即装、不存在即抛，逐个试探因此天然就是正确的过滤，且无需新依赖。
+   * 3. 一个都没装上 → 不记账，否则会留下一份撤销时无事可做的空账。
+   *
+   * 被吞掉的只有两种**预期**失败：该 scope 没有工具服务、某个名字不在这条 scope 链上。
+   * 异常绝不能漏出去 —— `agent/created` 监听器同步抛错会**否决 agent 创建并回滚**
+   * （DSH `core/agent` 的注册表语义），一个可选的界面开关不该有这种权力。
    */
   const installOn = (agent: ScopedAgent): void => {
     if (current().disableNativeWebSearch !== true || restrictions.has(agent.id)) return;
-    const deny = restrictableNativeTools();
-    if (deny.length === 0) return;
-    try {
-      restrictions.set(agent.id, agent.ctx.tools.restrict({ deny }));
-    } catch (error) {
-      warn(`[zhihu-search] 隐藏原生网页工具失败（不影响其他功能）：${String(error)}`);
+    const tools = toolsFor(agent);
+    if (tools === undefined) return;
+
+    const disposers: Array<() => void> = [];
+    for (const toolName of NATIVE_WEB_TOOLS) {
+      try {
+        disposers.push(tools.restrict({ deny: [toolName] }));
+      } catch {
+        // 这个名字不在该 agent 的 scope 链上（例如没装 tool-web）：不装即可，不是错误。
+      }
     }
+    if (disposers.length === 0) return;
+
+    restrictions.set(agent.id, () => {
+      for (const dispose of disposers) dispose();
+    });
   };
 
   /** 摘掉一个 agent 上的 restriction。 */

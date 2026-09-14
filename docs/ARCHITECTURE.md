@@ -114,13 +114,17 @@
 
 ## 原生工具的可见性
 
-「隐藏原生网页搜索」开关用 `ctx.tools.restrict()` 把 DSH 的 `web_search` / `web_fetch` 从**该 agent 的可见集**里摘掉 —— 不是执行期拦截，被 deny 的工具与不存在无法区分。
+「隐藏原生网页搜索」开关用 `tools.restrict()` 把 DSH 的 `web_search` / `web_fetch` 从**该 agent 的可见集**里摘掉 —— 不是执行期拦截，被 deny 的工具与不存在无法区分。
+
+**这两个工具不在全局层**：web profile 关掉了 base bundle 的全局 `tool-web` 行（DSH `bundle/web-app/cordis.patch.yml:470`），改由 **agent preset 的 standing scope** 注册，agent 的 scope 再挂到那一层下面（`preset/agent-presets/src/index.ts:3-12`）。「它们存在吗」只能站在某个 agent 的 scope 链上问。
 
 - restriction 必须装在 **agent 的 scoped ctx** 上：全局范围会被 DSH 直接拒绝（那会遮蔽每个 agent）。
+- 取注册表要**免 inject 的 `agent.ctx.get('tools')`**，不能用属性访问 —— 后者要求 agent scope 自己声明过 `tools` 依赖（不由本插件决定），实测抛 `cannot get property "tools" without inject`。
+- 名字过滤靠 `restrict()` 自己：它按**该 agent 的 scope 链**校验，存在即装、不存在即抛；逐个名字单独装、单独 catch，比"先查全局视图"正确且无需新依赖。
 - 它沿 scope 链继承，因此该 agent 派生的子 agent 自动遵守同一套规则。
 - 可见集在**每次模型请求**时重算，所以设置写入后从下一次请求起生效，无需重启或新窗口。
 - `restrict()` 返回撤销它自己的那个 disposer：拨回开关与插件卸载都要用它，插件侧因此持有一份按 agent 索引的账。
-- 装之前必须按注册表过滤工具名（名字不存在时 `restrict()` 抛错），并整段 try/catch —— `agent/created` 里的同步异常会**否决 agent 创建**。
+- 只吞两种**预期**失败（无工具服务、名字不在链上）：`agent/created` 里的同步异常会**否决 agent 创建**，但把意外错误也吞掉就等于制造静默故障 —— v1.3.0 正是这样丢了一次发布，见[复盘](postmortem/2026-09-14-hidden-tool-restriction-noop.md)。
 
 ## 防错清单
 

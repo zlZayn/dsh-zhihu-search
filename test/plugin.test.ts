@@ -91,19 +91,41 @@ function makeContext() {
   };
 }
 
-/** agent 的最小替身：只带 `id` 与 scoped ctx 上的 `restrict`。 */
-function fakeAgent(id: string, restrictions: Array<{ deny: string[]; lifted: boolean }>) {
+/**
+ * agent 的最小替身。
+ *
+ * 两处刻意对齐真实实现，否则测不出关键路径：
+ * - 只提供免 inject 的 `get('tools')`（真实环境里属性访问 `ctx.tools` 会抛 without inject）；
+ * - `restrict()` 对**不在该 scope 链上的名字**抛错，就像真实注册表那样 —— 替身若默默接受
+ *   任何名字，"名字过滤"这一步就永远测不到。
+ *
+ * @param knownTools - 该 agent 的 scope 链上真实存在的原生工具名。
+ * @param hasToolsService - 该 scope 是否拿得到工具服务。
+ */
+function fakeAgent(
+  id: string,
+  restrictions: Array<{ deny: string[]; lifted: boolean }>,
+  knownTools: readonly string[] = ['web_search', 'web_fetch'],
+  hasToolsService = true,
+) {
   return {
     id,
     ctx: {
-      tools: {
-        restrict(filter: { deny: readonly string[] }) {
-          const record = { deny: [...filter.deny], lifted: false };
-          restrictions.push(record);
-          return (): void => {
-            record.lifted = true;
-          };
-        },
+      get(name: string): unknown {
+        if (name !== 'tools' || !hasToolsService) return undefined;
+        return {
+          restrict(filter: { deny: readonly string[] }) {
+            const unknown = filter.deny.filter((toolName) => !knownTools.includes(toolName));
+            if (unknown.length > 0) {
+              throw new Error(`tools.restrict() names unknown global tool(s) ${unknown.join(', ')}`);
+            }
+            const record = { deny: [...filter.deny], lifted: false };
+            restrictions.push(record);
+            return (): void => {
+              record.lifted = true;
+            };
+          },
+        };
       },
     },
   };
@@ -190,51 +212,55 @@ describe('apply', () => {
 });
 
 describe('隐藏原生网页工具', () => {
-  it('tool-web 未启用时不装 restriction，也不让 agent 创建失败', () => {
+  it('原生工具不在场时不装任何 restriction，也不让 agent 创建失败', () => {
     const h = makeContext();
-    h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
-    apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
-    expect(h.restrictions).toHaveLength(0);
-    // 新 agent 出现：监听器必须静默 —— 同步抛错会否决 agent 创建并回滚。
+    h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions, [])]));
     expect(() => {
-      h.emit('agent/created', { agent: fakeAgent('fresh', h.restrictions) });
+      apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
     }).not.toThrow();
     expect(h.restrictions).toHaveLength(0);
-    expect(h.warnings.join('')).not.toContain('隐藏原生网页工具');
+    // 新 agent 出现：监听器同样必须静默 —— 同步抛错会否决 agent 创建并回滚。
+    expect(() => {
+      h.emit('agent/created', { agent: fakeAgent('fresh', h.restrictions, []) });
+    }).not.toThrow();
+    expect(h.restrictions).toHaveLength(0);
   });
 
-  it('tool-web 在场时，live agent 与后来的 agent 都被装上', () => {
+  it('两个原生工具都在场时，每个名字各装一条（取交集等价）', () => {
     const h = makeContext();
-    h.presentTools.add('web_search');
-    h.presentTools.add('web_fetch');
     h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
     apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
-    expect(h.restrictions.map((record) => record.deny)).toEqual([['web_search', 'web_fetch']]);
+    expect(h.restrictions.map((record) => record.deny)).toEqual([['web_search'], ['web_fetch']]);
 
     h.emit('agent/created', { agent: fakeAgent('fresh', h.restrictions) });
-    expect(h.restrictions).toHaveLength(2);
+    expect(h.restrictions).toHaveLength(4);
   });
 
-  it('只存在其中一个原生工具时，只 deny 存在的那一个', () => {
+  it('只存在其中一个原生工具时，只装存在的那一个', () => {
     const h = makeContext();
-    h.presentTools.add('web_search');
-    h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
+    h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions, ['web_search'])]));
     apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
     expect(h.restrictions.map((record) => record.deny)).toEqual([['web_search']]);
   });
 
-  it('默认不装：开关关闭时对账是空操作', () => {
+  it('开关关闭时对账是空操作', () => {
     const h = makeContext();
-    h.presentTools.add('web_search');
     h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
     apply(h.ctx as never, resolve({ accessSecret: 'x' }));
     expect(h.restrictions).toHaveLength(0);
   });
 
+  it('该 scope 拿不到工具服务时静默跳过，不抛错', () => {
+    const h = makeContext();
+    h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions, [], false)]));
+    expect(() => {
+      apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
+    }).not.toThrow();
+    expect(h.restrictions).toHaveLength(0);
+  });
+
   it('热切换：拨开补装到 live agent，拨回即撤销', () => {
     const h = makeContext();
-    h.presentTools.add('web_search');
-    h.presentTools.add('web_fetch');
     h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
     apply(h.ctx as never, resolve({ accessSecret: 'x' }));
     const hooks = h.installedSections[0]?.hooks;
@@ -243,41 +269,38 @@ describe('隐藏原生网页工具', () => {
 
     hooks?.setSource(() => resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
     hooks?.onChange();
-    expect(h.restrictions.map((record) => record.lifted)).toEqual([false]);
+    expect(h.restrictions.map((record) => record.lifted)).toEqual([false, false]);
 
     hooks?.setSource(() => resolve({ accessSecret: 'x' }));
     hooks?.onChange();
-    expect(h.restrictions.map((record) => record.lifted)).toEqual([true]);
+    expect(h.restrictions.map((record) => record.lifted)).toEqual([true, true]);
   });
 
   it('保存密钥触发的 onChange 不重复装（幂等）', () => {
     const h = makeContext();
-    h.presentTools.add('web_search');
     h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
     apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
     h.installedSections[0]?.hooks.onChange();
     h.installedSections[0]?.hooks.onChange();
-    expect(h.restrictions).toHaveLength(1);
+    expect(h.restrictions).toHaveLength(2);
   });
 
   it('agent 销毁后销账：不再去调用一个已随 scope 撤销的 restriction', () => {
     const h = makeContext();
-    h.presentTools.add('web_search');
     h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
     apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
     h.emit('agent/disposed', { agent: { id: 'live' } });
     h.unload();
-    // agent 的 scope 已经撤销了 restriction，这里再调那个 disposer 只会是多余动作。
-    expect(h.restrictions.map((record) => record.lifted)).toEqual([false]);
+    // agent 的 scope 已经撤销了 restriction，这里再调那些 disposer 只会是多余动作。
+    expect(h.restrictions.map((record) => record.lifted)).toEqual([false, false]);
   });
 
   it('卸载时撤销仍挂在 live agent 上的 restriction', () => {
     const h = makeContext();
-    h.presentTools.add('web_search');
     h.services.set('agents', fakeAgents([fakeAgent('live', h.restrictions)]));
     apply(h.ctx as never, resolve({ accessSecret: 'x', disableNativeWebSearch: true }));
-    expect(h.restrictions).toHaveLength(1);
+    expect(h.restrictions).toHaveLength(2);
     h.unload();
-    expect(h.restrictions.map((record) => record.lifted)).toEqual([true]);
+    expect(h.restrictions.map((record) => record.lifted)).toEqual([true, true]);
   });
 });

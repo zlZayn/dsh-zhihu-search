@@ -166,6 +166,8 @@ const S: Record<string, CSSProperties> = {
     color: 'var(--dsw-alias-label-primary)',
   },
   toggleLabel: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 },
+  // 状态行：比说明行重一档（secondary 对 tertiary），一行说清开关当前的含义。
+  stateNote: { margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-secondary)' },
   // 说明句里的外链：只用卡片既有的语义令牌，颜色取自 ui-theme 的 --dsw-alias-link。
   // 卡片是纯内联样式、无法写 :hover，所以常驻下划线作为静态可点提示。
   link: {
@@ -395,6 +397,9 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
                   }}
                 />
               </div>
+              {/* 状态行：与官方 SubagentModelSelectionCard 同款写法 —— 拨动即换文案，
+                  用户不必从开关位置猜它到底做了什么。 */}
+              <p style={S.stateNote}>{t(hideText ? 'hideNativeWebOn' : 'hideNativeWebOff')}</p>
               <p style={S.hint}>{t('hideNativeWebHint')}</p>
             </div>
 

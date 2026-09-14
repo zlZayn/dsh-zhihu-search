@@ -58,7 +58,9 @@
 - 可用作值导入的外部模块只有 `PLATFORM_MODULES`（DSH `packages/client/web/src/platform.ts`）；超出该清单必须写 `dsh.client.inject` / `external`
 - `lib/client.js` 专供浏览器半体；host 模块不得命名 `src/client.ts`，否则被 esbuild 覆盖（[复盘](docs/postmortem/2026-09-12-client-js-path-collision.md)）
 - 测试默认从 `src/` 导入，**不跑编译图**；产物级回归靠 `test/dist.test.ts`
-- **`agent/created` 监听器里同步抛错会否决 agent 创建并回滚**（只有 Promise 拒绝降级为 warn，DSH `core/agent` 实测）→ 该钩子里任何可能抛错的动作都要 try/catch；`tools.restrict()` 还会按名字校验并抛错，用它之前必须先按注册表过滤
+- **`agent/created` 监听器里同步抛错会否决 agent 创建并回滚**（只有 Promise 拒绝降级为 warn，DSH `core/agent` 实测）→ 该钩子里任何可能抛错的动作都要 try/catch
+- 原生网页工具（`web_search` / `web_fetch`）**不在全局层**：web profile 关掉了 base 的全局 `tool-web` 行，改由 **agent preset 的 standing scope** 注册 → 用根上下文的全局视图（`ctx.tools.get(name)`）去判断它们是否存在，**永远得到"不存在"**（v1.3.0 就这样静默失效，见[复盘](docs/postmortem/2026-09-14-hidden-tool-restriction-noop.md)）
+- agent scope 上取工具注册表必须走**免 inject 的 `agent.ctx.get('tools')`**；属性访问 `agent.ctx.tools` 抛 `cannot get property "tools" without inject`（agent scope 的依赖面不由调用方决定）
 - `@deepseek-ai/dsh-client-ui-primitives` 是浏览器静态库，Node 里加载不了（缺 `clsx`）；测试中须替身
 - 设计令牌只有 `--dsw-alias-*`，不存在 `--dsw-color-*` 系列
 - 本地用 `--legacy-peer-deps` 安装会让 `package-lock.json` 缺自动 peer，`npm ci` 随即失败；依赖变更后用 `npm install --registry=https://registry.npmjs.org/` 重建
