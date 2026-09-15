@@ -125,6 +125,20 @@ describe('红线 4：无可变全局状态', () => {
       expect(topLevelLet, file).toEqual([]);
     }
   });
+
+  it('凭据服务只能经 inject 取得，不得走 ctx.get 旁路', () => {
+    // 只校验生效的代码行：注释里正当地提到被否决的写法（与 cordis.patch.yml 的校验同理）。
+    const effective = readFileSync(root + 'src/index.ts', 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n');
+    // `ctx.get` 按 cordis 文档是「不受 inject 约束的读取」—— 它绕过的是门禁，
+    // 不是服务发现本身，跨挂载位置并不可靠。同一上下文里 `ctx.tools`（inject + 属性访问）
+    // 一直正常，而 `ctx.get('credentials')` 在 1.6.0 的线上装配里拿不到服务：
+    // 旧版有一条 `fromSettings` 兜底替它兜着，兜底一删，工具就集体「没有 key」。
+    // 取凭据的唯一合法路径是 `ctx.inject(['credentials'], …)` + 属性访问。
+    expect(effective, 'src/index.ts').not.toContain("ctx.get('credentials')");
+  });
 });
 
 describe('红线 5：模型绝不接触知乎原始语法', () => {

@@ -85,6 +85,7 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 - 把密钥从设置字面量迁到凭据存储（启动期自动迁徙 + 卡片改走 `remote.credentials`）→ Q1 否（旧用法自动搬走，仍正确）Q3 是（密钥不再落 `settings.yaml`、徽标改问凭据域、只读遮蔽可见）→ **minor**。理由见[决策记录](../.agents/notes/2026-09-15-credential-store-migration.md)。
 - **Q1 的边界：新增对某个平台服务的硬依赖**，若标准装配必然提供它、且依赖它的那一边在不满足时**整体不工作**（而不是退化成错误行为）→ 不算 Q1 的破坏。上一条即此例：`remote.credentials` 是官方 web 装配的必备件，缺它时新版卡片本就不工作，旧用法谈不上「变错」。前提不成立时（标准装配不保证提供该服务）仍按 Q1 判 major。
 - 修 v1.6.0 的卡片加载失败（`inject` 漏声明 `remote`，属性访问抛 `without inject`）→ 没有人**正确**的用法因此变错，也没有新能力 → Q1 否 Q3 否 → **patch**；**发布后才发现**的回归另记[复盘](postmortem/2026-09-15-client-inject-remote-missing.md)。
+- 修 v1.6.0/v1.6.1 的工具「没有 key」与迁徙失效（`ctx.get('credentials')` 在线上装配里拿不到服务）→ 同理，旧用法不会因此变错，只是真的开始工作 → **patch**；发布后才发现 → [复盘](postmortem/2026-09-15-credential-service-unreachable.md)。
 
 ### 兜底与升级条款
 

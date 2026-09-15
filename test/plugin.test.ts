@@ -101,7 +101,23 @@ function makeContext() {
     logger: { warn: (message: string) => warnings.push(message) },
   };
 
-  services.set('credentials', {
+  /**
+   * 提供服务的替身。
+   *
+   * 两处都要写，对齐 cordis 的真实注入面：`get` 查的是服务表，而**属性访问**是注入后
+   * `ctx.<name>` 的形态 —— 本插件取凭据只走后者（`ctx.get('credentials')` 在真实装配里
+   * 拿不到服务，见 [复盘](../../docs/postmortem/2026-09-15-credential-service-unreachable.md)），
+   * 替身若只填服务表，这条路径就永远测不到。
+   *
+   * @param name - 服务名。
+   * @param value - 服务面。
+   */
+  const provide = (name: string, value: unknown): void => {
+    services.set(name, value);
+    ctx[name] = value;
+  };
+
+  provide('credentials', {
     async resolve(ref: string) {
       const value = credentialStore.get(ref);
       return value === undefined ? undefined : { value };
@@ -120,6 +136,7 @@ function makeContext() {
     installedSections,
     warnings,
     services,
+    provide,
     presentTools,
     restrictions,
     userSection,
@@ -298,7 +315,7 @@ describe('旧明文迁徙（apply 接线）', () => {
   it('凭据域写不进去时明文原样保留，绝不清空', async () => {
     const h = makeContext();
     h.userSection['accessSecret'] = 'MUST-NOT-BE-LOST';
-    h.services.set('credentials', {
+    h.provide('credentials', {
       async resolve() {
         return undefined;
       },

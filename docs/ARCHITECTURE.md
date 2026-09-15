@@ -90,6 +90,7 @@
 DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插件照此实现，不自带字面量通道。
 
 - 插件不持有密钥本体，只持有**解析器**；每次请求现取，所以换密钥不需要重启进程。
+- **凭据服务只能经 `inject` + 属性访问取得**，不得走 `ctx.get('credentials')`。后者按 cordis 文档是「不受 inject 约束的读取」，绕过的是门禁而非服务发现本身 —— 实测它在 1.6.0 的线上装配里拿不到服务，而同一上下文里 `ctx.tools`（inject + 属性访问）一直正常。由 [test/redlines.test.ts](../test/redlines.test.ts) 静态拦下 → [复盘](postmortem/2026-09-15-credential-service-unreachable.md)。
 - 取值链固定为 **凭据域 → 进程环境**。凭据域是唯一的取值口；环境变量那一段只在 provider 没挂载时才有意义 —— provider 自己已按 进程环境 > `.credentials.yaml` > 项目 `.env` > `$DSH_HOME/.env` 分层，插件再分一次是重复的。
 - 引用名在卡片上是自由文本，而 seam 的语法是 POSIX shell 标识符。越界的名字（如 `my-key`）先经 `isCredentialRefName` 拦下、读作「未配置」，不让一个 typo 在请求路径上抛错。
 - 缓存键掺入的是**凭据来源标识**（就是引用名），不是明文；换一个引用名即换一个缓存空间。

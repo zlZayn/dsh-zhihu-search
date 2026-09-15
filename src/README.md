@@ -37,6 +37,7 @@
 - 改工具描述 → 描述是模型择路与判断能力的唯一依据，按 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「工具描述约定」三槽改，并跑 `test/tool.test.ts`（描述一致性断言在此）。
 - 改呈现层 → 跑 `test/presentation.test.ts` 与 `test/redlines.test.ts`。
 - 改密钥取值链或引用名守卫 → 契约变更，跑 `test/credentials.test.ts` 与 `test/auth.test.ts`，同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」；若环境变量名 `ZHIHU_ACCESS_SECRET` 变更，同时改根 [README.md](../README.md) 的那一句。
+- 改凭据服务的**取用方式** → 只能 `inject` + 属性访问（`ctx.get('credentials')` 由 `test/redlines.test.ts` 静态拦下，理由见 [复盘](../docs/postmortem/2026-09-15-credential-service-unreachable.md)）；跑 `test/plugin.test.ts`。动 `inject` 的嵌套层次前先读 [index.ts](index.ts) 里那段注释：卡片只依赖 `settings`，**凭据是可选依赖，嵌套不是风格而是为了让没有凭据服务的装配仍能显示卡片**。
 - 改 `migrate.ts` 的纪律或顺序 → 跑 `test/migrate.test.ts` 与 `test/plugin.test.ts` 的「旧明文迁徙」组；**「先写后删」的次序断言不可弱化成终态断言**（中途失败即密钥永久丢失）。删 `Config.accessSecret` 前先读 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」。
 - 改 `client/` → 必须 `npm run build` 并跑 `test/client-bundle.test.ts`，确认注册 key 与 `ZHIHU_SETTINGS_NAMESPACE` 一致；浏览器读的是 **profile 里那份** `lib/client.js`，要随新版本装进 profile 才生效。
 - 新增模块或调整依赖方向 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」，并同步本文件的「文件索引」与 [AGENTS.md](AGENTS.md) 的约束。

@@ -190,9 +190,18 @@ export function apply(ctx: Context, config: Config): void {
   // 因此在途与后续调用都会看到新值，无需重启。
   let current: () => Config = () => config;
 
-  /** 凭据服务；装配没挂载它时缺席。 */
-  const credentials = (): CredentialsFace | undefined =>
-    ctx.get('credentials') as CredentialsFace | undefined;
+  /**
+   * 凭据服务面。由下面的 `ctx.inject(['credentials'])` 就绪后写入，缺席时保持 `undefined`。
+   *
+   * **不能用 `ctx.get('credentials')` 取它。** 实测（1.6.0 线上）：从本插件的挂载位置
+   * `ctx.get` 拿不到该服务，而同一上下文里 `ctx.tools`（走 inject + 属性访问）一直正常 ——
+   * 这个对比就是判据。`ctx.get` 按文档是「不受 inject 约束的读取」，绕过的是门禁而不是
+   * 服务发现本身，跨挂载位置并不可靠。旧版有一条 `fromSettings` 兜底正好替它兜着，
+   * 所以这个洞直到兜底被删掉才暴露。
+   *
+   * 红线：`ctx.get('credentials')` 由 [test/redlines.test.ts](../test/redlines.test.ts) 静态拦下。
+   */
+  let credentialFace: CredentialsFace | undefined;
 
   /**
    * 当下生效的凭据引用名。
@@ -227,9 +236,8 @@ export function apply(ctx: Context, config: Config): void {
       referenceName,
       fromCredentials: async (reference) => {
         const ref = brand(reference);
-        const face = credentials();
-        if (ref === undefined || face === undefined) return undefined;
-        return (await face.resolve(ref))?.value;
+        if (ref === undefined || credentialFace === undefined) return undefined;
+        return (await credentialFace.resolve(ref))?.value;
       },
       fromEnvironment: (name) => process.env[name],
     });
@@ -279,17 +287,18 @@ export function apply(ctx: Context, config: Config): void {
       }),
       hasCredential: async () => {
         const ref = brand(referenceName());
-        const face = credentials();
-        if (ref === undefined || face === undefined) return false;
+        if (ref === undefined || credentialFace === undefined) return false;
         // 问 `configured` 而不是 `resolve`：环境变量也算已配置，
         // 而这正是「要不要再搬一份进去」该看的量。
-        return (await face.describe(ref)).configured;
+        return (await credentialFace.describe(ref)).configured;
       },
       adopt: async (value) => {
         const ref = brand(referenceName());
-        const face = credentials();
-        if (ref === undefined || face === undefined) throw new Error('凭据服务未挂载');
-        await face.set(ref, value);
+        if (ref === undefined || credentialFace === undefined) {
+          // 走到这里说明迁徙被排在凭据服务就绪之后，所以这是真异常而不是时序。
+          throw new Error('凭据服务未挂载');
+        }
+        await credentialFace.set(ref, value);
       },
       purge: async () => {
         await settings.mutate(ZHIHU_SETTINGS_NAMESPACE, [{ op: 'unset', path: ['accessSecret'] }]);
@@ -417,11 +426,24 @@ export function apply(ctx: Context, config: Config): void {
         syncNativeWebTools();
       },
     });
-    // 迁徙必须在 section 注册之后（要读 user 层、也要能改写它），
-    // 且应尽早完成 —— 老配置里的明文在 redact 眼里仍是 secret 槽位，
-    // 但留在盘上就是风险。整条路径幂等，设置服务重新就绪时重复进入无害。
-    void prepareCredentials(settingsCtx.settings).catch((error: unknown) => {
-      warn(`[zhihu-search] 启动期凭据体检失败：${error instanceof Error ? error.message : String(error)}`);
+
+    // 凭据是**可选**依赖：拿不到它时卡片仍要能显示、工具仍要能注册（调用时报鉴权错）。
+    // 所以嵌套一层 inject 而不是把 'credentials' 写进上面的数组 —— 那会让卡片陪着一起等，
+    // 一个没有凭据服务的装配连设置界面都进不去。
+    //
+    // 嵌套还顺带定死了顺序：迁徙必然发生在 installSection 之后（它要读 user 层、也要改它）。
+    settingsCtx.inject(['credentials'], (ready) => {
+      credentialFace = ready.credentials as CredentialsFace;
+
+      // 迁徙应尽早完成 —— 老配置里的明文在 redact 眼里仍是 secret 槽位，
+      // 但留在盘上就是风险。整条路径幂等，服务重新就绪时重复进入无害。
+      void prepareCredentials(settingsCtx.settings).catch((error: unknown) => {
+        warn(`[zhihu-search] 启动期凭据体检失败：${error instanceof Error ? error.message : String(error)}`);
+      });
+
+      return () => {
+        credentialFace = undefined;
+      };
     });
   });
 
