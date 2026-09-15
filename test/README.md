@@ -19,7 +19,7 @@
 - [tool.test.ts](tool.test.ts)：工具端到端，覆盖投影、参数编译、缓存、错误映射、SSE 拼接，以及**宿主同一套 `output.schema` 校验**（三个工具的成功值与失败值 + 一条反向控制）。对应 [src/tools/](../src/tools/)。
 - [plugin.test.ts](plugin.test.ts)：`apply` 装配、设置命名空间注册、配置默认值与 schema 角色、开关裁剪、effect 释放，**旧明文迁徙的接线**（搬进凭据域 / 已有值不覆盖 / 写不进去就不删），以及「隐藏原生网页工具」的对账（**原生工具不在场时不抛错的 blocker 守卫**、热切换、幂等、卸载撤销）。替身只提供免 inject 的 `get('tools')`，并像真实注册表那样对未知名字抛错。对应 [src/index.ts](../src/index.ts)。
 - [native-web-tools.test.ts](native-web-tools.test.ts)：同一能力的**实现级**回归 —— 用真实 `dsh-tools` 注册表与真实 `dsh-scope` 链复现 web profile 拓扑（原生工具住在 **preset 的 standing scope** 里），钉住「全局视图看不到它们」「agent scope 上必须走 `get('tools')` 而非属性访问」两条平台事实。
-- [client-bundle.test.ts](client-bundle.test.ts)：浏览器半体的**产物契约**（信封 id、导出面、inject 声明、注册进 `settings.plugin.item` 的 key，以及装配时就用默认引用名查一次凭据域）。
+- [client-bundle.test.ts](client-bundle.test.ts)：浏览器半体的**产物契约**（信封 id、导出面、inject 声明、注册进 `settings.plugin.item` 的 key，以及装配时就用默认引用名查一次凭据域），外加**按真实 Cordis 语义装配**的一组 —— 真实 `Context`、服务由**兄弟** fiber 提供、注入声明取产物自己导出的 `inject`，配三条反向控制。这一组是唯一能看见 inject 门禁的地方：普通替身传的是普通对象，Cordis 的属性代理根本没参与（v1.6.0 卡片加载失败正是这样漏出去的 → [复盘](../docs/postmortem/2026-09-15-client-inject-remote-missing.md)）。
 - [dist.test.ts](dist.test.ts)：host 半体**编译产物图**的两条不变量 —— `lib/` 里的 host 图能在 Node 中求值、浏览器信封不与 host 传输层抢同一路径（[事故复盘](../docs/postmortem/2026-09-12-client-js-path-collision.md)）。
 - [contract-helpers.ts](contract-helpers.ts)：契约测试的**共享底座**（直连客户端的 `callApi` + 指纹纯函数），刻意不 import `src/`。
 - [contract-helpers.test.ts](contract-helpers.test.ts)：该底座的**离线**自检（指纹工具写错会让契约测试假绿）。常驻日常 CI。

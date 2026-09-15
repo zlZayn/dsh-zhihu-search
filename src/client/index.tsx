@@ -34,9 +34,11 @@ import { LOCALE_NS, ZHIHU_LOCALES } from './locales.js';
 /**
  * `ctx.remote` 在本卡片用到的最小面。
  *
- * 刻意写成结构类型而不是 `import type {} from '@deepseek-ai/dsh-api-remotes/client'`：
- * 那是客户端的**装配**包，只为声明 `ctx.remote` 就把它加进 `peerDependencies` 不划算，
- * 而本卡片只碰 `credentials` 一个命名空间。装配缺席时 `inject` 会拦住这次注册。
+ * 收窄类型用**结构类型**而不是 `import type {} from '@deepseek-ai/dsh-api-remotes/client'`：
+ * 那是客户端的装配包，只为声明 `ctx.remote` 就把它加进 `peerDependencies` 不划算，
+ * 而本卡片只碰 `credentials` 一个命名空间。
+ *
+ * 类型与运行时是两件事：这里的收窄只解决类型，**能不能属性访问由 {@link inject} 决定**。
  */
 interface ClientRemoteFace {
   readonly credentials: CredentialsRemoteFace;
@@ -47,7 +49,7 @@ interface ClientRemoteFace {
 /**
  * 取 `ctx.remote` 并收窄到 {@link ClientRemoteFace}。
  *
- * 与 Host 侧取 `logger` 同款写法：依赖的是装配提供的服务，不是某个包的运行时值。
+ * 属性访问**要求服务名逐字出现在本 fiber 的 `inject` 里** —— 见 {@link inject} 的说明。
  *
  * @param ctx - 浏览器端 Cordis 上下文。
  * @returns 收窄后的 Remote 面。
@@ -63,10 +65,15 @@ function remoteOf(ctx: Context): ClientRemoteFace {
  * 缺席时 DSH 会直接报错而不是降级。标准 web 装配必然带它
  * （DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`）。
  *
- * `remote.credentials` 同理 —— 它是密钥的唯一落点。官方 `ui-settings-plugins`
- * 的 web 搜索卡片声明的是同一个键。
+ * **`remote` 与 `remote.credentials` 两个都要写，缺一不可**：
+ * - `remote.credentials` 是点号服务名（gateway 按 `remote.<namespace>` 提供），负责等命名空间就绪；
+ * - `remote` 负责让 `ctx.remote` 这个**属性访问**合法。
+ *
+ * Cordis 的判据是「服务名逐字出现在某个 fiber 的 `inject` 里」，点号键**不会**展开成父级。
+ * 只写点号键的后果不是降级而是整块装不上：`cannot get property "remote" without inject`（v1.6.0 的回归）。
+ * 官方 `ui-settings-plugins` 同样两个都写。
  */
-export const inject = ['slots', 'settingsScope', 'remote.credentials', 'locale'];
+export const inject = ['slots', 'settingsScope', 'remote', 'remote.credentials', 'locale'];
 
 /** 与 Host 侧 `ZHIHU_SETTINGS_NAMESPACE` 逐字一致；它就是卡片的分派 key。 */
 const NAMESPACE = 'zhihu-search';

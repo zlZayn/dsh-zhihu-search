@@ -2,9 +2,9 @@
 
 - 职责：在「设置 → 插件 → 插件配置」里渲染「知乎搜索」卡片。设置段只承载凭据引用名与开关；**密钥经 `ctx.remote.credentials` 写进凭据存储**（`$DSH_HOME/.credentials.yaml`），不经过设置文档。
 - 文件索引：`index.tsx` 卡片本体与注册；[credential-store.ts](credential-store.ts) 凭据状态源（纯逻辑，无 React）；[locales.ts](locales.ts) 中英字典，并导出 `LOCALE_NS`、`ZhihuLocaleKey` 与 `LocaleNamespaceMap` 增强声明（key 拼错或漏一种语言即编译错误）。
-- 关键导出：`apply`（注册字典与卡片）、`inject`（`['slots', 'settingsScope', 'remote.credentials', 'locale']`）、`createCredentialStore`（纯函数，跟踪引用名当下的配置状态）。
+- 关键导出：`apply`（注册字典与卡片）、`inject`（`['slots', 'settingsScope', 'remote', 'remote.credentials', 'locale']` —— **`remote` 与 `remote.credentials` 缺一不可**，理由见 [AGENTS.md](AGENTS.md)）、`createCredentialStore`（纯函数，跟踪引用名当下的配置状态）。
 - 被谁依赖：DSH Web 的客户端模块系统按包清单的 `dsh.client` 扫描并加载 `lib/client.js`。
-- 改后必测：`npm test` 的 [产物契约](../../test/README.md)（信封 id、导出面、注册 key）与 [credential-store 单测](../../test/credential-store.test.ts)。
+- 改后必测：`npm test` 的 [产物契约](../../test/README.md)（信封 id、导出面、inject 装配、注册 key）与 [credential-store 单测](../../test/credential-store.test.ts)。
 
 ## 视觉与结构
 
@@ -25,7 +25,7 @@
 ## 变更影响路由
 
 - 改 `index.tsx` 的注册 key → 必须与 Host 侧 `ZHIHU_SETTINGS_NAMESPACE` 逐字一致，否则卡片不被分派；同步 [src/README.md](../README.md)。
-- 改 `inject` 声明 → 同步 [test/client-bundle.test.ts](../../test/client-bundle.test.ts) 的导出面断言；`remote.credentials` 缺席时卡片没有写密钥的地方，不能删。
+- 改 `inject` 声明 → 同步 [test/client-bundle.test.ts](../../test/client-bundle.test.ts) 的导出面断言，并跑「按真实 Cordis 语义装配」组（**唯一**能看见 inject 门禁的地方）。`remote` 让 `ctx.remote` 属性访问合法、`remote.credentials` 等命名空间就绪，两个都不能删。
 - 改 `credential-store.ts` → 跑 [test/credential-store.test.ts](../../test/credential-store.test.ts)。两条不可弱化：**引用名一换旧答案立即作废**（徽标说谎比徽标迟到更糟）、**写失败必须抛**（安静停在「未配置」会让用户以为保存成功了）。
 - 改样式 → 只用 `--dsw-alias-*` 语义令牌，不写字面色值。
 - 加文案 → 只改 [locales.ts](locales.ts) 的 key 与两份字典；两处都补齐才编得过。
