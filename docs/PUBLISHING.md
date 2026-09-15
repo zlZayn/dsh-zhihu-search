@@ -28,6 +28,23 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 - **档位由判定链定**：`tier` 是入参，不从 commit 类型推断；patch / minor 由维护 agent 直接发，major 需人类确认。
 - **不发无行为变更的版本**：bump 之前先比「上个 tag..HEAD」的改动清单，只剩非产物改动就红；`force` 是唯一的越过方式，且要说明理由。
 
+## 发布后才发现严重缺陷
+
+顺序固定，四步都要做：
+
+1. **修 → 发 patch**（档位按[版本号](#版本号)的问题链定；修已发布缺陷一般是 patch）。
+2. **`npm deprecate` 坏版本**：`npm deprecate "包名@<版本>" "<一句人话的原因 + 该升级到哪>" --registry=https://registry.npmjs.org/`。
+3. **改坏版本的 GitHub Release 说明**：顶部加 `> [!WARNING]`，写清症状与替代版本 —— Release 说明是唯一能在「已经发出去之后」补充的对外面。
+4. **新版本的 Release 说明也要说明它修了什么**：`--generate-notes` 只抄提交标题，标题未必自带结论。
+
+三条边界：
+
+- **`deprecate` 是警告不是拦截**：精确指定版本或 lockfile 钉住的安装**照样装上**，只多一行提示。真正拦住正常路径的是 `latest` 指向修好的版本。
+- **不 unpublish**：撤版本会让钉住它的安装直接失败，也破坏可复现性。已发出的产物就当它存在。
+- **`deprecate` 没有 OIDC 通道**：Trusted Publishing 只覆盖 `npm publish`，所以这一步**必须人工带 2FA 在本地做**，加进 [release.yml](../.github/workflows/release.yml) 也没用。仓库的 npm 侧设了「Require 2FA and disallow bypass-2FA tokens」，自动化凭据一律不可用。
+
+判例：1.3.0（开关静默无效）、1.4.0（两个搜索工具整体失败）、1.6.0（卡片装不上）、1.6.1（工具无密钥）四个版本已按此标掉；理由与证据见 [docs/postmortem/](postmortem/)。
+
 ## 版本号
 
 按 SemVer 定档。判据是**原则加判定链**，不是清单：新情况按问题链推，不靠枚举命中。
@@ -177,6 +194,6 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 ## 兼容性
 
-- 宿主版本以 [package.json](../package.json) 的 `peerDependencies` 为准。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、`remote.credentials` 的 `describe`/`set`、`settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、密钥读不到，或**明文开始出现在 describe 线路上**）。
+- 宿主版本以 [package.json](../package.json) 的 `peerDependencies` 为准。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、密钥读不到，或**明文开始出现在 describe 线路上**）。
 - 判断依据始终以 DSH 源码为准，不凭文档推断。
 - 已知缺口见 [AGENTS.md](../AGENTS.md) 的待办。

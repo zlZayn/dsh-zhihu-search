@@ -52,4 +52,5 @@ DSH 本身有凭据存储（`$DSH_HOME/.credentials.yaml`）与引用机制，�
 - 徽标语义变准：过去只认「设置里填过」，手工写 `.credentials.yaml` 或 export 环境变量时工具能用而卡片显示「未配置」；现在问 `describe().configured`，覆盖环境变量这条通道。
 - 组合配置（`cordis.patch.yml`）里的明文搬得走但删不掉，只告警 —— 那是用户手写的文件，插件没有也不该有改写它的口子。
 - 边界：极简装配没挂 `dsh-credentials-local` 且密钥只在设置里时，迁徙写不进去，工具会鉴权失败。那种装配下新版卡片同样无法工作（`remote.credentials` 缺席），因此不按「旧用法失效」计档。
+- 取服务方式在发布后更正过一次：初版用 `ctx.get('credentials')`，线上拿不到服务，导致工具与迁徙一起失效（v1.6.0/v1.6.1）→ 改为 `inject` + 属性访问。**本记录的决策没变，变的是取服务那一行** → [复盘](../../docs/postmortem/2026-09-15-credential-service-unreachable.md)。
 - 传承认领：本记录取代 [密钥配置走原生插件配置表单](2026-09-12-secret-config-via-native-plugin-form.md) 中「密钥按 凭据域 → 设置字面量 → 环境变量 解析」那一条，其余不动。
