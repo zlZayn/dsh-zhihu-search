@@ -7,7 +7,8 @@
 - `index.ts`：插件入口。导出 `name` / `inject` / `Config` / `apply`，以及常量 `ZHIHU_SETTINGS_NAMESPACE` 与 `DEFAULT_ACCESS_SECRET_REF`；在 `ctx.effect()` 内创建客户端与状态并注册工具；并观察 `agent/created` / `agent/disposed`，维护「隐藏原生网页工具」的 restriction。被 DSH loader 加载。
 - `transport.ts`：知乎传输层。鉴权、两个搜索与额度自检走 GET、chat 走 POST、SSE 解析、错误映射、可取消重试。被 `tools/` 与 `utils/errors.ts` 依赖。
 - `state.ts`：缓存与令牌桶，以及缓存键计算。被 `index.ts` 创建、被 `tools/` 使用。
-- `credentials.ts`：Access Secret 的解析优先级（凭据域 → 设置字面量 → 环境变量）。纯函数 + 注入来源，被 `index.ts` 使用。
+- `credentials.ts`：Access Secret 的取值链（凭据域 → 进程环境）。纯函数 + 注入来源，被 `index.ts` 使用。
+- `migrate.ts`：把旧版写在设置里的明文搬进凭据域，并从设置文档删掉。纯逻辑 + 注入动作，启动期由 `index.ts` 调一次。**有删除条件**：使用者跨过这一版后整份删除。
 - `types.ts`：知乎原始响应类型与 Canonical Output 类型。
 - `tools/`：工具定义，见 [tools/README.md](tools/README.md)。
 - `utils/`：编译器与文本清洗，见 [utils/README.md](utils/README.md)。
@@ -16,7 +17,7 @@
 
 ## 依赖方向
 
-`index.ts` → `tools/` + `state.ts` + `transport.ts` + `credentials.ts`；`tools/` → `utils/` + `present/` + `transport.ts` + `state.ts`；`utils/errors.ts` → `transport.ts` + `state.ts` + `utils/compiler.ts`（只为 `instanceof` 判定取错误类）。`present/` 与 `types.ts` 无值依赖。
+`index.ts` → `tools/` + `state.ts` + `transport.ts` + `credentials.ts` + `migrate.ts`；`tools/` → `utils/` + `present/` + `transport.ts` + `state.ts`；`utils/errors.ts` → `transport.ts` + `state.ts` + `utils/compiler.ts`（只为 `instanceof` 判定取错误类）。`present/` 与 `types.ts` 无值依赖。
 
 逐条：
 
@@ -35,11 +36,11 @@
 - 改 `state.ts` 的 TTL、令牌桶或缓存键 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「缓存与限流」，跑 `test/state.test.ts`；缓存键必须用归一化参数加凭据来源标识。
 - 改工具描述 → 描述是模型择路与判断能力的唯一依据，按 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「工具描述约定」三槽改，并跑 `test/tool.test.ts`（描述一致性断言在此）。
 - 改呈现层 → 跑 `test/presentation.test.ts` 与 `test/redlines.test.ts`。
-- 改密钥解析优先级 → 契约变更，跑 `test/credentials.test.ts` 与 `test/auth.test.ts`，同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」；若环境变量名 `ZHIHU_ACCESS_SECRET` 变更，同时改根 [README.md](../README.md) 的那一句。
+- 改密钥取值链或引用名守卫 → 契约变更，跑 `test/credentials.test.ts` 与 `test/auth.test.ts`，同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」；若环境变量名 `ZHIHU_ACCESS_SECRET` 变更，同时改根 [README.md](../README.md) 的那一句。
+- 改 `migrate.ts` 的纪律或顺序 → 跑 `test/migrate.test.ts` 与 `test/plugin.test.ts` 的「旧明文迁徙」组；**「先写后删」的次序断言不可弱化成终态断言**（中途失败即密钥永久丢失）。删 `Config.accessSecret` 前先读 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」。
 - 改 `client/` → 必须 `npm run build` 并跑 `test/client-bundle.test.ts`，确认注册 key 与 `ZHIHU_SETTINGS_NAMESPACE` 一致；浏览器读的是 **profile 里那份** `lib/client.js`，要随新版本装进 profile 才生效。
 - 新增模块或调整依赖方向 → 同步 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」，并同步本文件的「文件索引」与 [AGENTS.md](AGENTS.md) 的约束。
-- 改「隐藏原生网页工具」的对账逻辑 → 跑 `test/plugin.test.ts` 与 `test/native-web-tools.test.ts`。两条硬约束别踩：原生工具住在 **preset 的 standing scope**（全局视图看不到它），且 agent scope 上取注册表必须用 `agent.ctx.get('tools')` 而非属性访问 → [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「原生工具的可见性」。
-- 改「隐藏原生网页工具」的对账逻辑 → 跑 `test/plugin.test.ts` 的「隐藏原生网页工具」组；那条 **tool-web 不在场时不抛错** 的断言是 blocker 守卫（同步抛错会否决 agent 创建），不可删。设计约束见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「原生工具的可见性」。
+- 改「隐藏原生网页工具」的对账逻辑 → 跑 `test/plugin.test.ts` 的「隐藏原生网页工具」组与 `test/native-web-tools.test.ts`。三条硬约束别踩：原生工具住在 **preset 的 standing scope**（全局视图看不到它）；agent scope 上取注册表必须用 `agent.ctx.get('tools')` 而非属性访问；那条 **tool-web 不在场时不抛错** 的断言是 blocker 守卫（同步抛错会否决 agent 创建），不可删。设计约束见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「原生工具的可见性」。
 
 ## 已知限制
 

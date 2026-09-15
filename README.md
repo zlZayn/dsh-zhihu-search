@@ -134,11 +134,22 @@ dsh plugin --profile web add dsh-zhihu-search
 
 打开 **设置 → 插件 → 插件配置 → 知乎搜索**，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
 
+密钥写进 DSH 的凭据存储（`~/.dsh/.credentials.yaml`），**不写进设置文件** —— `settings.yaml` 里只有引用名，可以安全地截图或分享。
+
 Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/profile)获取；设置卡片里有同一个链接。
 
-### 用环境变量代替
+### 改用别的凭据来源
 
-不想把密钥存在设置里时，改用环境变量 `ZHIHU_ACCESS_SECRET`；或在卡片的「凭据引用名」里填别的名字，指向另一个环境变量或凭据记录。
+卡片的「凭据引用名」默认是 `ZHIHU_ACCESS_SECRET`。填别的名字即可指向另一处。
+
+密钥按 DSH 的分层解析，优先级从高到低：
+
+- 进程环境变量（`export ZHIHU_ACCESS_SECRET=…`）
+- 凭据存储（`~/.dsh/.credentials.yaml`）
+- 项目目录下的 `.env`
+- `~/.dsh/.env`
+
+由只读来源（环境变量）提供时，卡片会禁用输入框并说明原因 —— 那里的值覆盖不了。
 
 ### 进阶：超时与限额
 

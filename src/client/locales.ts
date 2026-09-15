@@ -32,6 +32,7 @@ export type ZhihuLocaleKey =
   | 'secretHintBefore'
   | 'secretHintLink'
   | 'secretHintAfter'
+  | 'secretShadowed'
   | 'refLabel'
   | 'refOverridden'
   | 'reset'
@@ -61,7 +62,8 @@ const zh: Record<ZhihuLocaleKey, string> = {
   secretMissing: '未配置',
   secretHintBefore: '在',
   secretHintLink: '知乎开放平台个人中心',
-  secretHintAfter: '获取；留空则不修改已保存的密钥。',
+  secretHintAfter: '获取。密钥存入凭据存储，不写进设置文件；留空则不修改已保存的密钥。',
+  secretShadowed: '该引用名由只读来源（如进程环境变量）提供，无法在这里覆盖。',
   refLabel: '凭据引用名',
   refOverridden: '已覆盖',
   reset: '重置',
@@ -86,7 +88,8 @@ const en: Record<ZhihuLocaleKey, string> = {
   secretMissing: 'Not configured',
   secretHintBefore: 'Get yours at the ',
   secretHintLink: 'Zhihu Open Platform profile',
-  secretHintAfter: '. Leaving this blank keeps the saved secret.',
+  secretHintAfter: '. The key is stored in the credential store, never in the settings file; leaving this blank keeps the saved secret.',
+  secretShadowed: 'A read-only source (such as a process environment variable) supplies this reference; it cannot be overridden here.',
   refLabel: 'Credential reference',
   refOverridden: 'Overridden',
   reset: 'Reset',

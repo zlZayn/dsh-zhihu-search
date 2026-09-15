@@ -9,14 +9,17 @@
 - [compiler.test.ts](compiler.test.ts)：参数编译。每条断言对应一条生产实测语法。对应 [src/utils/compiler.ts](../src/utils/compiler.ts)。
 - [text.test.ts](text.test.ts)：高亮标签剥离、实体解码、跟踪参数剥离。对应 [src/utils/text.ts](../src/utils/text.ts)。
 - [state.test.ts](state.test.ts)：缓存 TTL 与 LRU、令牌桶补充、缓存键隔离。对应 [src/state.ts](../src/state.ts)。
-- [credentials.test.ts](credentials.test.ts)：密钥解析优先级与空白串处理。对应 [src/credentials.ts](../src/credentials.ts)。
-- [auth.test.ts](auth.test.ts)：字面量与凭据服务的取用顺序、逐请求重取、缺密钥的失败形态。对应 [src/transport.ts](../src/transport.ts)。
+- [credentials.test.ts](credentials.test.ts)：密钥取值链（凭据域 → 进程环境）与空白串处理。对应 [src/credentials.ts](../src/credentials.ts)。
+- [migrate.test.ts](migrate.test.ts)：旧明文迁徙的三条纪律。**「先写后删」那条断言的是调用序列而不是终态** —— 反过来中途失败就是密钥永久丢失，这个差别在终态上看不出来。对应 [src/migrate.ts](../src/migrate.ts)。
+- [redact-anchor.test.ts](redact-anchor.test.ts)：`Config.accessSecret` 作为 **redact 锚点**的契约。实测：`redactSecrets` 是 schema 驱动的，字段移出 schema 就不再被剥，明文会从 describe 线路走出去。删字段即变红。对应 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」。
+- [credential-store.test.ts](credential-store.test.ts)：卡片凭据状态源。引用名一换旧答案立即作废、迟到的响应被丢弃、写失败抛出。对应 [src/client/credential-store.ts](../src/client/credential-store.ts)。
+- [auth.test.ts](auth.test.ts)：取用顺序、逐请求重取、缺密钥的失败形态。对应 [src/transport.ts](../src/transport.ts)。
 - [quota.test.ts](quota.test.ts)：额度自检端点的路径、鉴权头与失败形态。对应 [src/transport.ts](../src/transport.ts)。
 - [presentation.test.ts](presentation.test.ts)：呈现层纯度，以及**模型可见文本的四条诚实不变量**（到顶必说 / 来源构成分流 / 空态条件限定 / 到顶与「筛少」互斥）。对应 [src/present/](../src/present/)。
 - [tool.test.ts](tool.test.ts)：工具端到端，覆盖投影、参数编译、缓存、错误映射、SSE 拼接，以及**宿主同一套 `output.schema` 校验**（三个工具的成功值与失败值 + 一条反向控制）。对应 [src/tools/](../src/tools/)。
-- [plugin.test.ts](plugin.test.ts)：`apply` 装配、设置命名空间注册、配置默认值与 schema 角色、开关裁剪、effect 释放，以及「隐藏原生网页工具」的对账（**原生工具不在场时不抛错的 blocker 守卫**、热切换、幂等、卸载撤销）。替身只提供免 inject 的 `get('tools')`，并像真实注册表那样对未知名字抛错。对应 [src/index.ts](../src/index.ts)。
+- [plugin.test.ts](plugin.test.ts)：`apply` 装配、设置命名空间注册、配置默认值与 schema 角色、开关裁剪、effect 释放，**旧明文迁徙的接线**（搬进凭据域 / 已有值不覆盖 / 写不进去就不删），以及「隐藏原生网页工具」的对账（**原生工具不在场时不抛错的 blocker 守卫**、热切换、幂等、卸载撤销）。替身只提供免 inject 的 `get('tools')`，并像真实注册表那样对未知名字抛错。对应 [src/index.ts](../src/index.ts)。
 - [native-web-tools.test.ts](native-web-tools.test.ts)：同一能力的**实现级**回归 —— 用真实 `dsh-tools` 注册表与真实 `dsh-scope` 链复现 web profile 拓扑（原生工具住在 **preset 的 standing scope** 里），钉住「全局视图看不到它们」「agent scope 上必须走 `get('tools')` 而非属性访问」两条平台事实。
-- [client-bundle.test.ts](client-bundle.test.ts)：浏览器半体的**产物契约**（信封 id、导出面、注册进 `settings.plugin.item` 的 key）。
+- [client-bundle.test.ts](client-bundle.test.ts)：浏览器半体的**产物契约**（信封 id、导出面、inject 声明、注册进 `settings.plugin.item` 的 key，以及装配时就用默认引用名查一次凭据域）。
 - [dist.test.ts](dist.test.ts)：host 半体**编译产物图**的两条不变量 —— `lib/` 里的 host 图能在 Node 中求值、浏览器信封不与 host 传输层抢同一路径（[事故复盘](../docs/postmortem/2026-09-12-client-js-path-collision.md)）。
 - [contract-helpers.ts](contract-helpers.ts)：契约测试的**共享底座**（直连客户端的 `callApi` + 指纹纯函数），刻意不 import `src/`。
 - [contract-helpers.test.ts](contract-helpers.test.ts)：该底座的**离线**自检（指纹工具写错会让契约测试假绿）。常驻日常 CI。

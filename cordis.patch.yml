@@ -5,9 +5,9 @@
 #
 # 关于 name：必须是 loader 能从 profile 的 node_modules 解析到的模块 id，即本包自身的包名。
 #
-# 关于 config：**刻意不写 accessSecret**。写了空串会让设置卡片的「已配置」判据
-# （DSH 的 RedactedSecret.set = value !== undefined）把空串当成已设值，卡片一打开就显示
-# 「已配置」，而实际没有任何密钥。密钥应当只从设置界面写入。
+# 关于 config：**刻意不写 accessSecret**。它已不是取值来源，写在这里只剩两个后果：
+# 启动期迁徙会把它搬进凭据存储，而组合配置那一行插件删不掉，只能每次启动告警请你手删。
+# 密钥应当从设置卡片写入（落在 `$DSH_HOME/.credentials.yaml`），或放进环境变量。
 - insert:
     - id: dsh-zhihu-search
       name: dsh-zhihu-search

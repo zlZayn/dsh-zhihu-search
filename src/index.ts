@@ -11,12 +11,13 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis';
-import { credentialRef } from '@deepseek-ai/dsh-credentials';
+import { credentialRef, isCredentialRefName, type CredentialRef } from '@deepseek-ai/dsh-credentials';
 import type {} from '@deepseek-ai/dsh-agent';
-import type {} from '@deepseek-ai/dsh-settings';
+import type { SettingsProvider } from '@deepseek-ai/dsh-settings';
 import z from '@deepseek-ai/schemastery';
 import { DEFAULT_STREAM_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, ZHIHU_BASE_URL, ZhihuClient } from './transport.js';
 import { resolveAccessSecret as resolveAccessSecretFrom } from './credentials.js';
+import { migrateLegacySecret } from './migrate.js';
 import { createState } from './state.js';
 import type { ToolDeps } from './tools/deps.js';
 import { createZhihuGlobalSearchTool } from './tools/global-search.js';
@@ -79,10 +80,13 @@ interface ScopedToolsFace {
 /** 插件配置。 */
 export interface Config {
   /**
-   * 字面量 Access Secret。
+   * 旧版的字面量 Access Secret。**已弃用：插件不再把它当作取值来源。**
    *
-   * `role('secret')` 让设置界面把它渲染成掩码输入框，并在下行描述里隐藏其值。
-   * 留空时回落到 {@link Config.accessSecretRef} 指向的凭据记录。
+   * 留在 schema 里有两个不可省的作用，两者都不是「还能填」：
+   * 1. `role('secret')` 是 redact 层的锚点。字段一旦移出 schema，redact 就不再认识
+   *    它是密钥，明文会**原样出现在发往浏览器的 describe 线路里**（实测，见
+   *    [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」）。
+   * 2. 它是迁徙的入口：启动时由 [migrate.ts](./migrate.ts) 搬进凭据域，再从设置文档里删掉。
    */
   accessSecret?: string;
   /** 凭据引用名（环境变量名或凭据记录名）。 */
@@ -123,8 +127,8 @@ export interface Config {
 
 /** 配置的运行时校验 schema；默认值同时是文档。 */
 export const Config = z.object({
-  // 与官方 web 搜索提供者同构：secret 角色负责「掩码显示 + 不下发明文」，
-  // credential-ref 角色负责「这一格填的是凭据名而不是凭据本身」。
+  // `secret` 角色只服务 redact 层（见 Config.accessSecret 的说明）；
+  // `credential-ref` 角色才是本插件真正的配置面：这一格填的是凭据名，不是凭据本身。
   accessSecret: z.string().role('secret'),
   accessSecretRef: z.string().role('credential-ref').default(DEFAULT_ACCESS_SECRET_REF),
   baseUrl: z.string().default(ZHIHU_BASE_URL),
@@ -142,7 +146,9 @@ export const Config = z.object({
 
 /** 凭据服务在本模块用到的最小面。 */
 interface CredentialsFace {
-  resolve(ref: ReturnType<typeof credentialRef>): Promise<{ value: string } | undefined>;
+  resolve(ref: CredentialRef): Promise<{ value: string } | undefined>;
+  describe(ref: CredentialRef): Promise<{ configured: boolean; writable: boolean }>;
+  set(ref: CredentialRef, value: string): Promise<void>;
 }
 
 /**
@@ -184,36 +190,56 @@ export function apply(ctx: Context, config: Config): void {
   // 因此在途与后续调用都会看到新值，无需重启。
   let current: () => Config = () => config;
 
+  /** 凭据服务；装配没挂载它时缺席。 */
+  const credentials = (): CredentialsFace | undefined =>
+    ctx.get('credentials') as CredentialsFace | undefined;
+
+  /**
+   * 当下生效的凭据引用名。
+   *
+   * 默认值的回落只在这一处表达 —— 解析、缓存隔离、迁徙三处都问它，
+   * 各自抄一遍必然会漂移。
+   */
+  const referenceName = (): string => current().accessSecretRef ?? DEFAULT_ACCESS_SECRET_REF;
+
+  /**
+   * 把引用名收窄成 seam 认得的 `CredentialRef`；不在语法内时返回 `undefined`。
+   *
+   * 引用名在卡片上是一个自由文本框，而 seam 的语法是 POSIX shell 标识符
+   * （`^[A-Za-z_][A-Za-z0-9_]*$`），越界的名字会让 `credentialRef()` **抛错**。
+   * 一个 typo 不该在请求路径上炸开 —— 按 seam 自己的说法，语法之外的名字
+   * 「没有可错过的引用」，读作「未配置」才是对的。
+   *
+   * @param reference - 用户填的引用名。
+   * @returns 打上标记的引用，或 `undefined`。
+   */
+  const brand = (reference: string): CredentialRef | undefined =>
+    isCredentialRefName(reference) ? credentialRef(reference) : undefined;
+
   /**
    * 解析本次调用要用的密钥。
    *
-   * 顺序：字面量配置 → 凭据服务。凭据服务是设置界面的落点，
-   * 也是唯一不会把明文写进任何配置文件的通道。
+   * 凭据域是唯一的取值口；进程环境只是 provider 缺席时的兜底。
+   * 设置里**没有**字面量通道 —— 旧明文由 {@link prepareCredentials} 一次性搬走。
    */
   const resolveAccessSecret = async (): Promise<string | undefined> =>
     resolveAccessSecretFrom({
-      referenceName: () => current().accessSecretRef ?? DEFAULT_ACCESS_SECRET_REF,
+      referenceName,
       fromCredentials: async (reference) => {
-        const credentials = ctx.get('credentials') as CredentialsFace | undefined;
-        if (credentials === undefined) return undefined;
-        return (await credentials.resolve(credentialRef(reference)))?.value;
+        const ref = brand(reference);
+        const face = credentials();
+        if (ref === undefined || face === undefined) return undefined;
+        return (await face.resolve(ref))?.value;
       },
-      fromSettings: () => current().accessSecret,
       fromEnvironment: (name) => process.env[name],
     });
 
   /**
    * 凭据来源标识，仅用于隔离缓存空间。
    *
-   * 有字面量时用字面量（`buildCacheKey` 内部只取哈希前 8 位），
-   * 否则用引用名 —— 引用名不含明文，可以安全地参与计算。
+   * 就是引用名：它不含明文，可以安全参与计算，换一个引用名即换一个缓存空间。
    */
-  const credentialId = (): string => {
-    const section = current();
-    const literal = section.accessSecret;
-    if (literal !== undefined && literal.trim() !== '') return literal;
-    return `ref:${section.accessSecretRef ?? DEFAULT_ACCESS_SECRET_REF}`;
-  };
+  const credentialId = (): string => `ref:${referenceName()}`;
 
   /** 一条告警通道；宿主 logger 缺失时静默 —— 诊断本身不该成为故障源。 */
   const logger = (ctx as unknown as { logger?: { warn?: (message: string) => void } }).logger;
@@ -221,12 +247,64 @@ export function apply(ctx: Context, config: Config): void {
     logger?.warn?.(message);
   };
 
-  if ((config.accessSecret ?? '').trim() === '') {
-    // 只告警不阻断：profile 必须能正常启动。
-    warn(
-      '[zhihu-search] 未配置 accessSecret，工具会注册但调用时返回鉴权错误。可在 DSH 设置 → 插件 → 知乎搜索 中填写。',
-    );
-  }
+  /**
+   * 启动期凭据体检：先把旧版明文搬进凭据域，再在真的取不到密钥时告警。
+   *
+   * 只告警不阻断：profile 必须能正常启动。
+   * 与 `agent/created` 同样的纪律 —— 一个可选的诊断不该有否决启动的权力，
+   * 所以整条路径的异常都在这里收口。
+   *
+   * @param settings - 已就绪的设置服务，用于读 user 层与抹掉旧明文。
+   */
+  const prepareCredentials = async (settings: SettingsProvider): Promise<void> => {
+    /**
+     * 读设置文档 user 层里的旧明文。
+     *
+     * 用 `describe()` 而不是 `current()`：后者是 base 与 user 合并后的值，
+     * 分不出明文来自哪一层 —— 而「删不删得掉」正好取决于这个区分。
+     *
+     * @returns user 层里的明文，或 `undefined`。
+     */
+    const readUserLayer = (): string | undefined => {
+      const user: unknown = settings.describe().find((entry) => entry.ns === ZHIHU_SETTINGS_NAMESPACE)?.user;
+      if (typeof user !== 'object' || user === null) return undefined;
+      const value = (user as Record<string, unknown>)['accessSecret'];
+      return typeof value === 'string' ? value : undefined;
+    };
+
+    await migrateLegacySecret({
+      readLegacy: () => ({
+        fromSettings: readUserLayer(),
+        fromComposition: config.accessSecret,
+      }),
+      hasCredential: async () => {
+        const ref = brand(referenceName());
+        const face = credentials();
+        if (ref === undefined || face === undefined) return false;
+        // 问 `configured` 而不是 `resolve`：环境变量也算已配置，
+        // 而这正是「要不要再搬一份进去」该看的量。
+        return (await face.describe(ref)).configured;
+      },
+      adopt: async (value) => {
+        const ref = brand(referenceName());
+        const face = credentials();
+        if (ref === undefined || face === undefined) throw new Error('凭据服务未挂载');
+        await face.set(ref, value);
+      },
+      purge: async () => {
+        await settings.mutate(ZHIHU_SETTINGS_NAMESPACE, [{ op: 'unset', path: ['accessSecret'] }]);
+      },
+      referenceName,
+      warn,
+    });
+
+    // 搬完之后仍然取不到，才说明用户是真的还没配。
+    if ((await resolveAccessSecret()) === undefined) {
+      warn(
+        '[zhihu-search] 未找到 Access Secret，工具会注册但调用时返回鉴权错误。可在 DSH 设置 → 插件 → 知乎搜索 中填写，或设置环境变量 ZHIHU_ACCESS_SECRET。',
+      );
+    }
+  };
 
   // ── 隐藏 DSH 原生网页工具 ──────────────────────────────────────────────
   // restriction 挂在**agent 的 scope** 上，`tools.restrict()` 返回的正是撤销它自己
@@ -339,6 +417,12 @@ export function apply(ctx: Context, config: Config): void {
         syncNativeWebTools();
       },
     });
+    // 迁徙必须在 section 注册之后（要读 user 层、也要能改写它），
+    // 且应尽早完成 —— 老配置里的明文在 redact 眼里仍是 secret 槽位，
+    // 但留在盘上就是风险。整条路径幂等，设置服务重新就绪时重复进入无害。
+    void prepareCredentials(settingsCtx.settings).catch((error: unknown) => {
+      warn(`[zhihu-search] 启动期凭据体检失败：${error instanceof Error ? error.message : String(error)}`);
+    });
   });
 
   // 插件卸载（含 HMR 换装）：撤掉我们装过的 restriction ——
@@ -389,8 +473,10 @@ export function apply(ctx: Context, config: Config): void {
 }
 
 export { ZHIHU_BASE_URL, ZhihuClient } from './transport.js';
-export { resolveAccessSecret } from './credentials.js';
+export { hasSecretValue, resolveAccessSecret } from './credentials.js';
 export type { SecretSources } from './credentials.js';
+export { migrateLegacySecret } from './migrate.js';
+export type { LegacySecret, MigrationDeps } from './migrate.js';
 export { createState, LocalRateLimitError, MemoryCache, TokenBucket } from './state.js';
 export { compileFilter, compileSortBy, CompileError } from './utils/compiler.js';
 export type { ZhidaOutput, SearchOutput } from './types.js';

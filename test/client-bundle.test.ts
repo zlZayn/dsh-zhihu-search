@@ -81,7 +81,8 @@ describe('client bundle 信封', () => {
   it('导出 apply 与 inject', () => {
     const mod = materialize(loadBundleRow());
     expect(typeof mod['apply']).toBe('function');
-    expect(mod['inject']).toEqual(['slots', 'settingsScope', 'locale']);
+    // `remote.credentials` 是密钥的唯一落点：没有它，卡片就没有地方写密钥。
+    expect(mod['inject']).toEqual(['slots', 'settingsScope', 'remote.credentials', 'locale']);
   });
 });
 
@@ -91,22 +92,34 @@ describe('client bundle 注册行为', () => {
     const registrations: Array<Record<string, unknown>> = [];
     const injected: string[] = [];
     const dictionaries: Array<{ ns: string; locales: string[] }> = [];
+    /** 读凭据域的记账。写路径由 [credential-store 单测](credential-store.test.ts) 覆盖。 */
+    const credentialReads: string[][] = [];
     const scope = {
       subscribe: () => () => undefined,
       getSnapshot: () => ({ status: 'ready', writable: true, value: undefined, user: undefined, base: undefined }),
       set: async () => undefined,
       unset: async () => undefined,
     };
-    const mirror = { subscribe: () => () => undefined, getSnapshot: () => ({}) };
-    /** 卡片在 apply 期就需要 effect 与 locale，缺任一项都会让它抛错。 */
+    const remote = {
+      credentials: {
+        describe: async (refs: readonly string[]) => {
+          credentialReads.push([...refs]);
+          return { ok: true as const, value: {} };
+        },
+        set: async () => ({ ok: true as const, value: undefined }),
+      },
+      $on: () => () => undefined,
+    };
+    /** 卡片在 apply 期就需要 effect、locale 与 remote，缺任一项都会让它抛错。 */
     const base = {
-      settingsScope: { bind: () => scope, describe: () => mirror },
+      settingsScope: { bind: () => scope },
       locale: {
         register(ns: string, dicts: Record<string, unknown>) {
           dictionaries.push({ ns, locales: Object.keys(dicts) });
           return () => undefined;
         },
       },
+      remote,
       effect(callback: () => unknown) {
         callback();
         return () => undefined;
@@ -125,7 +138,7 @@ describe('client bundle 注册行为', () => {
         },
       },
     };
-    return { ctx, base, registrations, injected, dictionaries };
+    return { ctx, base, registrations, injected, dictionaries, credentialReads };
   }
 
   it('注册进 settings.plugin.item，且 key 等于 host 侧命名空间', () => {
@@ -164,5 +177,12 @@ describe('client bundle 注册行为', () => {
     expect(dictionaries).toHaveLength(1);
     expect(dictionaries[0]?.ns).toBe('zhihu-search');
     expect(dictionaries[0]?.locales.slice().sort()).toEqual(['en', 'zh']);
+  });
+
+  it('装配时就查一次凭据域，且用的是默认引用名', () => {
+    const { ctx, credentialReads } = makeContext();
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(ctx);
+    expect(credentialReads).toEqual([['ZHIHU_ACCESS_SECRET']]);
   });
 });

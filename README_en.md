@@ -134,11 +134,22 @@ The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics
 
 Open **Settings → Plugins → Plugin configuration → Zhihu Search**, enter the Access Secret and save. It takes effect immediately, with no DSH restart.
 
+The key goes into DSH's credential store (`~/.dsh/.credentials.yaml`), **never into the settings file** — `settings.yaml` holds only the reference name, so it is safe to screenshot or share.
+
 Get the Access Secret from the [Zhihu Open Platform profile](https://developer.zhihu.com/profile); the settings card links to the same place.
 
-### Use an environment variable instead
+### Point at another credential source
 
-If you would rather not keep the secret in settings, use the `ZHIHU_ACCESS_SECRET` environment variable. Or put a different name in the card's "Credential reference" to point at another environment variable or credential record.
+The card's "Credential reference" defaults to `ZHIHU_ACCESS_SECRET`. Put a different name there to point elsewhere.
+
+The key resolves through DSH's layers, highest first:
+
+- Process environment variable (`export ZHIHU_ACCESS_SECRET=…`)
+- Credential store (`~/.dsh/.credentials.yaml`)
+- `.env` in the project directory
+- `~/.dsh/.env`
+
+When a read-only source (an environment variable) supplies the reference, the card disables its input and says so — a value there cannot be overridden.
 
 ### Advanced: timeouts and limits
 

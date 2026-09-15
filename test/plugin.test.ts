@@ -15,6 +15,18 @@ interface SectionHooks {
   onChange(): void;
 }
 
+/**
+ * 排空微任务与一轮宏任务。
+ *
+ * `apply` 里的启动期凭据体检是 fire-and-forget 的（它不许有否决启动的权力），
+ * 所以断言它的副作用前要先让它跑完。不涉及真实时钟。
+ */
+function flush(): Promise<void> {
+  return new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
 /** 记录注册、设置命名空间与 effect 的最小 Context 替身。 */
 function makeContext() {
   const registered: string[] = [];
@@ -27,6 +39,13 @@ function makeContext() {
   const presentTools = new Set<string>();
   /** 每次 `restrict` 调用留下的账，供断言读取。 */
   const restrictions: Array<{ deny: string[]; lifted: boolean }> = [];
+
+  /** 设置文档里本命名空间的 user 层。启动期体检读它、也改写它。 */
+  const userSection: Record<string, unknown> = {};
+  /** 记账：`mutate` 收到的路径操作。 */
+  const mutations: Array<{ ns: string; ops: ReadonlyArray<{ op: string; path: readonly string[] }> }> = [];
+  /** 凭据域的替身存储：引用名 → 值。 */
+  const credentialStore = new Map<string, string>();
 
   const ctx: Record<string, unknown> = {
     tools: {
@@ -47,6 +66,16 @@ function makeContext() {
     settings: {
       installSection(_owner: unknown, ns: string, _schema: unknown, entry: unknown, hooks: SectionHooks) {
         installedSections.push({ ns, entry, hooks });
+      },
+      // 与真实 provider 同构：未 redact 的 describe 原样带出 user 层（含 schema 外的键）。
+      describe() {
+        return [{ ns: ZHIHU_SETTINGS_NAMESPACE, user: { ...userSection } }];
+      },
+      async mutate(ns: string, ops: ReadonlyArray<{ op: string; path: readonly string[] }>) {
+        mutations.push({ ns, ops });
+        for (const op of ops) {
+          if (op.op === 'unset') delete userSection[op.path[0] ?? ''];
+        }
       },
     },
     // cordis 的 inject 只在所需服务齐备时回调；替身对齐这一点，
@@ -72,6 +101,19 @@ function makeContext() {
     logger: { warn: (message: string) => warnings.push(message) },
   };
 
+  services.set('credentials', {
+    async resolve(ref: string) {
+      const value = credentialStore.get(ref);
+      return value === undefined ? undefined : { value };
+    },
+    async describe(ref: string) {
+      return { configured: credentialStore.has(ref), writable: !credentialStore.has(ref) };
+    },
+    async set(ref: string, value: string) {
+      credentialStore.set(ref, value);
+    },
+  });
+
   return {
     ctx,
     registered,
@@ -80,6 +122,9 @@ function makeContext() {
     services,
     presentTools,
     restrictions,
+    userSection,
+    mutations,
+    credentialStore,
     /** 触发 effect 的 disposer，模拟插件卸载。 */
     unload: () => {
       for (const dispose of liveDisposers) dispose();
@@ -151,34 +196,35 @@ describe('插件元数据', () => {
 describe('apply', () => {
   it('默认注册全部三个工具', () => {
     const h = makeContext();
-    apply(h.ctx as never, resolve({ accessSecret: 'secret' }));
+    apply(h.ctx as never, resolve());
     expect(h.registered).toEqual(['zhihu_search', 'zhihu_global_search', 'zhihu_zhida']);
   });
 
   it('按开关裁剪注册集合', () => {
     const h = makeContext();
-    apply(h.ctx as never, resolve({ accessSecret: 'secret', enableGlobalSearch: false, enableZhida: false }));
+    apply(h.ctx as never, resolve({ enableGlobalSearch: false, enableZhida: false }));
     expect(h.registered).toEqual(['zhihu_search']);
   });
 
   it('卸载时释放全部注册与状态', () => {
     const h = makeContext();
-    apply(h.ctx as never, resolve({ accessSecret: 'secret' }));
+    apply(h.ctx as never, resolve());
     expect(h.registered).toHaveLength(3);
     h.unload();
     expect(h.registered).toEqual([]);
   });
 
-  it('缺凭据时只告警，不阻断 profile 启动', () => {
+  it('缺凭据时只告警，不阻断 profile 启动', async () => {
     const h = makeContext();
-    apply(h.ctx as never, resolve({ accessSecret: '' }));
+    apply(h.ctx as never, resolve());
     expect(h.registered).toHaveLength(3);
-    expect(h.warnings.join('')).toContain('accessSecret');
+    await flush();
+    expect(h.warnings.join('')).toContain('Access Secret');
   });
 
   it('注册设置命名空间，命名空间名与 client 半体的卡片 key 一致', () => {
     const h = makeContext();
-    apply(h.ctx as never, resolve({ accessSecret: 'secret' }));
+    apply(h.ctx as never, resolve());
     expect(h.installedSections).toHaveLength(1);
     expect(h.installedSections[0]?.ns).toBe(ZHIHU_SETTINGS_NAMESPACE);
     expect(ZHIHU_SETTINGS_NAMESPACE).toBe('zhihu-search');
@@ -186,9 +232,9 @@ describe('apply', () => {
 
   it('拒绝非法配置值，避免 0 容量缓存这类静默事故', () => {
     const h = makeContext();
-    expect(() => apply(h.ctx as never, resolve({ accessSecret: 'x', cacheMaxEntries: 0 }))).toThrow(/cacheMaxEntries/);
-    expect(() => apply(h.ctx as never, resolve({ accessSecret: 'x', searchPerMinute: -1 }))).toThrow(/searchPerMinute/);
-    expect(() => apply(h.ctx as never, resolve({ accessSecret: 'x', timeoutMs: 1.5 }))).toThrow(/timeoutMs/);
+    expect(() => apply(h.ctx as never, resolve({ cacheMaxEntries: 0 }))).toThrow(/cacheMaxEntries/);
+    expect(() => apply(h.ctx as never, resolve({ searchPerMinute: -1 }))).toThrow(/searchPerMinute/);
+    expect(() => apply(h.ctx as never, resolve({ timeoutMs: 1.5 }))).toThrow(/timeoutMs/);
   });
 
   it('schemastery schema 提供了文档化的默认值', () => {
@@ -201,13 +247,74 @@ describe('apply', () => {
     expect(resolved.disableNativeWebSearch).toBe(false);
     expect(resolved.accessSecretRef).toBe('ZHIHU_ACCESS_SECRET');
   });
+});
 
-  it('密钥字段带 secret 角色，凭据名带 credential-ref 角色（设置界面靠它渲染）', () => {
-    const dict = (ConfigSchema as unknown as { dict: Record<string, { meta?: { role?: string } }> }).dict;
-    const secret = dict['accessSecret'];
-    const ref = dict['accessSecretRef'];
-    expect(secret?.meta?.role).toBe('secret');
-    expect(ref?.meta?.role).toBe('credential-ref');
+describe('旧明文迁徙（apply 接线）', () => {
+  it('把设置里的明文搬进凭据域，并从设置文档删掉', async () => {
+    const h = makeContext();
+    h.userSection['accessSecret'] = 'LEGACY-PLAINTEXT';
+    h.userSection['disableNativeWebSearch'] = true;
+    apply(h.ctx as never, resolve());
+    await flush();
+
+    expect(h.credentialStore.get('ZHIHU_ACCESS_SECRET')).toBe('LEGACY-PLAINTEXT');
+    expect(h.userSection['accessSecret']).toBeUndefined();
+    // 同级字段必须活下来 —— 路径寻址删除的全部意义。
+    expect(h.userSection['disableNativeWebSearch']).toBe(true);
+    expect(h.mutations).toHaveLength(1);
+    expect(h.mutations[0]?.ns).toBe(ZHIHU_SETTINGS_NAMESPACE);
+  });
+
+  it('凭据域已有值时保留它，只清掉被遮蔽的明文', async () => {
+    const h = makeContext();
+    h.userSection['accessSecret'] = 'STALE';
+    h.credentialStore.set('ZHIHU_ACCESS_SECRET', 'CURRENT');
+    apply(h.ctx as never, resolve());
+    await flush();
+
+    expect(h.credentialStore.get('ZHIHU_ACCESS_SECRET')).toBe('CURRENT');
+    expect(h.userSection['accessSecret']).toBeUndefined();
+  });
+
+  it('没有旧明文时什么都不做（绝大多数启动路径）', async () => {
+    const h = makeContext();
+    apply(h.ctx as never, resolve());
+    await flush();
+    expect(h.mutations).toEqual([]);
+    expect(h.credentialStore.size).toBe(0);
+  });
+
+  it('组合配置里的明文搬得走、删不掉，因此如实告警', async () => {
+    const h = makeContext();
+    apply(h.ctx as never, resolve({ accessSecret: 'FROM-PATCH-YML' }));
+    await flush();
+
+    expect(h.credentialStore.get('ZHIHU_ACCESS_SECRET')).toBe('FROM-PATCH-YML');
+    // 组合配置不属设置文档，插件没有也不该有改写它的口子。
+    expect(h.mutations).toEqual([]);
+    expect(h.warnings.join('')).toContain('cordis.patch.yml');
+  });
+
+  it('凭据域写不进去时明文原样保留，绝不清空', async () => {
+    const h = makeContext();
+    h.userSection['accessSecret'] = 'MUST-NOT-BE-LOST';
+    h.services.set('credentials', {
+      async resolve() {
+        return undefined;
+      },
+      async describe() {
+        return { configured: false, writable: true };
+      },
+      async set() {
+        throw new Error('写入被拒绝');
+      },
+    });
+    apply(h.ctx as never, resolve());
+    await flush();
+
+    expect(h.userSection['accessSecret']).toBe('MUST-NOT-BE-LOST');
+    expect(h.mutations).toEqual([]);
+    expect(h.warnings.join('')).toContain('写入被拒绝');
   });
 });
 

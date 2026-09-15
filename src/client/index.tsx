@@ -9,11 +9,12 @@
  * 注册时用 `locale:` 声明命名空间，框架据此把类型化的 `t` 座位注入组件 props。
  * 切语言无需重挂载：字典注册会推进 locale 版本号，已挂载的出口自动重取。
  *
+ * 密钥**不经过设置文档**：它按引用名写进 `ctx.remote.credentials`（即 `.credentials.yaml`），
+ * 与官方 web 搜索卡片同一套做法。设置里只留引用名，因此 settings.yaml 被截图或上传时不泄任何凭据。
+ *
  * 复用 `@deepseek-ai/dsh-client-ui-primitives` 的 `Tag` 与折叠图标：那是公共基础库，
  * 不是别的插件 —— 被 bundle-purity gate 禁止的是跨插件值导入。
  * 其余控件按官方 CSS 自带样式，取值只用 `--dsw-alias-*` 语义令牌。
- *
- * 数据层契约完全由 Host 侧承担（`installSection` + `role('secret')`）。
  */
 
 import { useState, useSyncExternalStore, type CSSProperties } from 'react';
@@ -21,13 +22,39 @@ import { IconChevronDownOutline14, Switch, Tag } from '@deepseek-ai/dsh-client-u
 import type { Context } from '@deepseek-ai/cordis';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client';
-import type { SettingsDescribeFace, SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client';
 // 类型导入即声明：`ctx.locale` 由 locale 包的浏览器半体合并进 Context。
 import type {} from '@deepseek-ai/dsh-client-locale/client';
 // 类型导入即声明：ctx.slots 由 ui-renderer 的浏览器半体合并进 Context。
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
+import { createCredentialStore, type CredentialView, type CredentialsRemoteFace } from './credential-store.js';
 import { LOCALE_NS, ZHIHU_LOCALES } from './locales.js';
+
+/**
+ * `ctx.remote` 在本卡片用到的最小面。
+ *
+ * 刻意写成结构类型而不是 `import type {} from '@deepseek-ai/dsh-api-remotes/client'`：
+ * 那是客户端的**装配**包，只为声明 `ctx.remote` 就把它加进 `peerDependencies` 不划算，
+ * 而本卡片只碰 `credentials` 一个命名空间。装配缺席时 `inject` 会拦住这次注册。
+ */
+interface ClientRemoteFace {
+  readonly credentials: CredentialsRemoteFace;
+  /** 订阅宿主广播的凭据变更；返回撤销函数。 */
+  $on(event: 'credentials/reference-updated', listener: (ref: string) => void): () => void;
+}
+
+/**
+ * 取 `ctx.remote` 并收窄到 {@link ClientRemoteFace}。
+ *
+ * 与 Host 侧取 `logger` 同款写法：依赖的是装配提供的服务，不是某个包的运行时值。
+ *
+ * @param ctx - 浏览器端 Cordis 上下文。
+ * @returns 收窄后的 Remote 面。
+ */
+function remoteOf(ctx: Context): ClientRemoteFace {
+  return (ctx as unknown as { remote: ClientRemoteFace }).remote;
+}
 
 /**
  * 依赖的浏览器端服务。
@@ -35,14 +62,14 @@ import { LOCALE_NS, ZHIHU_LOCALES } from './locales.js';
  * `locale` 是硬依赖：注册时声明了 `locale:`，渲染就需要已安装的 locale 面，
  * 缺席时 DSH 会直接报错而不是降级。标准 web 装配必然带它
  * （DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`）。
+ *
+ * `remote.credentials` 同理 —— 它是密钥的唯一落点。官方 `ui-settings-plugins`
+ * 的 web 搜索卡片声明的是同一个键。
  */
-export const inject = ['slots', 'settingsScope', 'locale'];
+export const inject = ['slots', 'settingsScope', 'remote.credentials', 'locale'];
 
 /** 与 Host 侧 `ZHIHU_SETTINGS_NAMESPACE` 逐字一致；它就是卡片的分派 key。 */
 const NAMESPACE = 'zhihu-search';
-
-/** 承载密钥的字段名，对应 Host 侧 `Config.accessSecret`。 */
-const SECRET_FIELD = 'accessSecret';
 
 /** 凭据引用名字段，对应 Host 侧 `Config.accessSecretRef`。 */
 const REF_FIELD = 'accessSecretRef';
@@ -53,12 +80,14 @@ const HIDE_FIELD = 'disableNativeWebSearch';
 /** 拿密钥的地方；与根 README 用的是同一个链接名。 */
 const PROFILE_URL = 'https://developer.zhihu.com/profile';
 
+/** 引用名在不被覆盖时的默认值；与 Host 侧 `DEFAULT_ACCESS_SECRET_REF` 一致。 */
+const DEFAULT_REF = 'ZHIHU_ACCESS_SECRET';
+
 /** 框架注入的 `t` 座位类型，绑定到本卡片的字典命名空间。 */
 type CardTranslate = TranslateNS<typeof LOCALE_NS>;
 
 /** 本卡片的 section 形状。 */
 interface ZhihuSection {
-  accessSecret?: string;
   accessSecretRef?: string;
   disableNativeWebSearch?: boolean;
 }
@@ -66,25 +95,6 @@ interface ZhihuSection {
 /** 把不透明的 user 层收窄为可查键的对象。 */
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
-}
-
-/**
- * 判断密钥槽位是否已有值。
- *
- * 用线路上的 `secrets` 记录而不是 `value`/`user`：密钥字段在服务端就被剥离
- * （DSH `settings/src/redact.ts`），三个值里都读不到它；只有 `secrets[].set`
- * 保留了「这个槽位有没有值」这个事实。
- *
- * @param mirror - 设置描述镜像。
- * @returns 该槽位是否已有值。
- */
-export function readConfigured(mirror: SettingsDescribeFace): boolean {
-  const view = mirror.getSnapshot().view?.namespaces.find((row) => row.ns === NAMESPACE);
-  const slot = view?.secrets?.find(
-    (entry: { readonly path: readonly string[]; readonly set: boolean }) =>
-      entry.path.length === 1 && entry.path[0] === SECRET_FIELD,
-  );
-  return slot?.set === true;
 }
 
 // 取值逐条对齐官方 PluginCard.module.css 与 fields.module.css。
@@ -218,7 +228,7 @@ function dimStyle(base: CSSProperties, disabled: boolean): CSSProperties {
 /** 卡片 props；`t` 由框架按注册时声明的 locale 命名空间注入。 */
 interface CardProps {
   readonly scope: SettingsScope<ZhihuSection>;
-  readonly mirror: SettingsDescribeFace;
+  readonly store: ReturnType<typeof createCredentialStore>;
   readonly t: CardTranslate;
 }
 
@@ -228,17 +238,17 @@ interface CardProps {
  * 草稿跨折叠保留，因此头部标记「未保存」；保存成功后才折叠，
  * 失败则保持展开并保留草稿与诊断供修正。
  *
- * @param props - 命名空间作用域、描述镜像，以及框架注入的翻译座位。
+ * @param props - 命名空间作用域、凭据状态源，以及框架注入的翻译座位。
  * @returns 卡片元素。
  */
-function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
+function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
   const snapshot: SettingsScopeSnapshot<ZhihuSection> = useSyncExternalStore(
     (onChange) => scope.subscribe(onChange),
     () => scope.getSnapshot(),
   );
-  const configured = useSyncExternalStore(
-    (onChange) => mirror.subscribe(onChange),
-    () => readConfigured(mirror),
+  const credentialState = useSyncExternalStore(
+    (onChange) => store.subscribe(onChange),
+    () => store.getSnapshot(),
   );
 
   const [open, setOpen] = useState(false);
@@ -258,6 +268,12 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
   const hideText = hideDraft ?? hideEffective;
   const hideDirty = hideDraft !== undefined && hideDraft !== hideEffective;
   const dirty = secret !== '' || refDirty || hideDirty;
+
+  // 状态只对它所描述的那个引用名有效。引用名刚改、状态还没跟上时说「未配置」，
+  // 而不是拿上一条记录的答案冒充 —— 徽标说谎比徽标迟到更糟。
+  const credential: CredentialView =
+    credentialState.ref === effectiveRef ? credentialState : { configured: false, writable: true };
+  const secretDisabled = disabled || !credential.writable;
   const blocked = !dirty || disabled;
 
   const discard = (): void => {
@@ -271,12 +287,13 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
     setSaving(true);
     setFailed('');
     try {
-      // 空白密钥表示「不修改」，因此跳过写入 —— 否则会把已存的密钥清成空串。
-      if (secret !== '') await scope.set(SECRET_FIELD, secret);
+      // 先落引用名，再写凭据：失败的写入不该留下一个指向不存在记录的引用。
       if (refDirty) {
         if (refText === '') await scope.unset(REF_FIELD);
         else await scope.set(REF_FIELD, refText);
       }
+      // 空白密钥表示「不修改」：凭据域拒收空值，清空得走 unset，不做成隐式副作用。
+      if (secret !== '') await store.write(refText === '' ? DEFAULT_REF : refText, secret);
       if (hideDirty) await scope.set(HIDE_FIELD, hideText);
       setSecret('');
       setRefDraft(undefined);
@@ -320,8 +337,8 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
               <div style={S.head}>
                 <label style={S.label} htmlFor="zhihu-access-secret">{t('secretLabel')}</label>
                 <span style={S.badges}>
-                  <Tag tone={configured ? 'neutral' : 'quiet'}>
-                    {configured ? t('secretConfigured') : t('secretMissing')}
+                  <Tag tone={credential.configured ? 'neutral' : 'quiet'}>
+                    {credential.configured ? t('secretConfigured') : t('secretMissing')}
                   </Tag>
                 </span>
               </div>
@@ -331,7 +348,7 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
                 type="password"
                 autoComplete="off"
                 value={secret}
-                disabled={disabled}
+                disabled={secretDisabled}
                 onChange={(event) => {
                   setSecret(event.target.value);
                 }}
@@ -348,6 +365,7 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
                 </a>
                 {t('secretHintAfter')}
               </p>
+              {credential.writable ? null : <p style={S.hint}>{t('secretShadowed')}</p>}
             </div>
 
             <div style={S.fieldDivider}>
@@ -436,17 +454,41 @@ function ZhihuCard({ scope, mirror, t }: CardProps): JSX.Element {
  */
 export function apply(ctx: Context): void {
   const scope = ctx.settingsScope.bind<ZhihuSection>({ namespace: NAMESPACE });
-  const mirror = ctx.settingsScope.describe();
+  const remote = remoteOf(ctx);
+  // 读的是**生效**的引用名（设置里存下来的那个），不是编辑中的草稿 ——
+  // 徽标描述的是现实，草稿只是表单值。
+  const store = createCredentialStore(
+    () => remote.credentials,
+    () => {
+      const saved = scope.getSnapshot().value?.[REF_FIELD];
+      return typeof saved === 'string' && saved !== '' ? saved : DEFAULT_REF;
+    },
+  );
 
   ctx.effect(
     () => ctx.locale.register(LOCALE_NS, ZHIHU_LOCALES),
     'zhihu-search: card dictionaries',
   );
 
+  // 引用名一变就重读；密钥在别处被写（手改 `.credentials.yaml`、或别的页面写了同名引用）
+  // 时也重读，否则徽标会一直报告宿主早已替换掉的状态。
+  ctx.effect(
+    () => scope.subscribe(() => void store.refresh()),
+    'zhihu-search: credential refresh on reference change',
+  );
+  ctx.effect(
+    () =>
+      remote.$on('credentials/reference-updated', (ref: string) => {
+        if (ref === store.getSnapshot().ref) void store.refresh();
+      }),
+    'zhihu-search: credential refresh on host update',
+  );
+  void store.refresh();
+
   ctx.slots.inject('settings.plugin.item', () =>
     ctx.slots.register(
       { name: 'settings.plugin.item', key: NAMESPACE, locale: LOCALE_NS },
-      (seat: { t: CardTranslate }) => <ZhihuCard scope={scope} mirror={mirror} t={seat.t} />,
+      (seat: { t: CardTranslate }) => <ZhihuCard scope={scope} store={store} t={seat.t} />,
     ),
   );
 }

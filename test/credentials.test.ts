@@ -1,47 +1,39 @@
 /**
- * 密钥解析优先级测试。
+ * 密钥解析契约。
  *
- * 优先级是契约：它决定「用户在设置里填了密钥」这件事会不会生效。
+ * 契约只有一条：**凭据域是唯一的取值口**，进程环境只是 provider 缺席时的兜底。
+ * 设置里没有字面量通道 —— 曾经的三源优先级随旧版明文一起作废（[migrate.ts](../src/migrate.ts)）。
  */
 
 import { describe, expect, it } from 'vitest';
-import { resolveAccessSecret, type SecretSources } from '../src/credentials.js';
+import { hasSecretValue, resolveAccessSecret, type SecretSources } from '../src/credentials.js';
 
-/** 构造三条来源都可控的夹具。 */
+/** 构造两条来源都可控的夹具。 */
 function sources(overrides: Partial<SecretSources> = {}): SecretSources {
   return {
     referenceName: () => 'ZHIHU_ACCESS_SECRET',
     fromCredentials: async () => undefined,
-    fromSettings: () => undefined,
     fromEnvironment: () => undefined,
     ...overrides,
   };
 }
 
 describe('resolveAccessSecret', () => {
-  it('凭据域优先', async () => {
+  it('凭据域优先于环境变量', async () => {
     const value = await resolveAccessSecret(
       sources({
         fromCredentials: async () => 'from-credentials',
-        fromSettings: () => 'from-settings',
         fromEnvironment: () => 'from-env',
       }),
     );
     expect(value).toBe('from-credentials');
   });
 
-  it('凭据域为空时回落到设置值', async () => {
-    const value = await resolveAccessSecret(
-      sources({ fromSettings: () => 'from-settings', fromEnvironment: () => 'from-env' }),
-    );
-    expect(value).toBe('from-settings');
-  });
-
-  it('凭据域与设置都为空时回落到环境变量', async () => {
+  it('凭据域为空时回落到环境变量', async () => {
     expect(await resolveAccessSecret(sources({ fromEnvironment: () => 'from-env' }))).toBe('from-env');
   });
 
-  it('三条都空时返回 undefined，交由调用方报鉴权错误', async () => {
+  it('两条都空时返回 undefined，交由调用方报鉴权错误', async () => {
     expect(await resolveAccessSecret(sources())).toBeUndefined();
   });
 
@@ -49,7 +41,6 @@ describe('resolveAccessSecret', () => {
     const value = await resolveAccessSecret(
       sources({
         fromCredentials: async () => '   ',
-        fromSettings: () => '\n\t',
         fromEnvironment: () => 'ok',
       }),
     );
@@ -78,5 +69,14 @@ describe('resolveAccessSecret', () => {
     await expect(
       resolveAccessSecret(sources({ fromCredentials: async () => undefined, fromEnvironment: () => 'y' })),
     ).resolves.toBe('y');
+  });
+});
+
+describe('hasSecretValue', () => {
+  it('只有含非空白字符的字符串才算配好了', () => {
+    expect(hasSecretValue('sk-x')).toBe(true);
+    expect(hasSecretValue('')).toBe(false);
+    expect(hasSecretValue('  \t\n')).toBe(false);
+    expect(hasSecretValue(undefined)).toBe(false);
   });
 });
