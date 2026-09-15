@@ -49,8 +49,11 @@
 
 知乎 API 自身的反直觉处归 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；**模块内的坑下放到对应子目录的 `AGENTS.md`**（在那里工作时自动注入），此处只留跨模块、踩了整条链就崩的几条。
 
-- **生效链**：本机 profile 装的是版本化 registry 副本，不是 `link:` → 改完 `src/` 的路径是 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>` → **重启 host**；`dsh.profile.bundles` 只在启动时读，**首次挂载**同样要重启（或走 patch 层）。
-- **host 半体不热更**：`dsh-client-hmr` 只换浏览器半体 —— render、投影、工具描述改了都必须重启，否则模型看到的仍是旧版（2026-09-13 实测）。
+- **生效链取决于 profile 怎么挂的，先查再假设**：`Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`。
+  - **符号链接到仓库**（本机当前就是）：`npm run build`（含 `npm test` 的 build）**直接写线上**，`dsh-client-hmr` 轮询 `lib/client.js` 当场换掉**浏览器半体**；host 半体要重启才换。改客户端半体因此免发版即生效，但**构建即上线** —— 没验证过的构建会立刻影响正在用的界面。
+  - **版本化 registry 副本**：build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>` → 重启。
+  - 两种模式下 host 半体都只在启动时读，**必重启**；`dsh.profile.bundles` 同理。
+- **半体可以错配**：浏览器半体热更、host 半体不热更，两者版本因此可能不一致（一次 build 或一次安装就能造成）。v1.6.0 的卡片回归就是这样暴露的 —— 维护者没装任何东西，仓库里一次 `npm run build` 就把线上浏览器半体换成了带 bug 的构建，而 host 半体仍是旧的（启动期迁徙因此从未执行）。**看到客户端半体报错时，别假设 host 半体是同一个版本。**
 - **产物三副本**：改工具输出字段必须**同时**改 Canonical 类型、投影层、`output.schema`；宿主按最后一份校验（`additionalProperties: false`），漏一处 = 整个工具调用失败（v1.4.0 的 P0 → [复盘](docs/postmortem/2026-09-14-output-schema-drift.md)）。
 - **DSH scope 机制**：原生网页工具**不在全局层**（住在 agent preset 的 standing scope），判断存在性必须站在 agent scope 上；取注册表只能走**免 inject 的 `agent.ctx.get('tools')`**（属性访问抛 `without inject`）。v1.3.0 因读全局视图而静默失效 → [复盘](docs/postmortem/2026-09-14-hidden-tool-restriction-noop.md)。
 - **inject 门禁按服务名逐字判**：`ctx.x` 属性访问要求 `x` **逐字**出现在某个 fiber 的 `inject` 里，点号键**不展开**成父级 —— 声明了 `remote.credentials` **不等于**能访问 `ctx.remote`。同一机制已踩中两次（agent scope 的 `tools`、客户端半体的 `remote`，后者让卡片整块装不上）；碰平台服务先看官方同类插件的 `inject` 怎么声明 → [复盘](docs/postmortem/2026-09-15-client-inject-remote-missing.md)。

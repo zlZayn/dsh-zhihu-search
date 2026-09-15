@@ -30,7 +30,8 @@
 - 改样式 → 只用 `--dsw-alias-*` 语义令牌，不写字面色值。
 - 加文案 → 只改 [locales.ts](locales.ts) 的 key 与两份字典；两处都补齐才编得过。
 - 改 locale 命名空间 → 必须与槽位注册的 `locale:` 一致，否则 `t` 取不到值、界面显示 key 本身。
-- 改完必须 `npm run build`。客户端半体由 `dsh-client-hmr` 轮询 `lib/client.js` 就地换装；**host 半体换不了** —— 本机 profile 装的是版本化 registry 副本（不是 `link:`），生效链是 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>` → 重启 → 见 [../AGENTS.md](../AGENTS.md) 的活跃坑。
+- 改完必须 `npm run build`。客户端半体由 `dsh-client-hmr` 轮询 `lib/client.js` 就地换装；**host 半体换不了**。
+  生效链**取决于本机 profile 怎么挂的**（先 `Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`）：符号链接到仓库时构建**直接写线上浏览器半体**；版本化副本则要 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>`。两种模式下 host 半体都要重启 → 见 [../AGENTS.md](../AGENTS.md) 的活跃坑。
 
 ## 参考
 
