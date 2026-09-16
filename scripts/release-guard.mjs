@@ -17,7 +17,7 @@
 
 const NON_ARTIFACT_PREFIXES = ['docs/', 'test/', '.github/', '.agents/', 'assets/'];
 /** 工具类脚本：不参与构建产物，改它们不影响 npm 上的包。 */
-const NON_ARTIFACT_SCRIPTS = new Set(['scripts/acceptance.mjs', 'scripts/release-guard.mjs']);
+const NON_ARTIFACT_SCRIPTS = new Set(['scripts/acceptance.mjs', 'scripts/release-guard.mjs', 'scripts/compat-swap.mjs']);
 const NON_ARTIFACT_FILES = new Set(['LICENSE', '.gitignore', '.gitattributes']);
 
 /**

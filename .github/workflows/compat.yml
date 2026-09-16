@@ -1,0 +1,228 @@
+# DSH 兼容性（宿主防腐化）：盯住**宿主上游的版本线**。
+#
+# 与 contract.yml 同构、分工不同：那边盯知乎开放平台的行为指纹，这边盯 DSH 的 API 面。
+# 两边都是会悄悄漂移的上游，一边红了不代表另一边有事，所以两条线各自独立、时间错开。
+#
+# ## 为什么用 dist-tag 而不是版本矩阵
+#
+# DSH 至今没有正式版，版本号本身不构成承诺，tag 才是。三个 tag 的语义**各不相同**
+# （2026-09-16 实测，@deepseek-ai/dsh-* 全家族一致）：
+#
+#   next   —— 当前承诺支持的线。package.json 的 peer 范围就该罩住它。
+#   alpha  —— 前瞻线。按设计**就在声明范围之外**（^0.1.5-rc.2 只放行同 tuple 的预发布，
+#             因此不含 0.1.6-alpha.1）。这里只提前看破坏，不产生任何承诺。
+#   latest —— **不可用**：多数 @deepseek-ai/dsh-* 包上它指向很早的版本（dsh-tools 是
+#             0.0.1-rc.1、dsh-client-store 是 0.1.2-alpha.2），@deepseek-ai/dsh 自己是
+#             0.1.5-rc.1 —— 比本插件的声明下限还低一格。按默认方式装宿主会装到过期版本。
+#
+# ## 两条线的处理方式不同
+#
+#   next  红了 = 使用者会装到 = **必须修** → 整个 run 红，会发通知（declaration / next 两个 job）。
+#   alpha 红了 = **记录，等它切到 next 再处理** → job 红、run 绿，不发通知。
+#
+# 不挂 push：这条线看的是**上游**动没动，本地提交改不了结论。
+name: Compat
+
+on:
+  schedule:
+    # 每周一 02:00 UTC（北京时间 10:00）。与 contract.yml 的 01:00 错开：
+    # 两条上游线同时红会分不清是谁漂了。
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # 声明面：peer 范围还罩不罩得住 next 线。
+  #
+  # 单独成 job 的理由：它只读 package.json 再问 npm，几十秒出结果；而且它的结论
+  # 与「代码还能不能跑」是两件事 —— 混在 next job 里会被后者的红遮住，反过来也一样。
+  declaration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      # 不装任何东西：判据是「我们声明的区间能取到的最新版本」与「tag 指向的版本」是否同一个。
+      - run: node scripts/compat-swap.mjs check next
+
+  next:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # 刻意**不跑 npm ci**：要的是一棵按新声明重新解析出来的树。先 ci 再改，npm 会拿旧树去
+      # reconcile，实测直接 ERESOLVE（exit 1）并且 node_modules 原封不动停在旧版本上 ——
+      # 后面的测试于是全绿，报出一个假兼容。
+      - name: Swap the declared ranges onto the next line
+        run: node scripts/compat-swap.mjs swap next
+
+      # --ignore-scripts 是必须的：本包的 prepare 会跑 npm run build（内含 tsc），
+      # 类型面一漂移 tsc 就非零退出，install 本身失败，什么也测不到。构建由下面的步骤显式驱动。
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      # 换包没生效就必须红：旧版本装在那里会让后面每一步都绿。
+      - name: Verify the swap actually took effect
+        id: verify
+        run: node scripts/compat-swap.mjs verify next
+
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      # 跑的是现有套件，一条新断言都不加。
+      - name: Run the existing suite
+        id: suite
+        continue-on-error: true
+        run: npm test
+
+      # 只在套件红了之后跑，用来分流「类型面」与「行为面」：
+      # npm test = build && vitest，tsc 一挂 vitest 根本不跑，会把「只有类型动了」误报成
+      # 「整套挂了」。tsc 默认 noEmitOnError=false，报错仍会产出 lib/，所以这里能重建产物
+      # 并真的跑到测试。
+      - name: Diagnose — separate the type surface from the behaviour surface
+        id: diagnose
+        if: steps.suite.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          npx tsc || true
+          npx tsc -p tsconfig.client.json || true
+          node scripts/build-client.mjs
+          npx vitest run --reporter=basic
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## DSH 兼容性 · next 线（承诺支持的线）"
+            echo ""
+            echo "| 步骤 | 结果 |"
+            echo "| --- | --- |"
+            echo "| 换包 + 核对装出来的版本 | ${{ steps.verify.outcome }} |"
+            echo "| 类型面（npm run typecheck） | ${{ steps.typecheck.outcome }} |"
+            echo "| 全量测试（npm test） | ${{ steps.suite.outcome }} |"
+            if [ -n "${{ steps.diagnose.outcome }}" ] && [ "${{ steps.diagnose.outcome }}" != "skipped" ]; then
+              echo "| 分流诊断（跳过 tsc 的类型面） | ${{ steps.diagnose.outcome }} |"
+            fi
+            echo ""
+            echo "**红了怎么办**（顺序不可颠倒）："
+            echo ""
+            echo "1. 先判类别 —— 三类红的处理完全不同："
+            echo "   - **换包那一步或核对失败** → 树根本没换成，先解决安装问题再看别的（多半是上游包之间的 peer 冲突）。"
+            echo "   - **类型面红** → 上游 API 签名变了。定位到具体包与符号，改调用点使其**新旧都能编译**"
+            echo "     （2026-09-16 实测例子：agent/created 监听器显式 return undefined 即可同时满足"
+            echo "     0.1.5-rc.2 与 0.1.6-alpha.1）。两版不可兼得时说明下限必须抬高，那是 Q2 是 → **major，先问人类**。"
+            echo "   - **全量测试红** → **行为差异**，最重。按 test/README.md 的分层定位："
+            echo "     L3b/L6a（native-web-tools / client-bundle / dist）说明平台语义变了；L1/L2 红则先怀疑"
+            echo "     换包装错了 —— 那几层对宿主版本不敏感。"
+            echo "2. 本地复现：clone 之后照本 job 的步骤跑一遍（swap → npm install --ignore-scripts → verify）。"
+            echo "3. 修 → 按 docs/PUBLISHING.md 定档 → 发版 → 等下一轮。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 各步都是 continue-on-error（为了拿到全部信号并让摘要一定跑得到），
+      # 所以「有没有红」必须在这里显式汇总成 job 的成败。
+      - name: Verdict
+        if: always()
+        run: |
+          if [ "${{ steps.verify.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ] || [ "${{ steps.suite.outcome }}" != "success" ]; then
+            echo "::error::next 线漂移：换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}。处理链见本次运行的 Summary。"
+            exit 1
+          fi
+
+  alpha:
+    runs-on: ubuntu-latest
+    # 前瞻线：红了**不阻断** run。
+    # 它按设计就落在声明范围之外，红是这个 job 的常态而不是仓库出事的信号 ——
+    # 因此不让它把每周的失败通知打出去。真正看住的东西在 next 与 declaration 上。
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # 与 next 线**同一套机制**，只差两个开关：tag 换成 alpha，install 加 --force。
+      #
+      # 为什么这里必须 --force 而 next 不需要：alpha 线上的包**内部** peer 图还没定型
+      # （dsh-agent@0.1.6-alpha.1 要 peer dsh-typert-protocol / dsh-sandbox 等一批同样只在
+      # alpha 上存在的包），npm 解析不动，install 直接 ERESOLVE 退出 ——
+      # 树装不出来，后面什么也测不到。改写声明区间解决不了这一层，因为冲突不在我们这边。
+      # next 线刻意**不加** force：那条线本该装得干净，需要 force 本身就是要看的信号。
+      #
+      # ⚠ 绝不要退回 npm install <包>@alpha：
+      #   - 不点名的那个包的目录会被清空（实测 dsh-client-locale / dsh-client-ui-primitives 都中过），
+      #     随后 typecheck 报「找不到模块」，是与上游无关的假红；
+      #   - 加 --legacy-peer-deps 更糟：它连 npm 的 **peer 自动安装**一起关掉，dsh-tools 自己的
+      #     peer（dsh-sandbox / dsh-sandbox-policy / dsh-ptc-runtime）一个都不装，
+      #     6 个测试文件以「Cannot find package '@deepseek-ai/dsh-sandbox'」假红（2026-09-16 实测）。
+      - name: Swap the declared ranges onto the alpha line
+        id: verify
+        continue-on-error: true
+        run: |
+          node scripts/compat-swap.mjs swap alpha
+          npm install --ignore-scripts --no-audit --no-fund --force
+          node scripts/compat-swap.mjs verify alpha
+
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Run the existing suite
+        id: suite
+        continue-on-error: true
+        run: npm test
+
+      - name: Diagnose — separate the type surface from the behaviour surface
+        id: diagnose
+        if: steps.suite.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          npx tsc || true
+          npx tsc -p tsconfig.client.json || true
+          node scripts/build-client.mjs
+          npx vitest run --reporter=basic
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## DSH 兼容性 · alpha 线（前瞻，不构成承诺）"
+            echo ""
+            echo "| 步骤 | 结果 |"
+            echo "| --- | --- |"
+            echo "| 换包 + 核对装出来的版本 | ${{ steps.verify.outcome }} |"
+            echo "| 类型面 | ${{ steps.typecheck.outcome }} |"
+            echo "| 全量测试 | ${{ steps.suite.outcome }} |"
+            if [ -n "${{ steps.diagnose.outcome }}" ] && [ "${{ steps.diagnose.outcome }}" != "skipped" ]; then
+              echo "| 分流诊断 | ${{ steps.diagnose.outcome }} |"
+            fi
+            echo ""
+            echo "**红了怎么办**：只记录，**不动 peer 范围** —— alpha 不产生承诺，按它放宽声明会把使用者引到未发布的线上。"
+            echo ""
+            echo "- **类型面红**（截至 2026-09-16 的实况）→ 在 .agents/notes/ 记一条"
+            echo "  「alpha 收紧了某个 API，正式版前需处理」；顺手判断能否提前写成新旧都能编译的形式。"
+            echo "- **行为面红** → 提前开修，别等正式版：它早晚会走到 next 线上，那时就是 must-fix。"
+            echo "- 等 alpha 切到 next（或发正式版）时，这条记录升级为必须处理项。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verdict
+        if: always()
+        run: |
+          if [ "${{ steps.verify.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ] || [ "${{ steps.suite.outcome }}" != "success" ]; then
+            echo "::error::alpha 线漂移（换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}）。这是**记录**不是告警：处理链见本次运行的 Summary。"
+            exit 1
+          fi
