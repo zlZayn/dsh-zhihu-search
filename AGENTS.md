@@ -46,7 +46,7 @@
 ## 待办
 
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）
-- **声明面已落后于实际部署**：本机宿主跑的是 `0.1.6-alpha.1`（alpha 线），而 `peerDependencies` 只到 `^0.1.5-rc.2`；同时 `latest` 装出来的 `0.1.5-rc.1` 落在范围之**下**。等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档
+- **声明面已落后于实际部署**：本机宿主跑的是 `0.1.6-alpha.1`（alpha 线），而 `peerDependencies` 只到 `^0.1.5-rc.2`；同时 `latest` 装出来的 `0.1.5-rc.1` 落在范围之**下**。等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档；**放宽时一并定下限** —— 抬到新 next 即放弃 `0.1.5-rc.2`，保留它则它落在两条 lane（next / alpha）之外，无人覆盖
 - 处置 `@deepseek-ai/dsh-code-runtime`：`devDependencies` 里**没有任何文件引用它**，且它的 alpha 标签停在 `0.1.5-alpha.2`（比 next 的 `0.1.5-rc.2` 还旧）—— 换包脚本因此每个 alpha 轮都要告警跳过它一次。删掉即消失
 
 ## 活跃坑（工具链与 DSH 平台）
