@@ -1,5 +1,8 @@
 # 发布：唯一入口是手动触发（Actions → Release → Run workflow，或 gh workflow run release.yml -f tier=patch）。
 #
+# ⚠ 改本文件后**必须手动 dispatch 实跑一次**：PR 上的 CI 只跑 ci.yml，动 release.yml 的 PR
+# 就算绿勾也不代表发布链路验过。理由与 CI 全貌见 docs/PUBLISHING.md 的「CI」节。
+#
 # 为什么单入口、且不再由 tag 触发：
 # - 档位由人按 docs/PUBLISHING.md 的问题链定档（major 必须人类确认），不适合由 commit 类型自动推断。
 # - 顺序是全有或全无：先发布成功，才推 main、才建 tag 与 GitHub Release；

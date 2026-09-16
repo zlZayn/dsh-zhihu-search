@@ -33,7 +33,7 @@
 盯的是**上游行为**，不是我们的实现：知乎是黑盒，已经实测出来的结论（区间只筛候选、host 精确匹配、未记载的 `Filter` 可用……）会随上游悄悄漂移，所以把它们写成会红的断言。
 
 - 跑法：`npm run test:contract`（需 `ZHIHU_ACCESS_SECRET`）；CI 由 [.github/workflows/contract.yml](../.github/workflows/contract.yml) 每周一 UTC 01:00 + 手动触发。
-- **不进日常 CI**：花真实配额（约 16 次/轮），且契约漂移是「周」级信号。日常 `npm test` 由 [vitest.config.ts](../vitest.config.ts) 排除 `test/contract-live-*.test.ts`；契约跑法由 [vitest.contract.config.ts](../vitest.contract.config.ts) 定义（串行 + 30s 超时）；底座的离线自检留在日常套件里。
+- **不进日常 CI**：花真实配额（每轮二十余次调用），且契约漂移是「周」级信号。日常 `npm test` 由 [vitest.config.ts](../vitest.config.ts) 排除 `test/contract-live-*.test.ts`；契约跑法由 [vitest.contract.config.ts](../vitest.contract.config.ts) 定义（串行 + 30s 超时）；底座的离线自检留在日常套件里。
 - **不 import `src/`**：只用 `fetch` 直连上游，避免插件的解析 bug 同时污染被测对象与断言。
 - 密钥缺席时**红**，不静默跳过。
 - **红了怎么办（顺序不可颠倒）**：① 重跑确认不是偶发 → ② 重跑探针确认上游变成了什么 → ③ 更新 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「端点契约 / 防错清单 / 与知乎官方文档的偏差」 → ④ 最后才改实现与断言。
