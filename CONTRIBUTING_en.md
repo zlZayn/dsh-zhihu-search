@@ -2,23 +2,21 @@
 
 # Contributing — Getting involved with dsh-zhihu-search
 
-Issues and PRs both go through [GitHub](https://github.com/zlZayn/dsh-zhihu-search).
+Issues and PRs are filed on [GitHub](https://github.com/zlZayn/dsh-zhihu-search).
 
-## What a bug report needs
+## When filing a bug
 
-- Plugin version, DSH version and which line it came from (`next` / `alpha` / `latest`), Node version.
-- Install shape (symlink to the repo / registry copy), whether the host was restarted, and whether the browser half and the host half are the same version.
+- Plugin version, DSH version (`dsh --version`), Node version (`node --version`).
+- Installed from source or from npm; whether DSH was restarted after the change.
 - A minimal reproduction, and the full error text.
-
-How to check the first two → [AGENTS.md](AGENTS.md), the "活跃坑" section.
 
 ## Before proposing a feature
 
-Read [.agents/notes/](.agents/notes/) first — proposals already rejected by measurement live there, and every record lists the alternatives it beat.
-What the design and the platform will not do → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Read [.agents/notes/](.agents/notes/) — proposals already rejected by measurement, along with the alternatives each decision ruled out.
+- What the design and the platform will not do → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Before opening a PR
 
-- Run `npm test` once.
-- Read "全局规则" in [AGENTS.md](AGENTS.md) and [test/README.md](test/README.md): the merge criteria live there, and the red lines are pinned by [test/redlines.test.ts](test/redlines.test.ts).
-- Do not touch the version number (release process → [docs/PUBLISHING.md](docs/PUBLISHING.md)).
+- Run `npm test` in the repository directory.
+- Read "全局规则" in [AGENTS.md](AGENTS.md) and [test/README.md](test/README.md): merge criteria live there, and the red lines are pinned by [test/redlines.test.ts](test/redlines.test.ts).
+- Do not modify the version number (release process → [docs/PUBLISHING.md](docs/PUBLISHING.md)).
