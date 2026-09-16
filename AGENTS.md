@@ -30,6 +30,7 @@
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - 发版：`gh workflow run release.yml -f tier=patch|minor|major` —— 唯一入口，档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
+- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap next` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify next`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check next`
 
 ## 验证快照（2026-09-16 实跑）
 
@@ -39,11 +40,14 @@
 - 真机验收：[scripts/acceptance.mjs](scripts/acceptance.mjs) 覆盖扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本；升级 + host 重启后在 profile 安装副本上跑通，工具面同参数复验一致
 - 发版守卫：只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
 - 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
+- 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `next`（承诺线）与 `alpha`（前瞻线）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动** —— alpha 线上类型面已红而 260 个测试全绿，所以「测试全绿」不能当作「兼容」的结论
 - 明文迁徙：**真机跑通**（2026-09-16）—— 装入 1.6.2 + 重启 host 后，`settings.yaml` 的 `zhihu-search:` 段只剩 `disableNativeWebSearch`，值（40 位十六进制、与原明文逐字一致）落进 `.credentials.yaml` 的 `refs`，两个文件同一秒被改写。此前在 `lib/` 产物 + 真实 provider + 本机 `settings.yaml` **副本**上也跑通过（段内清理、其他 section 与注释原样保留、第二次运行是空操作）
 
 ## 待办
 
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）
+- **声明面已落后于实际部署**：本机宿主跑的是 `0.1.6-alpha.1`（alpha 线），而 `peerDependencies` 只到 `^0.1.5-rc.2`；同时 `latest` 装出来的 `0.1.5-rc.1` 落在范围之**下**。等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档
+- 处置 `@deepseek-ai/dsh-code-runtime`：`devDependencies` 里**没有任何文件引用它**，且它的 alpha 标签停在 `0.1.5-alpha.2`（比 next 的 `0.1.5-rc.2` 还旧）—— 换包脚本因此每个 alpha 轮都要告警跳过它一次。删掉即消失
 
 ## 活跃坑（工具链与 DSH 平台）
 
@@ -61,6 +65,10 @@
 - **告警可能到不了终端**：v1.6.x 的每一处失败都 `warn` 过，维护者终端里一条都没有。判断故障别只看日志，先看文件状态与工具报错。
 - **redact 是 schema 驱动的**：`redactSecrets` 只剥 schema 里带 `role('secret')` 的字段。把一个「代码已经不读」的密钥字段从 schema 里删掉，redact 会同时停止保护它 —— 明文改从 describe 线路走出，而功能测试全绿。删密钥字段前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「密钥解析契约」。
 - **挂载方式**：只用官方 CLI `dsh plugin --profile web add <path>`（它会顺带 reconcile `dsh.profile.bundles`），不要手改 `cordis.patch.yml`。
+- **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：`next` = 当前承诺支持的线，`alpha` = 前瞻线，`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本（`dsh-tools` 是 `0.0.1-rc.1`、`dsh-client-store` 是 `0.1.2-alpha.2`），`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1`，**比本插件的声明下限还低一格**。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+- **换包有两个方向相反的假信号，都踩过**：
+  - **假红**：`npm install <包>@<tag>` 会把某个恰好没被点名的包**目录清空**（实测 `dsh-client-locale` 与 `dsh-client-ui-primitives` 都中过），随后 typecheck 报「找不到模块」。`--legacy-peer-deps` 也不是解药：它连 npm 的 peer 自动安装一起关掉，`dsh-tools` 自己的 peer 集体缺席。正路是 [scripts/compat-swap.mjs](scripts/compat-swap.mjs) 的「改写 package.json + 裸 `npm install`」。
+  - **假绿**：`npm install` 因上游 peer 冲突退出时，`node_modules` 会**原封不动停在旧版本**上，随后 typecheck 与全套测试全绿。所以换包之后必须 `verify` 断言实装版本 —— **「测试全绿」不等于「跑在目标版本上」**。
 
 ## 文档网络与自更新
 
@@ -68,7 +76,7 @@
 
 - **一条事实只有一个 home**：根 README 讲门面（给访客），本文件讲规则与仪表盘；子目录双件分讲「有什么 / 改哪」（README）与「在这里要怎么干」（AGENTS.md，进入该目录时自动注入）；[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 讲不变的设计与防错，[.agents/notes/](.agents/notes/) 讲为什么，[docs/PUBLISHING.md](docs/PUBLISHING.md) 讲怎么发。别处一律链接，不复制。
 - **能自证的不抄（自更新）**：凡是有「会自己更新的来源」的事实就指向它 —— 测试与类型检查 → [Actions](https://github.com/zlZayn/dsh-zhihu-search/actions)，发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)，产物一致性 → 哈希比对。抄一次数字就要手动跟一次（本文件已经因此过时过两回），所以只留指针与不随数字漂移的定性结论。
-- **能落成校验的不写散文**：五条红线 → 测试；发版噪音 → [release-guard](scripts/release-guard.mjs)；上游契约 → [contract.yml](.github/workflows/contract.yml)；文档链接与换行 → 校验脚本。机器判得了的规则，就别指望人记得。
+- **能落成校验的不写散文**：五条红线 → 测试；发版噪音 → [release-guard](scripts/release-guard.mjs)；上游契约 → [contract.yml](.github/workflows/contract.yml)；**宿主版本线 → [compat.yml](.github/workflows/compat.yml)**；文档链接与换行 → 校验脚本。机器判得了的规则，就别指望人记得。
 - **改一处要查得到同步点**：每个子目录 README 的「变更影响路由」是同步清单的入口；新增或改名文件后必须回填，否则下一个人只能靠运气。
 - **坑按作用域分流**：跨模块、踩了整条链就崩的留在本文件；模块内的下放到对应子目录 `AGENTS.md`，本文件不重复。
 

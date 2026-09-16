@@ -182,6 +182,9 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 - [ci.yml](../.github/workflows/ci.yml)：推 `main` 与每个 PR 跑 typecheck + test。
 - [release.yml](../.github/workflows/release.yml)：手动触发，一次跑完[发版](#发版)全流程。
+- [contract.yml](../.github/workflows/contract.yml)：每周一 01:00 UTC 盯**知乎开放平台**的行为指纹。
+- [compat.yml](../.github/workflows/compat.yml)：每周一 02:00 UTC 盯**宿主 DSH** 的版本线，见[兼容性](#兼容性)。
+  与 contract.yml 同构、分工不同：两条上游各自会悄悄漂移，时间错开是为了红了能分清是谁漂了。
 
 两者都用 `npm ci`：它严格按锁文件安装，锁文件与 `package.json` 不同步时直接失败 —— 这是我们要在 CI 里拦下的情况。
 
@@ -194,6 +197,34 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 ## 兼容性
 
-- 宿主版本以 [package.json](../package.json) 的 `peerDependencies` 为准。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、密钥读不到，或**明文开始出现在 describe 线路上**）。
-- 判断依据始终以 DSH 源码为准，不凭文档推断。
-- 已知缺口见 [AGENTS.md](../AGENTS.md) 的待办。
+**声明面**只有一个事实来源：[package.json](../package.json) 的 `peerDependencies`。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、密钥读不到，或**明文开始出现在 describe 线路上**）。判断依据始终以 DSH 源码为准，不凭文档推断。
+
+**验证面**是 [compat.yml](../.github/workflows/compat.yml)。声明与验证必须对齐 —— 改动任意一边都要同步另一边。
+
+### dist-tag 是唯一可用的锚点
+
+DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三个 tag 语义**各不相同**（2026-09-16 实测，`@deepseek-ai/dsh-*` 全家族一致）：
+
+| tag | 含义 | compat.yml 怎么用 |
+| --- | --- | --- |
+| `next` | 当前承诺支持的线 | 换包 + 跑全套；红了**必须修**（run 红） |
+| `alpha` | 前瞻线，按设计在声明范围之外 | 换包 + 跑全套；红了**只记录**（job 红、run 绿） |
+| `latest` | **不可用** | 不碰 |
+
+`latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本（`dsh-tools` 是 `0.0.1-rc.1`、`dsh-client-store` 是 `0.1.2-alpha.2`），`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1` —— **比本插件的声明下限 `0.1.5-rc.2` 还低一格**。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线；这也是 `next` 线存在的理由。
+
+### 红了怎么办（按线分流）
+
+**`next` 红 = 使用者会装到，必须修。**先判类别，三类处理完全不同：
+
+- **换包或核对步骤失败** → 树根本没换成，先解决安装问题再看别的（多半是上游包之间的 peer 冲突）。这一条不能省：旧版本的树会让后面每一步都绿，报出一个**假兼容**。
+- **类型面红** → 上游 API 签名变了。定位到具体包与符号，改调用点使其**新旧都能编译**；做不到就说明下限必须抬高，那是 Q2 是 → **major，先问人类**。
+- **全量测试红** → **行为差异**，最重。按 [test/README.md](../test/README.md) 的分层定位：L3b/L6a 红说明平台语义变了，L1/L2 红则先怀疑换包装错了（那几层对宿主版本不敏感）。
+
+**`alpha` 红 = 记录，等它切到 `next` 再处理。**不动 peer 范围 —— alpha 不产生承诺，按它放宽声明会把使用者引到未发布的线上。类型面红在 [.agents/notes/](../.agents/notes/) 记一条；行为面红提前开修，别等正式版。
+
+### 声明面变动要同步的地方
+
+- `peerDependencies` 的区间 → [README.md](../README.md) 与 [README_en.md](../README_en.md) 的「前置」版本（两份必同改）。
+- 区间放宽本身不改行为（旧用法仍正确，只是允许更新的宿主）→ 按[版本号](#版本号)的 Q1/Q2 全否 → **patch**；但**必须发版**，声明在产物里。
+- 已知缺口与待办见 [AGENTS.md](../AGENTS.md)。

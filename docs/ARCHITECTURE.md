@@ -190,6 +190,13 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 - 缓存只写成功结果；失败结果入缓存会把一次偶发限流锁定整个 TTL。
 - **设置里的密钥靠 schema 活着，不靠代码读它**：`redactSecrets` 只认识 schema 声明的 `role('secret')` 字段。把一个「已经没人读」的密钥字段从 schema 里删掉，redact 会同时停止保护它，明文改从 describe 线路走出 —— 功能测试全绿，泄漏静默发生。见「密钥解析契约」与 [test/redact-anchor.test.ts](../test/redact-anchor.test.ts)。
 
+### 宿主版本（DSH 侧，不随我们改）
+
+- **声明面只有一个**：`package.json` 的 `peerDependencies`。它同时是安装器的判据与 npm 页面上的对外承诺 —— 改它等于改对外契约，因此必须与实测对齐，不能凭文档推断。
+- **依赖的是运行时行为，不是 API 形状**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、密钥读不到，或明文开始出现在 describe 线路上）。
+- **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（`dsh-tools` 是 `0.0.1-rc.1`；`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1`，**低于本包声明的下限**），`next` 才是当前承诺支持的线。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
+- **类型面会先于行为面动**：宿主收紧 API 签名时 `npm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
+
 ### 契约纪律（破坏即改契约）
 
 - 参数**不得静默失效**。`sortField` 为 `default` 或缺省时不下发 `SortBy`，此时 `minValue` 与非默认 `order` 没有落点，一律拒绝并给出改正提示。静默丢弃会让模型以为自己筛过了，然后照着未过滤的结果作答——比报错更糟。

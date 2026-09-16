@@ -38,6 +38,20 @@
 - 密钥缺席时**红**，不静默跳过。
 - **红了怎么办（顺序不可颠倒）**：① 重跑确认不是偶发 → ② 重跑探针确认上游变成了什么 → ③ 更新 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「端点契约 / 防错清单 / 与知乎官方文档的偏差」 → ④ 最后才改实现与断言。
 
+## 版本敏感面（宿主升级时先看这里）
+
+各层对 DSH 版本的敏感度差别很大 —— 这决定了 [compat.yml](../.github/workflows/compat.yml) 红了之后该往哪看：
+
+- **不敏感**：L1 纯逻辑与 L2 产物契约（走真实 `ZhihuClient`、只换最外层 `fetch`），以及用最小替身装配的 [plugin.test.ts](plugin.test.ts)。它们对宿主版本无感，红了先怀疑**换包装错了**，不是上游变了。
+- **敏感（L3b / L6a）**：用**真实** DSH 包跑装配的三处 ——
+  - [native-web-tools.test.ts](native-web-tools.test.ts)：真实 `dsh-tools` + `dsh-scope` + `dsh-system-prompt` + cordis，复现 web profile 拓扑；
+  - [client-bundle.test.ts](client-bundle.test.ts)：按真实 Cordis 语义装配客户端入口，是唯一能看见 inject 门禁的地方；
+  - [dist.test.ts](dist.test.ts)：编译后的 host 图能否在 Node 中求值（吃 `dsh-tools` 的导出面）。
+  这三处红了 = **平台语义变了**，是最该警惕的一类。
+- **类型面**：`npm run typecheck` 覆盖 `src/` 与 `test/`。宿主收紧 API 签名时**它先红，而全部测试仍然全绿** —— 所以「测试全绿」不能当作「兼容」的结论。
+
+宿主的换包实测由 [compat.yml](../.github/workflows/compat.yml) 每周跑一次（`next` 承诺线 / `alpha` 前瞻线），跑的就是上面这些现有用例，不额外写测试；机制与处理链见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」。
+
 ## 测试约定
 
 - 时间相关断言注入 `now`，不依赖真实时钟。
@@ -45,7 +59,7 @@
 - 真机验收用 [scripts/acceptance.mjs](../scripts/acceptance.mjs)：它直接 import 装好的产物，同时覆盖真实接口、宿主 `output.schema` 校验与模型可见文本。这三件事单元测试都够不到（v1.4.0 的 P0 正是漏在这条缝里）。
 - 断言「失败不入缓存」使用不被重试的错误码；`90001` 会被客户端自动重试，第一次调用实际成功。
 - 校验 `cordis.patch.yml` 前先滤掉注释行：注释会正当地提到被否决的写法。
-- `@deepseek-ai/*` 在 npm 的 `latest` 标签是过期版本；安装版本以 [package.json](../package.json) 的 `peerDependencies` 为准。
+- `@deepseek-ai/*` 在 npm 的 `latest` 标签是过期版本（`dsh-tools` 是 `0.0.1-rc.1`，`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1` —— 比本包的声明下限还低）；安装版本以 [package.json](../package.json) 的 `peerDependencies` 为准，当前该跟哪条线由 [compat.yml](../.github/workflows/compat.yml) 盯。
 - 产物契约测试里外壳预置模块要替身：`ui-primitives` 是浏览器静态库，Node 中导入会因缺 `clsx` 失败；浏览器里它由 `PLATFORM_MODULES` seed 表提供。
 
 ## 参考

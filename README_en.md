@@ -100,8 +100,16 @@ The three sections below are each tool's full parameter set and limits. The mode
 
 ### Requirements
 
-- DSH `0.1.5-rc.2`
+- **DSH `0.1.5-rc.2` or newer, below `0.2.0`** — the range declared in [package.json](package.json)'s `peerDependencies`.
 - Node `>= 20`
+
+Install the host from an **explicit dist-tag**: `latest` for `@deepseek-ai/dsh` points at `0.1.5-rc.1`, **one prerelease below what this plugin requires**, so a default install lands outside the declared range.
+
+```bash
+npm install -g @deepseek-ai/dsh@next     # the line this plugin commits to
+```
+
+Compatibility is measured, not inferred: [compat.yml](.github/workflows/compat.yml) swaps the DSH packages onto the `next` and `alpha` lines every week and runs the existing suite. Current results and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ### From source
 

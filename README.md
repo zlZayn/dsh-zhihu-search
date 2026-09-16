@@ -100,8 +100,16 @@
 
 ### 前置
 
-- DSH `0.1.5-rc.2`
+- **DSH `0.1.5-rc.2` 或更高，且低于 `0.2.0`** —— 即 [package.json](package.json) 的 `peerDependencies` 声明的范围。
 - Node `>= 20`
+
+装宿主时**要显式指定版本线**：`@deepseek-ai/dsh` 的 `latest` 标签指向 `0.1.5-rc.1`，**比本插件要求的版本还低一格** —— 按默认方式装会直接落在声明范围之外。
+
+```bash
+npm install -g @deepseek-ai/dsh@next     # 本插件承诺支持的线
+```
+
+兼容性不是推断出来的：每周由 [compat.yml](.github/workflows/compat.yml) 对 `next` 与 `alpha` 两条线换包实跑一遍现有测试。当前结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 
 ### 从源码安装
 
