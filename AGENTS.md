@@ -87,9 +87,9 @@
 - 事故复盘 → [docs/postmortem/](docs/postmortem/)
 - 源码手册 → [src/README.md](src/README.md)
 - 工具层 → [src/tools/README.md](src/tools/README.md)
-- 编译器与文本清洗 → [src/utils/README.md](src/utils/README.md)
+- 参数编译、文本清洗与错误规范化 → [src/utils/README.md](src/utils/README.md)
 - 呈现层 → [src/present/README.md](src/present/README.md)
 - 浏览器半体 → [src/client/README.md](src/client/README.md)
 - 测试对应关系 → [test/README.md](test/README.md)
-- 构建脚本 → [scripts/README.md](scripts/README.md)
+- 构建与校验脚本 → [scripts/README.md](scripts/README.md)
 - 图片资源 → [assets/](assets/)（`cover.svg` 头图双语共用，`cover.jpg` 为旧版位图未引用；设置卡片中英各一张，换图要同改两份）
