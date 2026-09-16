@@ -4,8 +4,9 @@
 
 ## 文件与引用面
 
-- `cover.svg`：头图，双语共用，被 [README.md](../README.md) 与 [README_en.md](../README_en.md) 引用。
-- `cover.jpg`：旧版位图，未引用。
+- `banner.svg`：头图，双语共用，被 [README.md](../README.md) 与 [README_en.md](../README_en.md) 引用。
+- `zhihu-daily-quota.jpg`：知乎开放平台「各接口剩余配额」面板的截图，双语 README 共用（**额度**按自然日刷新，这张图是静态截图、不随日更换）。
+- `banner.jpg`、`logo.jpg`、`logo.svg`、`slogan.jpg`、`slogan.svg`：未引用。
 - `settings-card.png`：设置卡片截图（中文），被 [README.md](../README.md) 引用。
 - `settings-card_en.png`：设置卡片截图（英文），被 [README_en.md](../README_en.md) 引用。
 

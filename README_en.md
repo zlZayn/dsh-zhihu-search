@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/cover.svg" alt="dsh-zhihu-search: Equipping DSH with Zhihu search" width="600">
+  <img src="assets/banner.svg" alt="dsh-zhihu-search: Equipping DSH with Zhihu search" width="600">
 </p>
 
 <div align="center">
@@ -145,6 +145,14 @@ Open **Settings → Plugins → Plugin configuration → Zhihu Search**, enter t
 The key goes into DSH's credential store (`~/.dsh/.credentials.yaml`), **never into the settings file** — `settings.yaml` holds only the reference name, so it is safe to screenshot or share.
 
 Get the Access Secret from the [Zhihu Open Platform profile](https://developer.zhihu.com/profile); the settings card links to the same place.
+
+### Daily quota
+
+Quotas settle per calendar day, and the per-endpoint readings live in the [Zhihu Open Platform profile](https://developer.zhihu.com/profile) — the same place you get the Access Secret. This is what that panel looks like:
+
+<p align="center">
+  <img src="assets/zhihu-daily-quota.jpg" alt="The Zhihu Open Platform panel showing remaining quota per endpoint" width="220">
+</p>
 
 ### Point at another credential source
 

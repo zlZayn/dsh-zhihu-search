@@ -119,7 +119,7 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 - `lib/**/*.map` 被排除：这些 source map 指向未随包的 `src/`，对使用者是悬空的，却占了三分之一体积。tsconfig 仍生成它们，本地调试照常。
 - `README_en.md` 必须随包：`README.md` 顶部链接指向它，不随包就是 npm 页面上的死链。
 - `scripts/` 与 `src/` 不发布，因此 `npm run build` 必须在打包前跑过，`lib/` 是唯一交付物。
-- `assets/` **不必**进包：npm 页面会把 README 里的相对图片路径改写到默认分支的 raw 地址（实测 `assets/cover.svg` → `raw.githubusercontent.com/zlZayn/dsh-zhihu-search/HEAD/assets/cover.svg`，1170×513 正常渲染）。代价是**所有已发布版本的页面都跟着 `main` 上的图走** —— 换图或删图等于同时改历史版本的展示。
+- `assets/` **不必**进包：npm 页面会把 README 里的相对图片路径改写到默认分支的 raw 地址（实测形态：`raw.githubusercontent.com/zlZayn/dsh-zhihu-search/HEAD/<仓库相对路径>`，按仓库里的原始尺寸渲染）。代价是**所有已发布版本的页面都跟着 `main` 上的图走** —— 换图或删图等于同时改历史版本的展示。
 
 校验：
 

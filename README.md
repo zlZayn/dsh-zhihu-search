@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/cover.svg" alt="dsh-zhihu-search：给 DSH 装上知乎搜索" width="600">
+  <img src="assets/banner.svg" alt="dsh-zhihu-search：给 DSH 装上知乎搜索" width="600">
 </p>
 
 <div align="center">
@@ -145,6 +145,14 @@ dsh plugin --profile web add dsh-zhihu-search
 密钥写进 DSH 的凭据存储（`~/.dsh/.credentials.yaml`），**不写进设置文件** —— `settings.yaml` 里只有引用名，可以安全地截图或分享。
 
 Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/profile)获取；设置卡片里有同一个链接。
+
+### 每日额度
+
+额度按自然日结算，各接口的配额读数都在[知乎开放平台个人中心](https://developer.zhihu.com/profile) —— 与取 Access Secret 是同一个地方。下图是那个面板：
+
+<p align="center">
+  <img src="assets/zhihu-daily-quota.jpg" alt="知乎开放平台的「各接口剩余配额」面板" width="220">
+</p>
 
 ### 改用别的凭据来源
 

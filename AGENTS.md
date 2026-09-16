@@ -93,4 +93,4 @@
 - 浏览器半体 → [src/client/README.md](src/client/README.md)
 - 测试对应关系 → [test/README.md](test/README.md)
 - 构建与校验脚本 → [scripts/README.md](scripts/README.md)
-- 图片资源与重截流程 → [assets/README.md](assets/README.md)（`cover.svg` 头图双语共用，`cover.jpg` 为旧版位图未引用；设置卡片中英各一张）+ [assets/AGENTS.md](assets/AGENTS.md)（改渲染面必重截，先问再占用浏览器）
+- 图片资源与重截流程 → [assets/README.md](assets/README.md)（`banner.svg` 头图双语共用，其余资产的引用面见该文件）+ [assets/AGENTS.md](assets/AGENTS.md)（改渲染面必重截，先问再占用浏览器）
