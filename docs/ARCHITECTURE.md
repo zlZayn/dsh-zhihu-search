@@ -109,12 +109,12 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 
 ## 两半体约束
 
-插件在设置面板中出现，需要**两个半体同时存在**：
+插件在面板中出现，需要**两个半体同时存在**：
 
 - Host 半体用 `ctx.settings.installSection` 注册设置命名空间，使 Host 透过 describe 线路把它暴露出来。
-- 浏览器半体声明 `dsh.client`，并向 `settings.plugin.item` 注册一张 `key` 等于该命名空间的卡片。
+- 浏览器半体声明 `dsh.client`，并向插件页的 `plugins.bundle.config` 注册一张 `key` 等于**本包包名**的卡片（该槽只向条目要 `view: 'page'`）。
 
-面板渲染的是两者取交集：已服务的命名空间 ∩ 已注册的卡片。**没有通用 schema 表单回退**，因此「注册了命名空间」与「面板里看得见」是两件事。命名空间同时是两端的唯一连接键，任一侧拼错即静默不显示。
+页面渲染的是两者同时在场：已服务的命名空间提供值，已注册的条目提供界面。**没有通用 schema 表单回退**，因此「注册了命名空间」与「页面里看得见」是两件事。命名空间是 Host 与卡片之间的连接键，包名是插件页取条目的连接键 —— 任一侧拼错都是静默不显示。
 
 卡片文案走 DSH 的 locale 服务，不硬编码：字典在 [src/client/locales.ts](../src/client/locales.ts)，槽位注册声明 `locale:` 之后框架才把类型化的 `t` 座位注入组件 props。代价是一个**硬依赖**——声明了 `locale:` 的条目在渲染时要求已安装的 locale 面，缺席即报错而不是降级。标准 `dsh web` 装配必然带它（DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`，多个核心客户端包也依赖它）。
 
@@ -193,7 +193,7 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 ### 宿主版本（DSH 侧，不随我们改）
 
 - **声明面只有一个**：`package.json` 的 `peerDependencies`。它同时是安装器的判据与 npm 页面上的对外承诺 —— 改它等于改对外契约，因此必须与实测对齐，不能凭文档推断。
-- **依赖的是运行时行为，不是 API 形状**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、密钥读不到，或明文开始出现在 describe 线路上）。
+- **依赖的是运行时行为，不是 API 形状**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派规则、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、密钥读不到，或明文开始出现在 describe 线路上）。
 - **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（`dsh-tools` 是 `0.0.1-rc.1`；`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1`，**低于本包声明的下限**），`next` 才是当前承诺支持的线。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
 - **类型面会先于行为面动**：宿主收紧 API 签名时 `npm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
 

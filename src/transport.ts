@@ -566,7 +566,7 @@ export class ZhihuClient {
     if (resolved !== undefined && resolved.trim() !== '') return resolved;
 
     throw new ZhihuClientError('auth', '未配置知乎 Access Secret。', {
-      hint: '打开 DSH 设置 → 插件 → 知乎搜索 填入 Access Secret，或在 profile 的 cordis.patch.yml 里设置 config.accessSecret。',
+      hint: '打开 DSH 侧边栏 插件（Plugins） → dsh-zhihu-search 详情页填入 Access Secret，或在 profile 的 cordis.patch.yml 里设置 config.accessSecret。',
     });
   }
 

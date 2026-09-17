@@ -35,9 +35,9 @@
 搜索不幻觉，引用有出处。给 DSH 装上知乎：站内检索、全网检索与直答三个工具，返回可引用的来源列表，而不是一段无法核对的摘要。
 
 <p align="center">
-  <img src="assets/settings-card.png" alt="插件配置页中的「知乎搜索」卡片" width="600">
+  <img src="assets/settings-card.png" alt="插件详情页中的「知乎搜索」配置卡片" width="600">
   <br>
-  <em>在 <strong>设置 → 插件 → 插件配置</strong> 中与其他插件并排，Access Secret 就地填写、立即生效。</em>
+  <em>在侧边栏 <strong>插件（Plugins）</strong> →「已安装（Installed）」组的本插件详情页里，Access Secret 就地填写、立即生效。</em>
 </p>
 
 ## 工具一览
@@ -138,13 +138,13 @@ dsh plugin --profile web add dsh-zhihu-search
 
 ## 配置
 
-### 在设置界面填写
+### 在插件页填写
 
-打开 **设置 → 插件 → 插件配置 → 知乎搜索**，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
+打开侧边栏 **插件（Plugins）** →「已安装（Installed）」组的 **dsh-zhihu-search** 详情页，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
 
 密钥写进 DSH 的凭据存储（`~/.dsh/.credentials.yaml`），**不写进设置文件** —— `settings.yaml` 里只有引用名，可以安全地截图或分享。
 
-Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/profile)获取；设置卡片里有同一个链接。
+Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/profile)获取；配置卡片里有同一个链接。
 
 ### 每日额度
 
@@ -184,7 +184,7 @@ Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/pr
 
 ## 安全与边界
 
-- Access Secret 只在设置界面、凭据域与环境变量之间流转：不写日志、不以明文进入缓存键、不进仓库。
+- Access Secret 只在配置卡片、凭据域与环境变量之间流转：不写日志、不以明文进入缓存键、不进仓库。
 - 返回内容按外部不可信数据处理：摘要剥离 HTML 标签，链接剥离跟踪参数。
 - 只访问 `developer.zhihu.com`，不代理、不转发其他流量。
 

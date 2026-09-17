@@ -1,9 +1,13 @@
 /**
- * 浏览器半体：设置 → 插件 → 插件配置 里的「知乎搜索」卡片。
+ * 浏览器半体：侧边栏「插件（Plugins）」→「已安装（Installed）」组 → 本插件详情页里的「知乎搜索」配置卡片。
  *
- * 视觉与交互对齐官方插件卡片（`ui-settings-plugins` 的 PluginCard + fields）：
- * 可展开头部（名称 / 说明 / 未保存标记 / 折叠箭头）、字段行（标签 / 状态标记 / 重置）、
- * 底部「放弃 + 保存」，保存成功且 Host 回读确认后才折叠。
+ * 挂载点是插件管理页声明的 `plugins.bundle.config` 槽，key 取本包的**包名**（`dsh-zhihu-search`）：
+ * 页面按 bundle 的包名分派，写错 key 的表现是整块配置不出现，且页面不报错。
+ *
+ * 外壳对齐原生配置表单（`ui-settings-plugins` 的 PluginConfigForm + fields）：不可折叠、无外框，
+ * 一列控件直接落在插件页的 `data-plugin-config` 区里；只读提示行 + 字段行（标签 / 状态标记 / 重置）
+ * + 底部「失败诊断 + 单一保存按钮」（无分割线，按钮左对齐）。
+ * 草稿随卸载丢弃，只有保存才写；保存成功由 Host 回读确认。
  *
  * 文案全部走 DSH 的 locale 服务（`ctx.locale`），不硬编码 —— 字典在 [locales.ts](./locales.ts)，
  * 注册时用 `locale:` 声明命名空间，框架据此把类型化的 `t` 座位注入组件 props。
@@ -12,18 +16,19 @@
  * 密钥**不经过设置文档**：它按引用名写进 `ctx.remote.credentials`（即 `.credentials.yaml`），
  * 与官方 web 搜索卡片同一套做法。设置里只留引用名，因此 settings.yaml 被截图或上传时不泄任何凭据。
  *
- * 复用 `@deepseek-ai/dsh-client-ui-primitives` 的 `Tag` 与折叠图标：那是公共基础库，
+ * 复用 `@deepseek-ai/dsh-client-ui-primitives` 的 `Tag` 与 `Switch`：那是公共基础库，
  * 不是别的插件 —— 被 bundle-purity gate 禁止的是跨插件值导入。
  * 其余控件按官方 CSS 自带样式，取值只用 `--dsw-alias-*` 语义令牌。
  */
 
 import { useState, useSyncExternalStore, type CSSProperties } from 'react';
-import { IconChevronDownOutline14, Switch, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
+import { Switch, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { Context } from '@deepseek-ai/cordis';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client';
-import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client';
+// 类型导入即声明：`plugins.bundle.config` 槽由插件管理页的浏览器半体合并进 SlotMap。
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
 // 类型导入即声明：`ctx.locale` 由 locale 包的浏览器半体合并进 Context。
 import type {} from '@deepseek-ai/dsh-client-locale/client';
 // 类型导入即声明：ctx.slots 由 ui-renderer 的浏览器半体合并进 Context。
@@ -75,8 +80,14 @@ function remoteOf(ctx: Context): ClientRemoteFace {
  */
 export const inject = ['slots', 'settingsScope', 'remote', 'remote.credentials', 'locale'];
 
-/** 与 Host 侧 `ZHIHU_SETTINGS_NAMESPACE` 逐字一致；它就是卡片的分派 key。 */
+/** 与 Host 侧 `ZHIHU_SETTINGS_NAMESPACE` 逐字一致；设置段的命名空间，不再兼作分派 key。 */
 const NAMESPACE = 'zhihu-search';
+
+/**
+ * 槽位分派 key：插件页按 bundle 的**包名**取配置，因此它必须与 [package.json](../../package.json)
+ * 的 `name` 逐字一致。写错的表现是整块配置不出现（页面不报错）。
+ */
+const BUNDLE_NAME = 'dsh-zhihu-search';
 
 /** 凭据引用名字段，对应 Host 侧 `Config.accessSecretRef`。 */
 const REF_FIELD = 'accessSecretRef';
@@ -104,43 +115,10 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
 }
 
-// 取值逐条对齐官方 PluginCard.module.css 与 fields.module.css。
+// 取值逐条对齐官方 PluginConfigForm.module.css 与 fields.module.css：无外框、无圆角、无底色、无内边距 ——
+// 一列控件直接铺在插件页的 `data-plugin-config` 区里；没有折叠头（标题与面包屑由插件页自己画）。
 const S: Record<string, CSSProperties> = {
-  card: {
-    listStyle: 'none',
-    border: '0.5px solid var(--dsw-alias-border-l4)',
-    borderRadius: 16,
-    background: 'var(--dsw-alias-bg-layer-3)',
-    transition: 'border-color .16s, background .16s',
-  },
-  cardOpen: {
-    listStyle: 'none',
-    border: '0.5px solid var(--dsw-alias-label-dimmed)',
-    borderRadius: 16,
-    background: 'var(--dsw-alias-bg-layer-2)',
-    transition: 'border-color .16s, background .16s',
-  },
-  header: {
-    width: '100%',
-    appearance: 'none',
-    border: 0,
-    background: 'none',
-    font: 'inherit',
-    color: 'inherit',
-    textAlign: 'left',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    padding: '14px 16px',
-    borderRadius: 12,
-  },
-  headText: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 },
-  name: { fontSize: 15, fontWeight: 600, lineHeight: 1.4, color: 'var(--dsw-alias-label-primary)' },
-  description: { fontSize: 13, lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary)' },
-  chevron: { flex: 'none', color: 'var(--dsw-alias-label-tertiary)', transition: 'transform .16s' },
-  chevronOpen: { flex: 'none', color: 'var(--dsw-alias-label-tertiary)', transform: 'rotate(180deg)', transition: 'transform .16s' },
-  body: { borderTop: '0.5px solid var(--dsw-alias-border-l2)', margin: '0 16px', paddingBottom: 8 },
+  form: { display: 'flex', flexDirection: 'column' },
   readOnly: { margin: '12px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary)' },
   field: { display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0' },
   fieldDivider: { display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: '0.5px solid var(--dsw-alias-border-l2)' },
@@ -192,27 +170,15 @@ const S: Record<string, CSSProperties> = {
     textDecoration: 'underline',
     textUnderlineOffset: 2,
   },
+  // 原生 .footer：无分割线、无右推 —— 失败文本占满剩余宽度（flex:1），没有失败文本时按钮就靠左。
   footer: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: 8,
-    padding: '12px 0 4px',
-    borderTop: '0.5px solid var(--dsw-alias-border-l2)',
+    paddingTop: 16,
   },
-  failed: { flex: 1, minWidth: 0, margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-error)' },
-  discard: {
-    appearance: 'none',
-    border: '1px solid var(--dsw-alias-border-l2)',
-    borderRadius: 8,
-    padding: '5px 14px',
-    font: 'inherit',
-    fontSize: 13,
-    lineHeight: 1.5,
-    cursor: 'pointer',
-    background: 'none',
-    color: 'var(--dsw-alias-label-secondary)',
-  },
+  // 错误色用有定义的那个令牌：原生照抄来的那一个在 harness 里从未定义，写了不会生效（见 [AGENTS.md](./AGENTS.md)）。
+  failed: { flex: 1, minWidth: 0, margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-state-error-primary)' },
   save: {
     appearance: 'none',
     border: '1px solid transparent',
@@ -240,10 +206,10 @@ interface CardProps {
 }
 
 /**
- * 一张插件卡片：头部可展开，字段在展开处就地编辑，底部一次性写入。
+ * 一张配置卡片：字段就地编辑，底部一次性写入。
  *
- * 草稿跨折叠保留，因此头部标记「未保存」；保存成功后才折叠，
- * 失败则保持展开并保留草稿与诊断供修正。
+ * 草稿只活在组件本地状态里 —— 卸载即丢弃（原生表单同款语义），因此没有「放弃」控件；
+ * 保存成功同时清空草稿，失败则保留草稿与诊断供修正。
  *
  * @param props - 命名空间作用域、凭据状态源，以及框架注入的翻译座位。
  * @returns 卡片元素。
@@ -258,7 +224,6 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
     () => store.getSnapshot(),
   );
 
-  const [open, setOpen] = useState(false);
   const [secret, setSecret] = useState('');
   const [refDraft, setRefDraft] = useState<string | undefined>(undefined);
   const [hideDraft, setHideDraft] = useState<boolean | undefined>(undefined);
@@ -283,13 +248,6 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
   const secretDisabled = disabled || !credential.writable;
   const blocked = !dirty || disabled;
 
-  const discard = (): void => {
-    setSecret('');
-    setRefDraft(undefined);
-    setHideDraft(undefined);
-    setFailed('');
-  };
-
   const save = async (): Promise<void> => {
     setSaving(true);
     setFailed('');
@@ -305,7 +263,6 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
       setSecret('');
       setRefDraft(undefined);
       setHideDraft(undefined);
-      setOpen(false);
     } catch (error) {
       setFailed(error instanceof Error ? error.message : String(error));
     } finally {
@@ -314,147 +271,123 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
   };
 
   return (
-    <li style={open ? S.cardOpen : S.card}>
-      <button
-        type="button"
-        style={S.header}
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-        }}
-      >
-        <span style={S.headText}>
-          <span style={S.name}>{t('title')}</span>
-          <span style={S.description}>{t('description')}</span>
-        </span>
-        {dirty ? <Tag tone="neutral">{t('unsaved')}</Tag> : null}
-        <span style={open ? S.chevronOpen : S.chevron}>
-          <IconChevronDownOutline14 />
-        </span>
-      </button>
-
-      {open
-        ? (
-          <div style={S.body}>
-            {!writable && snapshot.status !== 'loading'
-              ? <p style={S.readOnly} role="status">{t('readOnly')}</p>
-              : null}
-
-            <div style={S.field}>
-              <div style={S.head}>
-                <label style={S.label} htmlFor="zhihu-access-secret">{t('secretLabel')}</label>
-                <span style={S.badges}>
-                  <Tag tone={credential.configured ? 'neutral' : 'quiet'}>
-                    {credential.configured ? t('secretConfigured') : t('secretMissing')}
-                  </Tag>
-                </span>
-              </div>
-              <input
-                id="zhihu-access-secret"
-                style={S.input}
-                type="password"
-                autoComplete="off"
-                value={secret}
-                disabled={secretDisabled}
-                onChange={(event) => {
-                  setSecret(event.target.value);
-                }}
-              />
-              <p style={S.hint}>
-                {t('secretHintBefore')}
-                <a
-                  style={S.link}
-                  href={PROFILE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('secretHintLink')}
-                </a>
-                {t('secretHintAfter')}
-              </p>
-              {credential.writable ? null : <p style={S.hint}>{t('secretShadowed')}</p>}
-            </div>
-
-            <div style={S.fieldDivider}>
-              <div style={S.head}>
-                <label style={S.label} htmlFor="zhihu-access-secret-ref">{t('refLabel')}</label>
-                {refOverridden
-                  ? (
-                    <span style={S.badges}>
-                      <Tag tone="neutral">{t('refOverridden')}</Tag>
-                      <button
-                        type="button"
-                        style={dimStyle(S.reset, disabled)}
-                        disabled={disabled}
-                        onClick={() => {
-                          setRefDraft('');
-                        }}
-                      >
-                        {t('reset')}
-                      </button>
-                    </span>
-                  )
-                  : null}
-              </div>
-              <input
-                id="zhihu-access-secret-ref"
-                style={S.input}
-                type="text"
-                spellCheck={false}
-                value={refText}
-                disabled={disabled}
-                onChange={(event) => {
-                  setRefDraft(event.target.value);
-                }}
-              />
-              <p style={S.hint}>{t('refHint')}</p>
-            </div>
-
-            <div style={S.fieldDivider}>
-              <div style={S.toggleRow}>
-                <span style={S.toggleLabel}>{t('hideNativeWebLabel')}</span>
-                <Switch
-                  checked={hideText}
-                  label={t('hideNativeWebLabel')}
-                  disabled={disabled}
-                  onChange={(next) => {
-                    setHideDraft(next);
-                  }}
-                />
-              </div>
-              {/* 状态行：与官方 SubagentModelSelectionCard 同款写法 —— 拨动即换文案，
-                  用户不必从开关位置猜它到底做了什么。 */}
-              <p style={S.stateNote}>{t(hideText ? 'hideNativeWebOn' : 'hideNativeWebOff')}</p>
-              <p style={S.hint}>{t('hideNativeWebHint')}</p>
-            </div>
-
-            <div style={S.footer}>
-              {failed !== '' ? <p style={S.failed} role="status">{failed}</p> : null}
-              <button type="button" style={dimStyle(S.discard, !dirty || saving)} disabled={!dirty || saving} onClick={discard}>
-                {t('discard')}
-              </button>
-              <button
-                type="button"
-                style={dimStyle(S.save, blocked)}
-                disabled={blocked}
-                onClick={() => {
-                  void save();
-                }}
-              >
-                {saving ? t('saving') : t('save')}
-              </button>
-            </div>
-          </div>
-        )
+    <div style={S.form}>
+      {!writable && snapshot.status !== 'loading'
+        ? <p style={S.readOnly} role="status">{t('readOnly')}</p>
         : null}
-    </li>
+
+      <div style={S.field}>
+        <div style={S.head}>
+          <label style={S.label} htmlFor="zhihu-access-secret">{t('secretLabel')}</label>
+          <span style={S.badges}>
+            <Tag tone={credential.configured ? 'neutral' : 'quiet'}>
+              {credential.configured ? t('secretConfigured') : t('secretMissing')}
+            </Tag>
+          </span>
+        </div>
+        <input
+          id="zhihu-access-secret"
+          style={S.input}
+          type="password"
+          autoComplete="off"
+          value={secret}
+          disabled={secretDisabled}
+          onChange={(event) => {
+            setSecret(event.target.value);
+          }}
+        />
+        <p style={S.hint}>
+          {t('secretHintBefore')}
+          <a
+            style={S.link}
+            href={PROFILE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t('secretHintLink')}
+          </a>
+          {t('secretHintAfter')}
+        </p>
+        {credential.writable ? null : <p style={S.hint}>{t('secretShadowed')}</p>}
+      </div>
+
+      <div style={S.fieldDivider}>
+        <div style={S.head}>
+          <label style={S.label} htmlFor="zhihu-access-secret-ref">{t('refLabel')}</label>
+          {refOverridden
+            ? (
+              <span style={S.badges}>
+                <Tag tone="neutral">{t('refOverridden')}</Tag>
+                <button
+                  type="button"
+                  style={dimStyle(S.reset, disabled)}
+                  disabled={disabled}
+                  onClick={() => {
+                    setRefDraft('');
+                  }}
+                >
+                  {t('reset')}
+                </button>
+              </span>
+            )
+            : null}
+        </div>
+        <input
+          id="zhihu-access-secret-ref"
+          style={S.input}
+          type="text"
+          spellCheck={false}
+          value={refText}
+          disabled={disabled}
+          onChange={(event) => {
+            setRefDraft(event.target.value);
+          }}
+        />
+        <p style={S.hint}>{t('refHint')}</p>
+      </div>
+
+      <div style={S.fieldDivider}>
+        <div style={S.toggleRow}>
+          <span style={S.toggleLabel}>{t('hideNativeWebLabel')}</span>
+          <Switch
+            checked={hideText}
+            label={t('hideNativeWebLabel')}
+            disabled={disabled}
+            onChange={(next) => {
+              setHideDraft(next);
+            }}
+          />
+        </div>
+        {/* 状态行：与官方 SubagentModelSelectionCard 同款写法 —— 拨动即换文案，
+            用户不必从开关位置猜它到底做了什么。 */}
+        <p style={S.stateNote}>{t(hideText ? 'hideNativeWebOn' : 'hideNativeWebOff')}</p>
+        <p style={S.hint}>{t('hideNativeWebHint')}</p>
+      </div>
+
+      <div style={S.footer}>
+        {failed !== '' ? <p style={S.failed} role="status">{failed}</p> : null}
+        <button
+          type="button"
+          style={dimStyle(S.save, blocked)}
+          disabled={blocked}
+          onClick={() => {
+            void save();
+          }}
+        >
+          {saving ? t('saving') : t('save')}
+        </button>
+      </div>
+    </div>
   );
 }
 
 /**
- * 注册设置卡片与它的字典。
+ * 注册配置卡片与它的字典。
  *
- * `key` 必须等于命名空间：面板正是按这个 key 决定分派哪些卡片。
+ * 槽是插件管理页的 `plugins.bundle.config`，`key` 必须等于本包的包名（见 {@link BUNDLE_NAME}）：
+ * 页面按 bundle 的包名分派，写错即整块不出现。该槽只向条目要 `view: 'page'`（表单一处），
+ * `summary` 因此返回空 —— 契约允许，也避免为一个不会被调用的视图另造一套渲染。
+ *
  * 字典注册进 `ctx.effect`，插件卸载时随之注销（`register` 返回 disposer）。
  *
  * @param ctx - 浏览器端 Cordis 上下文。
@@ -492,10 +425,11 @@ export function apply(ctx: Context): void {
   );
   void store.refresh();
 
-  ctx.slots.inject('settings.plugin.item', () =>
+  ctx.slots.inject('plugins.bundle.config', () =>
     ctx.slots.register(
-      { name: 'settings.plugin.item', key: NAMESPACE, locale: LOCALE_NS },
-      (seat: { t: CardTranslate }) => <ZhihuCard scope={scope} store={store} t={seat.t} />,
+      { name: 'plugins.bundle.config', key: BUNDLE_NAME, locale: LOCALE_NS },
+      (seat: { t: CardTranslate; view: 'summary' | 'page' }) =>
+        seat.view === 'page' ? <ZhihuCard scope={scope} store={store} t={seat.t} /> : null,
     ),
   );
 }

@@ -35,9 +35,9 @@
 Grounded search. Cited answers. Three Zhihu tools for DSH: in-site search, global web search, and Zhida direct answers — returning a list of citable sources instead of an unverifiable summary.
 
 <p align="center">
-  <img src="assets/settings-card_en.png" alt="Zhihu Search card in the plugin settings" width="600">
+  <img src="assets/settings-card_en.png" alt="Zhihu Search config card on the plugin page" width="600">
   <br>
-  <em>Sits alongside other plugins in <strong>Settings → Plugins → Plugin configuration</strong>. Enter your Access Secret and it takes effect immediately.</em>
+  <em>Lives on the <strong>Plugins</strong> panel, on the bundle's details page under Installed. Enter your Access Secret and it takes effect immediately.</em>
 </p>
 
 ## Tools
@@ -138,13 +138,13 @@ The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics
 
 ## Configuration
 
-### In the settings UI
+### On the Plugins page
 
-Open **Settings → Plugins → Plugin configuration → Zhihu Search**, enter the Access Secret and save. It takes effect immediately, with no DSH restart.
+Open the **dsh-zhihu-search** details page under **Plugins → Installed**, enter the Access Secret and save. It takes effect immediately, with no DSH restart.
 
 The key goes into DSH's credential store (`~/.dsh/.credentials.yaml`), **never into the settings file** — `settings.yaml` holds only the reference name, so it is safe to screenshot or share.
 
-Get the Access Secret from the [Zhihu Open Platform profile](https://developer.zhihu.com/profile); the settings card links to the same place.
+Get the Access Secret from the [Zhihu Open Platform profile](https://developer.zhihu.com/profile); the config card links to the same place.
 
 ### Daily quota
 
@@ -184,7 +184,7 @@ The card's "Hide native web search (web_search / web_fetch)" switch is off by de
 
 ## Security and boundaries
 
-- The Access Secret only travels between the settings UI, the credential scope and the environment: never logged, never in a cache key in clear text, never committed.
+- The Access Secret only travels between the config card, the credential scope and the environment: never logged, never in a cache key in clear text, never committed.
 - Returned content is treated as untrusted external data: snippets are stripped of HTML tags, URLs of tracking parameters.
 - Only `developer.zhihu.com` is contacted; nothing is proxied or forwarded.
 

@@ -7,7 +7,7 @@
 #
 # 关于 config：**刻意不写 accessSecret**。它已不是取值来源，写在这里只剩两个后果：
 # 启动期迁徙会把它搬进凭据存储，而组合配置那一行插件删不掉，只能每次启动告警请你手删。
-# 密钥应当从设置卡片写入（落在 `$DSH_HOME/.credentials.yaml`），或放进环境变量。
+# 密钥应当从插件配置卡片写入（落在 `$DSH_HOME/.credentials.yaml`），或放进环境变量。
 - insert:
     - id: dsh-zhihu-search
       name: dsh-zhihu-search

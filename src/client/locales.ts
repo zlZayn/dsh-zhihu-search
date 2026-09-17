@@ -22,9 +22,6 @@ export const LOCALE_NS = 'zhihu-search';
 
 /** 本卡片全部文案的 key。 */
 export type ZhihuLocaleKey =
-  | 'title'
-  | 'description'
-  | 'unsaved'
   | 'readOnly'
   | 'secretLabel'
   | 'secretConfigured'
@@ -41,7 +38,6 @@ export type ZhihuLocaleKey =
   | 'hideNativeWebOn'
   | 'hideNativeWebOff'
   | 'hideNativeWebHint'
-  | 'discard'
   | 'save'
   | 'saving';
 
@@ -53,9 +49,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** 简体中文文案。 */
 const zh: Record<ZhihuLocaleKey, string> = {
-  title: '知乎搜索',
-  description: '知乎站内、全网与直答检索，基于开放平台官方 API。',
-  unsaved: '未保存',
   readOnly: '当前连接不允许写入设置。',
   secretLabel: 'Access Secret',
   secretConfigured: '已配置',
@@ -72,16 +65,12 @@ const zh: Record<ZhihuLocaleKey, string> = {
   hideNativeWebOn: '模型只看得到知乎的三个工具。',
   hideNativeWebOff: '原生网页搜索对模型可见。',
   hideNativeWebHint: '只控可见性 —— tool-web 本身照常加载。下次请求生效，无需重启。',
-  discard: '放弃',
   save: '保存',
   saving: '保存中…',
 };
 
 /** English copy. */
 const en: Record<ZhihuLocaleKey, string> = {
-  title: 'Zhihu Search',
-  description: 'In-site, global and Zhida search over the Zhihu Open Platform API.',
-  unsaved: 'Unsaved',
   readOnly: 'This connection does not allow writing settings.',
   secretLabel: 'Access Secret',
   secretConfigured: 'Configured',
@@ -98,7 +87,6 @@ const en: Record<ZhihuLocaleKey, string> = {
   hideNativeWebOn: 'The model sees only the three Zhihu tools.',
   hideNativeWebOff: 'Native web search stays visible to the model.',
   hideNativeWebHint: 'Visibility only — tool-web still loads. Takes effect next request; no restart.',
-  discard: 'Discard',
   save: 'Save',
   saving: 'Saving…',
 };

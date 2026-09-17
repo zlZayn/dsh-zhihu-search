@@ -54,7 +54,7 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 所有判定都对着使用者问，先确认谁在依赖这个包：
 
 - **模型**：读工具名、工具描述、参数 schema、返回文本。
-- **人类使用者**：读设置卡片、README、安装命令、环境变量名、npm 页面元数据。
+- **人类使用者**：读插件配置卡片、README、安装命令、环境变量名、npm 页面元数据。
 - **下游代码**：依赖包导出、`peerDependencies`、Node 与 DSH 的版本要求。
 - **不算使用者**：CI、测试、`docs/`、[.agents/](../.agents/) —— 它们不进入发布产物。
 
@@ -89,7 +89,7 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 - 参数改名或删除 → Q2 是 → major。
 - `peerDependencies` 大版本升级 → Q2 是 → major。
 - 输出 schema **放宽**（字段变可选、允许省略值）→ Q1 否 Q2 否 → patch。
-- 新增可选参数、新工具、新配置项、设置卡片新能力 → Q3 是 → minor。
+- 新增可选参数、新工具、新配置项、配置卡片新能力 → Q3 是 → minor。
 - 重写工具描述让模型更容易择路（描述本身没错）→ Q3 是 → minor。
 - 工具描述纯纠错（去掉一句做不到的承诺）→ Q1 否 Q3 否 → patch；描述随新能力一起更新 → 随该能力的档位。
 - 补上端点本来就有、只是没透出的信号 → Q3 否（不是新能力）→ patch。
@@ -197,7 +197,7 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 ## 兼容性
 
-**声明面**只有一个事实来源：[package.json](../package.json) 的 `peerDependencies`。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`settings.plugin.item` 的分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、密钥读不到，或**明文开始出现在 describe 线路上**）。判断依据始终以 DSH 源码为准，不凭文档推断。
+**声明面**只有一个事实来源：[package.json](../package.json) 的 `peerDependencies`。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、密钥读不到，或**明文开始出现在 describe 线路上**）。判断依据始终以 DSH 源码为准，不凭文档推断。
 
 **验证面**是 [compat.yml](../.github/workflows/compat.yml)。声明与验证必须对齐 —— 改动任意一边都要同步另一边。
 

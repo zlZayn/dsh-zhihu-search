@@ -13,7 +13,7 @@
 - `tools/`：工具定义，见 [tools/README.md](tools/README.md)。
 - `utils/`：编译器与文本清洗，见 [utils/README.md](utils/README.md)。
 - `present/`：纯函数呈现层，见 [present/README.md](present/README.md)。
-- `client/`：浏览器半体（设置卡片），见 [client/README.md](client/README.md)。
+- `client/`：浏览器半体（插件页配置卡片），见 [client/README.md](client/README.md)。
 
 ## 依赖方向
 

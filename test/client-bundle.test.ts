@@ -3,9 +3,9 @@
  *
  * 为什么需要它：client 半体只有装进浏览器才能跑通，普通单测覆盖不到；
  * 但**产物格式**与**装配能否跑起来**是可以在这里钉死的 —— 信封 id、factory 形状、
- * 导出面、注册进 `settings.plugin.item` 的 key，以及本模块最后那组
+ * 导出面、注册进 `plugins.bundle.config` 的 key（等于本包包名），以及本模块最后那组
  * 「按真实 Cordis 语义挂载」。这几处任何一处错了，
- * 症状都是「设置页里什么都没有」，排查代价极高。
+ * 症状都是「插件页里什么都没有」，排查代价极高。
  *
  * 依赖 `lib/client.js` 已构建（`npm test` 会先跑 build）。
  */
@@ -90,9 +90,13 @@ describe('client bundle 信封', () => {
 });
 
 describe('client bundle 注册行为', () => {
+  /** 槽位注册交出的组件；本组只关心它的 view 分支返回值。 */
+  type CardComponent = (seat: { t: (key: string) => string; view: 'summary' | 'page' }) => unknown;
+
   /** 记录槽位注册与字典注册的替身上下文。 */
   function makeContext() {
     const registrations: Array<Record<string, unknown>> = [];
+    const components: CardComponent[] = [];
     const injected: string[] = [];
     const dictionaries: Array<{ ns: string; locales: string[] }> = [];
     /** 读凭据域的记账。写路径由 [credential-store 单测](credential-store.test.ts) 覆盖。 */
@@ -135,23 +139,35 @@ describe('client bundle 注册行为', () => {
           injected.push(name);
           callback();
         },
-        register(options: Record<string, unknown>) {
+        register(options: Record<string, unknown>, component: unknown) {
           registrations.push(options);
+          components.push(component as CardComponent);
           return () => undefined;
         },
       },
     };
-    return { ctx, base, registrations, injected, dictionaries, credentialReads };
+    return { ctx, base, registrations, components, injected, dictionaries, credentialReads };
   }
 
-  it('注册进 settings.plugin.item，且 key 等于 host 侧命名空间', () => {
+  it('注册进 plugins.bundle.config，且 key 等于本包包名', () => {
     const { ctx, registrations, injected } = makeContext();
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(ctx);
 
-    expect(injected).toEqual(['settings.plugin.item']);
+    expect(injected).toEqual(['plugins.bundle.config']);
     expect(registrations).toHaveLength(1);
-    expect(registrations[0]).toMatchObject({ name: 'settings.plugin.item', key: 'zhihu-search' });
+    expect(registrations[0]).toMatchObject({ name: 'plugins.bundle.config', key: 'dsh-zhihu-search' });
+  });
+
+  it('该槽只被要求 page：summary 视图返回空而不是抛错', () => {
+    const { ctx, components } = makeContext();
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(ctx);
+
+    expect(components).toHaveLength(1);
+    // summary 分支不渲染表单，因此不碰 React —— 表单组件带 hook，直接调用会抛「Invalid hook call」，
+    // 断言它**没有**走到那一步正是这条用例的区分力所在。
+    expect(components[0]?.({ t: (key) => key, view: 'summary' })).toBeNull();
   });
 
   it('注册是惰性的：只在声明到账后才发生', () => {

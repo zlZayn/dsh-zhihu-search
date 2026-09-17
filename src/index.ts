@@ -33,8 +33,9 @@ export const inject = ['tools'];
 /**
  * 设置命名空间。
  *
- * 同时是 client 半体注册设置卡片时的 `key`：官方「插件」设置页按命名空间
- * 分派卡片，两端必须用同一个字符串，否则卡片不会被渲染。
+ * 设置文档、describe 线路与凭据引用名都按它寻址，两端必须用同一个字符串。
+ * 它**不再是** client 半体的槽位分派 key：卡片迁到插件页后按包的**包名**分派，
+ * 见 [client/index.tsx](client/index.tsx) 的 `BUNDLE_NAME`。
  */
 export const ZHIHU_SETTINGS_NAMESPACE = 'zhihu-search';
 
@@ -310,7 +311,7 @@ export function apply(ctx: Context, config: Config): void {
     // 搬完之后仍然取不到，才说明用户是真的还没配。
     if ((await resolveAccessSecret()) === undefined) {
       warn(
-        '[zhihu-search] 未找到 Access Secret，工具会注册但调用时返回鉴权错误。可在 DSH 设置 → 插件 → 知乎搜索 中填写，或设置环境变量 ZHIHU_ACCESS_SECRET。',
+        '[zhihu-search] 未找到 Access Secret，工具会注册但调用时返回鉴权错误。可在 DSH 侧边栏 插件（Plugins） → dsh-zhihu-search 详情页中填写，或设置环境变量 ZHIHU_ACCESS_SECRET。',
       );
     }
   };
@@ -414,7 +415,7 @@ export function apply(ctx: Context, config: Config): void {
   });
 
   // 设置命名空间：让 Host 把这个 section 暴露给浏览器端的描述镜像，
-  // 否则自带的「插件」设置页不会分派我们的卡片。
+  // 否则插件页的配置卡片取不到值（分派 key 是包名，不是这个命名空间）。
   ctx.inject(['settings'], (settingsCtx) => {
     settingsCtx.settings.installSection(ctx, ZHIHU_SETTINGS_NAMESPACE, Config, config, {
       setSource: (source) => {
