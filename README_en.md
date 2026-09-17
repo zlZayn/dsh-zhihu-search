@@ -138,6 +138,8 @@ The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics
 
 ## Configuration
 
+The configuration UI registers into the Host's `plugins.bundle.config` slot, and **that slot arrives with DSH 0.1.6**: on an earlier Host the three tools keep working, but the configuration area never appears on the Plugins page (silently, with no error) — that is the watershed. To configure in place, run the Host at **`0.1.6-alpha.2` or newer**.
+
 ### On the Plugins page
 
 Open the **dsh-zhihu-search** details page under **Plugins → Installed**, enter the Access Secret and save. It takes effect immediately, with no DSH restart.

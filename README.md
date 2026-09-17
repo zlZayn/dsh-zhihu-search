@@ -138,6 +138,8 @@ dsh plugin --profile web add dsh-zhihu-search
 
 ## 配置
 
+配置界面注册在宿主的 `plugins.bundle.config` 槽，**该槽由 DSH 0.1.6 引入**：更早的宿主上三个工具照常工作，但**插件页里不会出现配置区**（静默，不报错）—— 这就是分水岭。需要就地配置请把宿主升到 **`0.1.6-alpha.2` 或更高**。
+
 ### 在插件页填写
 
 打开侧边栏 **插件（Plugins）** →「已安装（Installed）」组的 **dsh-zhihu-search** 详情页，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
