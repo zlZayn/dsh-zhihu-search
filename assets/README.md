@@ -7,8 +7,8 @@
 - `banner.svg`：头图，双语共用，被 [README.md](../README.md) 与 [README_en.md](../README_en.md) 引用。
 - `zhihu-daily-quota.jpg`：知乎开放平台「各接口剩余配额」面板的截图，双语 README 共用（**额度**按自然日刷新，这张图是静态截图、不随日更换）。
 - `banner.jpg`、`logo.jpg`、`logo.svg`、`slogan.jpg`、`slogan.svg`：未引用。
-- `settings-card.png`：设置卡片截图（中文），被 [README.md](../README.md) 引用。
-- `settings-card_en.png`：设置卡片截图（英文），被 [README_en.md](../README_en.md) 引用。
+- `settings-card.png`：插件详情页里配置区的整屏实拍（中文），被 [README.md](../README.md) 引用。
+- `settings-card_en.png`：同一画面的英文版，被 [README_en.md](../README_en.md) 引用。
 
 两份 README 都以 `width=600` 展示。
 `assets/` **不进 npm 包**：npm 会把 README 的相对图片路径改写到默认分支的 raw 地址，线上展示跟的是 `main` 上的图 —— **改图等于同时改所有历史版本的展示**。
@@ -19,12 +19,15 @@
 
 | 项 | 基准 |
 | --- | --- |
-| 尺寸 | 不写死像素：只截页面内容（不含浏览器标签栏 / 书签栏），随窗口实测视口，中英两张一致（整屏拿不到，见 [AGENTS.md](AGENTS.md)） |
-| 侧边栏 | 左右都收起 |
+| 尺寸 | 整屏图**不设 viewport**，用自然视口拍 —— 物理产物自然就是 **2449x1223**（CSS 1484x741 × dpr 1.65）；**别调 `setViewportSize`**，那会压掉 dpr、界面缩到约 60%。中英两张一致；见 [AGENTS.md](AGENTS.md) |
+| 侧边栏 | **按快门前必须收起**（导航时先展开，否则点不到 `Plugins`）：展开的左侧栏带出维护者真实的会话标题与工作区名，理由与顺序见 [AGENTS.md](AGENTS.md) 第 4 步 |
 | 背景 | 空会话 |
 | 主题 | 浅色 |
-| 卡片 | 展开、完整可见 |
+| 配置区 | 完整可见，底部唯一保存按钮在图内（原生表单不可折叠） |
 | 两张的关系 | 只有界面语言不同 |
+
+**侧栏为什么必须收起**：展开的左侧栏列的是维护者真实的会话标题与工作区名 —— 那是别人的工作内容，不是装饰；门面图是给外人看的，带出去就是泄露。
+收起状态下点不到 `Plugins`，所以顺序也是死的：**展开导航 → 走到目标画面 → 收起侧栏 → 按快门**。
 
 开关状态**不属基准** —— 规则与理由见 [AGENTS.md](AGENTS.md)。
 
