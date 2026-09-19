@@ -9,11 +9,11 @@
 # （2026-09-16 实测，@deepseek-ai/dsh-* 全家族一致）：
 #
 #   next   —— 当前承诺支持的线。package.json 的 peer 范围就该罩住它。
-#   alpha  —— 前瞻线。按设计**就在声明范围之外**（^0.1.5-rc.2 只放行同 tuple 的预发布，
-#             因此不含 0.1.6-alpha.1）。这里只提前看破坏，不产生任何承诺。
-#   latest —— **不可用**：多数 @deepseek-ai/dsh-* 包上它指向很早的版本（dsh-tools 是
-#             0.0.1-rc.1、dsh-client-store 是 0.1.2-alpha.2），@deepseek-ai/dsh 自己是
-#             0.1.5-rc.1 —— 比本插件的声明下限还低一格。按默认方式装宿主会装到过期版本。
+#   alpha  —— 前瞻线。按设计**就在声明范围之外**（预发布版本只被同 tuple 的区间放行，
+#             所以 next 线的 peer 范围取不到 alpha 上的版本）。这里只提前看破坏，不产生任何承诺。
+#   latest —— **不可用**：多数 @deepseek-ai/dsh-* 包上它指向很早的版本，@deepseek-ai/dsh 自己
+#             那条也未必落在本插件的声明里（具体值现查 npm view @deepseek-ai/dsh dist-tags）。
+#             按默认方式装宿主会装到过期版本。
 #
 # ## 两条线的处理方式不同
 #
@@ -165,7 +165,7 @@ jobs:
             echo "   - **换包那一步或核对失败** → 树根本没换成，先解决安装问题再看别的（多半是上游包之间的 peer 冲突）。"
             echo "   - **类型面红** → 上游 API 签名变了。定位到具体包与符号，改调用点使其**新旧都能编译**"
             echo "     （2026-09-16 实测例子：agent/created 监听器显式 return undefined 即可同时满足"
-            echo "     0.1.5-rc.2 与 0.1.6-alpha.1）。两版不可兼得时说明下限必须抬高，那是 Q2 是 → **major，先问人类**。"
+            echo "     next 线与 alpha 线）。两版不可兼得时说明下限必须抬高，那是 Q2 是 → **major，先问人类**。"
             echo "   - **全量测试红** → **行为差异**，最重。按 test/README.md 的分层定位："
             echo "     L3b/L6a（native-web-tools / client-bundle / dist）说明平台语义变了；L1/L2 红则先怀疑"
             echo "     换包装错了 —— 那几层对宿主版本不敏感。"
@@ -200,7 +200,7 @@ jobs:
       # 与 next 线**同一套机制**，只差两个开关：tag 换成 alpha，install 加 --force。
       #
       # 为什么这里必须 --force 而 next 不需要：alpha 线上的包**内部** peer 图还没定型
-      # （dsh-agent@0.1.6-alpha.1 要 peer dsh-typert-protocol / dsh-sandbox 等一批同样只在
+      # （alpha 线上的 dsh-agent 要 peer dsh-typert-protocol / dsh-sandbox 等一批同样只在
       # alpha 上存在的包），npm 解析不动，install 直接 ERESOLVE 退出 ——
       # 树装不出来，后面什么也测不到。改写声明区间解决不了这一层，因为冲突不在我们这边。
       # next 线刻意**不加** force：那条线本该装得干净，需要 force 本身就是要看的信号。

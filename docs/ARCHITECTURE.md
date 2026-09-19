@@ -196,7 +196,7 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 
 - **声明面只有一个**：`package.json` 的 `peerDependencies`。它同时是安装器的判据与 npm 页面上的对外承诺 —— 改它等于改对外契约，因此必须与实测对齐，不能凭文档推断。
 - **依赖的是运行时行为，不是 API 形状**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派规则、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、密钥读不到，或明文开始出现在 describe 线路上）。
-- **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（`dsh-tools` 是 `0.0.1-rc.1`；`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1`，**低于本包声明的下限**），`next` 才是当前承诺支持的线。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
+- **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`），`next` 才是当前承诺支持的线。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
 - **类型面会先于行为面动**：宿主收紧 API 签名时 `npm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
 
 ### 契约纪律（破坏即改契约）

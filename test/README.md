@@ -24,7 +24,7 @@
 - [contract-helpers.ts](contract-helpers.ts)：契约测试的**共享底座**（直连客户端的 `callApi` + 指纹纯函数），刻意不 import `src/`。
 - [contract-helpers.test.ts](contract-helpers.test.ts)：该底座的**离线**自检（指纹工具写错会让契约测试假绿）。常驻日常 CI。
 - [contract-live-search.test.ts](contract-live-search.test.ts) / [contract-live-global-search.test.ts](contract-live-global-search.test.ts)：**契约测试**，直连真实知乎接口盯上游行为指纹。**不在日常 CI 里**，见下方「契约测试」一节。
-- [redlines.test.ts](redlines.test.ts)：五条红线的可执行守卫（依赖分层 / 呈现隔离 / 模型上下文隔离 / 无全局状态 / 模型不见原始语法），含 `package.json` 依赖检查与源码静态检查；另有一条**取服务路径**守卫 —— `src/index.ts` 的生效代码行里不得出现 `ctx.get('credentials')`（理由见 [复盘](../docs/postmortem/2026-09-15-credential-service-unreachable.md)）。
+- [redlines.test.ts](redlines.test.ts)：五条红线的可执行守卫（依赖分层 / 呈现隔离 / 模型上下文隔离 / 无全局状态 / 模型不见原始语法），含 `package.json` 依赖检查与源码静态检查；另有一条**取服务路径**守卫 —— `src/index.ts` 的生效代码行里不得出现 `ctx.get('credentials')`（理由见 [复盘](../docs/postmortem/2026-09-15-credential-service-unreachable.md)）；还有一组 `文档不抄实测值` —— 活文档与 workflow 里不得留会漂的宿主版本字面量，门面双件只有在**同一行写出真源 [package.json](../package.json)** 时才允许留（记录层 `.agents/notes/`、`docs/postmortem/` 除外，它们写的是当时的事实）。
 
 产物级测试是**两个**（client-bundle 与 dist），它们读 `lib/`，故 `npm test` 先跑 build；其余测试一律从 `src/` 导入。
 
@@ -59,7 +59,7 @@
 - 真机验收用 [scripts/acceptance.mjs](../scripts/acceptance.mjs)：它直接 import 装好的产物，同时覆盖真实接口、宿主 `output.schema` 校验与模型可见文本。这三件事单元测试都够不到（v1.4.0 的 P0 正是漏在这条缝里）。
 - 断言「失败不入缓存」使用不被重试的错误码；`90001` 会被客户端自动重试，第一次调用实际成功。
 - 校验 `cordis.patch.yml` 前先滤掉注释行：注释会正当地提到被否决的写法。
-- `@deepseek-ai/*` 在 npm 的 `latest` 标签是过期版本（`dsh-tools` 是 `0.0.1-rc.1`，`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1` —— 比本包的声明下限还低）；安装版本以 [package.json](../package.json) 的 `peerDependencies` 为准，当前该跟哪条线由 [compat.yml](../.github/workflows/compat.yml) 盯。
+- `@deepseek-ai/*` 在 npm 的 `latest` 标签是过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`）；安装版本以 [package.json](../package.json) 的 `peerDependencies` 为准，当前该跟哪条线由 [compat.yml](../.github/workflows/compat.yml) 盯。
 - 产物契约测试里外壳预置模块要替身：`ui-primitives` 是浏览器静态库，Node 中导入会因缺 `clsx` 失败；浏览器里它由 `PLATFORM_MODULES` seed 表提供。
 
 ## 参考

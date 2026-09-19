@@ -211,7 +211,7 @@ DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三�
 | `alpha` | 前瞻线，按设计在声明范围之外 | 换包 + 跑全套；红了**只记录**（job 红、run 绿） |
 | `latest` | **不可用** | 不碰 |
 
-`latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本（`dsh-tools` 是 `0.0.1-rc.1`、`dsh-client-store` 是 `0.1.2-alpha.2`），`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1` —— **比本插件的声明下限 `0.1.5-rc.2` 还低一格**。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线；这也是 `next` 线存在的理由。
+`latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本，`@deepseek-ai/dsh` 自己那条也未必落在本插件的声明区间里 —— 逐包对照现查 `node scripts/compat-swap.mjs check latest`（`check` 收任意 dist-tag），宿主自己那条线现查 `npm view @deepseek-ai/dsh dist-tags`。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线；这也是 `next` 线存在的理由。
 
 ### 红了怎么办（按线分流）
 

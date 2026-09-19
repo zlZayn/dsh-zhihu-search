@@ -47,8 +47,8 @@
 ## 待办
 
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）
-- **声明面已落后于实际部署**：本机宿主跑的是 `0.1.6-alpha.1`（alpha 线），而 `peerDependencies` 只到 `^0.1.5-rc.2`；同时 `latest` 装出来的 `0.1.5-rc.1` 落在范围之**下**。等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档；**放宽时一并定下限** —— 抬到新 next 即放弃 `0.1.5-rc.2`，保留它则它落在两条 lane（next / alpha）之外，无人覆盖。**新下限不得低于 `0.1.6-alpha.2`**：配置面只向 `plugins.bundle.config` 注册，而该槽是 0.1.6 引入的 —— 落在 0.1.5 线上的宿主装上去，配置页**静默不出现**。
-- 处置 `@deepseek-ai/dsh-code-runtime`：`devDependencies` 里**没有任何文件引用它**，且它的 alpha 标签停在 `0.1.5-alpha.2`（比 next 的 `0.1.5-rc.2` 还旧）—— 换包脚本因此每个 alpha 轮都要告警跳过它一次。删掉即消失
+- **声明面已落后于实际部署**：本机宿主跑在 **alpha 线**上（比 next 线新），而 `peerDependencies` 只到 **next 线**的版本 —— 预发布区间取不到 alpha 上的版本。等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档；**放宽时一并定下限** —— 抬到新 next 即放弃旧下限，保留它则它落在两条 lane（next / alpha）之外，无人覆盖。**新下限不得低于引入 `plugins.bundle.config` 的那个版本**（`engines.dsh` 现在声明的下限就是它）：配置面只向该槽注册，落在更早的宿主线上装上去，配置页**静默不出现**。
+- 处置 `@deepseek-ai/dsh-code-runtime`：`devDependencies` 里**没有任何文件引用它**，且它在 alpha 线上停在一个比 next 线还旧的版本（现查 `node scripts/compat-swap.mjs check latest`）—— 换包脚本因此每个 alpha 轮都要告警跳过它一次。删掉即消失
 - **npm 上已发布版本的头图会断**：npm 页面按 `main`（HEAD）取 README 里的图，而 v1.6.3 及更早的 README 写的是 `assets/cover.svg` —— 该文件已随头图换新（`banner.svg`）删除。**最新**那页会随下次发版自动修好；更早版本的页面文字在发布时就定死，除非把 `cover.svg` 补回。下次发版后顺手看一眼 npm 页面头图即可
 
 ## 活跃坑（工具链与 DSH 平台）
@@ -67,7 +67,7 @@
 - **告警可能到不了终端**：v1.6.x 的每一处失败都 `warn` 过，维护者终端里一条都没有。判断故障别只看日志，先看文件状态与工具报错。
 - **redact 是 schema 驱动的**：`redactSecrets` 只剥 schema 里带 `role('secret')` 的字段。把一个「代码已经不读」的密钥字段从 schema 里删掉，redact 会同时停止保护它 —— 明文改从 describe 线路走出，而功能测试全绿。删密钥字段前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「密钥解析契约」。
 - **挂载方式**：只用官方 CLI `dsh plugin --profile web add <path>`（它会顺带 reconcile `dsh.profile.bundles`），不要手改 `cordis.patch.yml`。
-- **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：`next` = 当前承诺支持的线，`alpha` = 前瞻线，`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本（`dsh-tools` 是 `0.0.1-rc.1`、`dsh-client-store` 是 `0.1.2-alpha.2`），`@deepseek-ai/dsh` 自己是 `0.1.5-rc.1`，**比本插件的声明下限还低一格**。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+- **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：`next` = 当前承诺支持的线，`alpha` = 前瞻线，`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本，具体值一律现查（`npm view @deepseek-ai/dsh dist-tags`）。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 - **换包有两个方向相反的假信号，都踩过**：
   - **假红**：`npm install <包>@<tag>` 会把某个恰好没被点名的包**目录清空**（实测 `dsh-client-locale` 与 `dsh-client-ui-primitives` 都中过），随后 typecheck 报「找不到模块」。`--legacy-peer-deps` 也不是解药：它连 npm 的 peer 自动安装一起关掉，`dsh-tools` 自己的 peer 集体缺席。正路是 [scripts/compat-swap.mjs](scripts/compat-swap.mjs) 的「改写 package.json + 裸 `npm install`」。
   - **假绿**：`npm install` 因上游 peer 冲突退出时，`node_modules` 会**原封不动停在旧版本**上，随后 typecheck 与全套测试全绿。所以换包之后必须 `verify` 断言实装版本 —— **「测试全绿」不等于「跑在目标版本上」**。
