@@ -14,6 +14,11 @@ import { createZhihuZhidaTool } from '../src/tools/zhida.js';
 import { createState } from '../src/state.js';
 import { envelope, jsonResponse, makeHarness } from './helpers.js';
 
+/** 去掉块注释与行注释，避免注释里的字样触发守卫。 */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
 const root = fileURLToPath(new URL('..', import.meta.url));
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
   dependencies?: Record<string, string>;
@@ -52,6 +57,21 @@ describe('红线 1：@deepseek-ai/* 绝不进入 dependencies', () => {
     for (const [name, range] of Object.entries(peers)) {
       if (!name.startsWith('@deepseek-ai/')) continue;
       expect(devs[name]).toBe(range);
+    }
+  });
+});
+
+describe('类型检查开关', () => {
+  const tsconfig = JSON.parse(stripComments(readFileSync(new URL('../tsconfig.json', import.meta.url), 'utf8'))) as {
+    compilerOptions?: Record<string, unknown>;
+  };
+
+  it('四个「通用 lint 那一档」的开关都在', () => {
+    // 它们是不引入 linter 这个决定的全部依据：缺任何一个，覆盖面就不再成立。
+    // client 与 test 两个 project 都 extends 根 tsconfig，所以这里一处生效、三个 project 都覆盖。
+    const flags = ['noUnusedLocals', 'noUnusedParameters', 'noImplicitReturns', 'noFallthroughCasesInSwitch'];
+    for (const flag of flags) {
+      expect(tsconfig.compilerOptions?.[flag], flag).toBe(true);
     }
   });
 });

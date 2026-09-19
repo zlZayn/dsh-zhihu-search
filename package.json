@@ -63,6 +63,7 @@
     "test": "npm run build && vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.ts",
+    "check:release": "node scripts/check-release.mjs",
     "prepare": "npm run build"
   },
   "peerDependencies": {

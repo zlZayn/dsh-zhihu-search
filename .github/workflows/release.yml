@@ -92,6 +92,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+      # 发布态不变量：dsh.bundle 在、private 没设、engines.dsh 声明了、files 带 cordis.patch.yml。
+      - run: npm run check:release
+
       # bump 前先拦两处版本号漂移：npm version 会同时写两处，漂移只可能来自手工改动。
       - name: Verify the lockfile version matches package.json
         run: |

@@ -16,6 +16,8 @@
 - 「版本兼容」章节只讲分水岭与真源指针，**不抄会漂的宿主版本**；判据：`engines.dsh` 一旦落后于实际部署的宿主线（[compat.yml](.github/workflows/compat.yml) 的 declaration 作业转红即为信号），该章与两份 README 的「前置」必须同批复核
 - **声明面应当自洽**：所有 `@deepseek-ai/dsh-*` 声明的下限不该低于 `engines.dsh` 的下限 —— 两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有 `plugins.bundle.config` 槽，而配置面只向该槽注册（落上去配置页**静默不出现**）。**但此刻不能抬**：本仓声明停在 next 线、`engines.dsh` 下限在 alpha 线，而 alpha 线的**类型面已红**（见下面「宿主兼容性」那条），抬上去默认安装会装不出来。**触发条件与尝试记录见[决策记录](.agents/notes/2026-09-20-declaration-floor-stays-on-next.md)**
 - **只做类型面（module augmentation）、运行时由宿主经 `dsh.client.inject` 提供的官方包，只写 `devDependencies`，不写 `peerDependencies`** —— 目前只有 `@deepseek-ai/dsh-client-ui-plugin-manager`，见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)
+- **四个「通用 lint 那一档」的编译器开关代替 linter**（`noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch`），缺任何一个覆盖面就不成立 → 由 [test/redlines.test.ts](test/redlines.test.ts) 断言；client / test 两个 project 都 extends 根 `tsconfig.json`，一处生效三处
+- **发布态不变量由脚本守卫**（`dsh.bundle.patch` 在、`private` 没设、`engines.dsh` 声明了、`files` 带 `cordis.patch.yml`、LICENSE 在）→ `npm run check:release`，[release.yml](.github/workflows/release.yml) 发布前跑
 - 决策理由 → [.agents/notes/](.agents/notes/)
 - 发版授权：patch / minor 按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定档后**直接发**；**major 必须先问人类**；**零行为变更不发版**（纯文档 / 测试 / CI / 等价重构）
 

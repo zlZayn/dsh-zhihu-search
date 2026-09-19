@@ -176,6 +176,7 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 - `package.json` 的 `repository.url` 必须指向真实仓库，否则 npm 拒绝 provenance 或页面上没有源链接。
 - 所有 `@deepseek-ai/*` 保持在 `peerDependencies` 与 `devDependencies`，**不得**进 `dependencies` —— 见 [ARCHITECTURE.md](ARCHITECTURE.md) 的「不可破坏的约束」。
 - `package-lock.json` 的 `resolved` 必须指向 `registry.npmjs.org`。锁文件若由国内镜像生成，CI 会去镜像取包（供应链隐患），且 `npm ci` 可能因 peer 未同步而失败。**这条已落成红线**（[test/redlines.test.ts](../test/redlines.test.ts) 的「锁文件」组）—— 别再靠人核对。
+- **发布态不变量**（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在）已落成脚本 `npm run check:release`，[release.yml](../.github/workflows/release.yml) 发布前自动跑 —— 别再靠人核对这一节。
 - 依赖变更后用 `npm install --registry=https://registry.npmjs.org/` 重建锁文件：本地用 `--legacy-peer-deps` 安装会让 `package-lock.json` 缺自动 peer，`npm ci` 随即失败。
 
 ## CI

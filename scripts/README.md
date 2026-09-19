@@ -7,6 +7,8 @@
 - `build-client.mjs`：用 esbuild 生成浏览器半体的 lazy-CJS 工厂信封（`window.__ModuleLoader__.load({ id, factory })`），被 `npm run build` 调用，产物为 `lib/client.js`。
   信封为何必须长这样、官方预设为何不能直接用 → 见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「构建链的两个事实」，此处不重述。
 - `release-guard.mjs`：**发版守卫**。从 stdin 读「上个 tag..HEAD」的改动清单，判定这段区间是否真的改变了已发布产物；只剩非产物改动时以非零退出码拦下发布。
+
+`check-release.mjs`：**发布态守卫**。断言五条发布态不变量（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在），被 `npm run check:release` 调用、[release.yml](../.github/workflows/release.yml) 发布前跑。
   口径是「能否改变 npm 上的产物」而非「文件是否随包发布」：`build-client.mjs` 自己不随包，却决定 `lib/client.js` 长什么样，所以算产物改动。接线在 [release.yml](../.github/workflows/release.yml)，判定规则归 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的 Q0。
 - `acceptance.mjs`：**验收脚本**。对指定包目录的产物打真实接口，验三件事：下限扩池、输出面与排序档位对称、`site` 归一化；每条都过一遍宿主的 `output.schema` 校验器，并打印模型可见文本。
   用法 `ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]`，默认验本机 profile 里装的那份；退出码非 0 即有未通过项。
