@@ -56,6 +56,23 @@ describe('红线 1：@deepseek-ai/* 绝不进入 dependencies', () => {
   });
 });
 
+describe('锁文件：resolved 必须指向官方源', () => {
+  it('package-lock.json 里没有镜像源', () => {
+    // 镜像生成的锁文件会让 CI 去镜像取包（供应链隐患），也可能因镜像未同步而让 npm ci 失败。
+    // 这条此前只写在 docs/PUBLISHING.md 的前置条件里（散文）—— 规则住在文字里就没人执行，
+    // 所以 2026-09-20 落成断言。
+    const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8')) as {
+      packages?: Record<string, { resolved?: string }>;
+    };
+    const offenders = Object.entries(lock.packages ?? {})
+      // 只看 http(s) 来源；file:/link:/git 之类本就不是包的公开源。
+      .filter(([, meta]) => meta.resolved?.startsWith('http'))
+      .filter(([, meta]) => !meta.resolved!.startsWith('https://registry.npmjs.org/'))
+      .map(([name, meta]) => `${name || '(root)'} → ${new URL(meta.resolved!).host}`);
+    expect(offenders, `这些包的 resolved 不指向官方源：\n${offenders.join('\n')}`).toEqual([]);
+  });
+});
+
 describe('红线 2 & 3：呈现层与模型上下文严格隔离', () => {
   it('模型可见的 Markdown 不含任何 UI 卡片字段', async () => {
     const { tools, dispose } = allTools();

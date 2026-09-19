@@ -14,6 +14,8 @@
 - 对外可见行为变化，同一次改动内同步 [README.md](README.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)，冲突以中文为准
 - 「版本兼容」章节只讲分水岭与真源指针，**不抄会漂的宿主版本**；判据：`engines.dsh` 一旦落后于实际部署的宿主线（[compat.yml](.github/workflows/compat.yml) 的 declaration 作业转红即为信号），该章与两份 README 的「前置」必须同批复核
+- **声明面应当自洽**：所有 `@deepseek-ai/dsh-*` 声明的下限不该低于 `engines.dsh` 的下限 —— 两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有 `plugins.bundle.config` 槽，而配置面只向该槽注册（落上去配置页**静默不出现**）。**但此刻不能抬**：本仓声明停在 next 线、`engines.dsh` 下限在 alpha 线，而 alpha 线的**类型面已红**（见下面「宿主兼容性」那条），抬上去默认安装会装不出来。**触发条件与尝试记录见[决策记录](.agents/notes/2026-09-20-declaration-floor-stays-on-next.md)**
+- **只做类型面（module augmentation）、运行时由宿主经 `dsh.client.inject` 提供的官方包，只写 `devDependencies`，不写 `peerDependencies`** —— 目前只有 `@deepseek-ai/dsh-client-ui-plugin-manager`，见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)
 - 决策理由 → [.agents/notes/](.agents/notes/)
 - 发版授权：patch / minor 按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定档后**直接发**；**major 必须先问人类**；**零行为变更不发版**（纯文档 / 测试 / CI / 等价重构）
 
@@ -47,8 +49,8 @@
 ## 待办
 
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）
-- **声明面已落后于实际部署**：本机宿主跑在 **alpha 线**上（比 next 线新），而 `peerDependencies` 只到 **next 线**的版本 —— 预发布区间取不到 alpha 上的版本。等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档；**放宽时一并定下限** —— 抬到新 next 即放弃旧下限，保留它则它落在两条 lane（next / alpha）之外，无人覆盖。**新下限不得低于引入 `plugins.bundle.config` 的那个版本**（`engines.dsh` 现在声明的下限就是它）：配置面只向该槽注册，落在更早的宿主线上装上去，配置页**静默不出现**。
-- 处置 `@deepseek-ai/dsh-code-runtime`：`devDependencies` 里**没有任何文件引用它**，且它在 alpha 线上停在一个比 next 线还旧的版本（现查 `node scripts/compat-swap.mjs check latest`）—— 换包脚本因此每个 alpha 轮都要告警跳过它一次。删掉即消失
+- **声明面仍落后于实际部署**（2026-09-20 复核，仍未解）：`engines.dsh` 的下限在 alpha 线，而 `peerDependencies` 与 dev 面共 27 条声明停在 next 线。**这次试过抬上去，抬不动** —— 在 alpha 线上 `npm install` 能装（依赖图解得开），但 `npm run build` 过不了：`tsc` 在 `src/index.ts` 的 `agent/created` handler 上报类型不符，即 alpha 线的**类型面已红**（证据与备份路径见[决策记录](.agents/notes/2026-09-20-declaration-floor-stays-on-next.md)）。所以维持原计划：等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档；放宽时一并定下限 —— **新下限不得低于引入 `plugins.bundle.config` 的那个版本**（`engines.dsh` 现在声明的下限就是它）。
+- 处置 `@deepseek-ai/dsh-code-runtime`：`devDependencies` 里**没有任何文件引用它**，且它在 alpha 线上停在一个比 next 线还旧的版本（现查 `node scripts/compat-swap.mjs check latest`）—— 换包脚本因此每个 alpha 轮都要告警跳过它一次。删掉即消失；**它也是上面那条「抬不动」里唯一一个在 alpha 线上连版本都对不上的包**（抬了直接装不出来）
 - **npm 上已发布版本的头图会断**：npm 页面按 `main`（HEAD）取 README 里的图，而 v1.6.3 及更早的 README 写的是 `assets/cover.svg` —— 该文件已随头图换新（`banner.svg`）删除。**最新**那页会随下次发版自动修好；更早版本的页面文字在发布时就定死，除非把 `cover.svg` 补回。下次发版后顺手看一眼 npm 页面头图即可
 
 ## 活跃坑（工具链与 DSH 平台）
