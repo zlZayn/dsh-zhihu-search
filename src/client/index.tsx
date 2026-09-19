@@ -101,6 +101,27 @@ const PROFILE_URL = 'https://developer.zhihu.com/profile';
 /** 引用名在不被覆盖时的默认值；与 Host 侧 `DEFAULT_ACCESS_SECRET_REF` 一致。 */
 const DEFAULT_REF = 'ZHIHU_ACCESS_SECRET';
 
+/**
+ * 配置槽的能力探测窗口。
+ *
+ * 探测的是**能力**不是版本号：版本在插件侧取不到，而「`plugins.bundle.config` 这个槽在不在」
+ * 是当场可观测的事实 —— 槽由插件管理页的浏览器半体声明，缺席时 {@link apply} 里
+ * `ctx.slots.inject` 的回调**永远不来**，且宿主不报任何错（静默）。
+ * 窗口刻意给宽：迟到的声明只多留一条撤销提示，窗口太短反而会打扰新宿主上的用户。
+ */
+const SLOT_PROBE_TIMEOUT_MS = 10_000;
+
+/**
+ * 槽缺席时的提示。英文、`[WARN]` 前缀、无 emoji；落点是**客户端控制台** ——
+ * 本插件唯一的界面（这张卡片）就长在缺席的那个槽里，没有跨版本的 UI 面可落。
+ */
+const SLOT_MISSING_WARNING =
+  '[WARN] dsh-zhihu-search: this Host provides no plugins.bundle.config slot, so the configuration card cannot be shown. The three tools keep working. For in-place configuration, upgrade the Host - see the version compatibility section of the README.';
+
+/** 提示必须可撤销：槽迟于窗口才声明时补一条，声明前一条作废。 */
+const SLOT_LATE_INFO =
+  '[INFO] dsh-zhihu-search: plugins.bundle.config appeared after the probe window, so the earlier warning is withdrawn and the configuration card is registered.';
+
 /** 框架注入的 `t` 座位类型，绑定到本卡片的字典命名空间。 */
 type CardTranslate = TranslateNS<typeof LOCALE_NS>;
 
@@ -196,6 +217,17 @@ const S: Record<string, CSSProperties> = {
 /** 官方 CSS 的 `:disabled { opacity: .4 }`。 */
 function dimStyle(base: CSSProperties, disabled: boolean): CSSProperties {
   return disabled ? { ...base, opacity: 0.4, cursor: 'default' } : base;
+}
+
+/**
+ * 浏览器计时器没有 `unref`；Node 里有 —— 产物契约测试会在 Node 里求值本模块，
+ * 不 unref 就有一条计时器吊着事件循环。有就调，没有就跳过。
+ *
+ * @param timer - `setTimeout` 的返回值（浏览器是数字，Node 是带 `unref` 的对象）。
+ */
+function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
+  const candidate = timer as unknown as { unref?: () => void };
+  if (typeof candidate.unref === 'function') candidate.unref();
 }
 
 /** 卡片 props；`t` 由框架按注册时声明的 locale 命名空间注入。 */
@@ -425,11 +457,39 @@ export function apply(ctx: Context): void {
   );
   void store.refresh();
 
-  ctx.slots.inject('plugins.bundle.config', () =>
-    ctx.slots.register(
+  // 能力探测：**只新增提示路径**，注册的槽名 / key / 时机一字不动。
+  // 状态活在 apply 的闭包里（模块顶层不得有状态），计时器由 ctx.effect 拥有并释放。
+  let slotDeclared = false;
+  let probeTimer: ReturnType<typeof setTimeout> | undefined;
+  let probeWarned = false;
+
+  ctx.effect(() => {
+    probeTimer = setTimeout(() => {
+      probeTimer = undefined;
+      if (slotDeclared) return;
+      probeWarned = true;
+      console.warn(SLOT_MISSING_WARNING);
+    }, SLOT_PROBE_TIMEOUT_MS);
+    unrefTimer(probeTimer);
+    return () => {
+      if (probeTimer !== undefined) clearTimeout(probeTimer);
+      probeTimer = undefined;
+    };
+  }, 'zhihu-search: config slot capability probe');
+
+  ctx.slots.inject('plugins.bundle.config', () => {
+    slotDeclared = true;
+    if (probeTimer !== undefined) {
+      clearTimeout(probeTimer);
+      probeTimer = undefined;
+    } else if (probeWarned) {
+      // 声明迟到：撤掉那条提示，注册照常。探测失败从不影响主体功能。
+      console.info(SLOT_LATE_INFO);
+    }
+    return ctx.slots.register(
       { name: 'plugins.bundle.config', key: BUNDLE_NAME, locale: LOCALE_NS },
       (seat: { t: CardTranslate; view: 'summary' | 'page' }) =>
         seat.view === 'page' ? <ZhihuCard scope={scope} store={store} t={seat.t} /> : null,
-    ),
-  );
+    );
+  });
 }

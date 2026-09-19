@@ -18,7 +18,12 @@
 # ## 两条线的处理方式不同
 #
 #   next  红了 = 使用者会装到 = **必须修** → 整个 run 红，会发通知（declaration / next 两个 job）。
-#   alpha 红了 = **记录，等它切到 next 再处理** → job 红、run 绿，不发通知。
+#   alpha 红了 = **记录，等它切到 next 再处理** → job 红、run 绿，不进跟踪 issue。
+#
+# 声明面（declaration）是这两条之外的一件事：它不跑任何代码，只问「我们声明的区间还罩不罩得住
+# **README 告诉用户去装的那条线**」。那条线现在落在 alpha 上（配置界面的下限就在那里），
+# 所以它两条线都查、任一条不达标即红 —— 与「alpha 红了只记录」不冲突：
+# alpha job 判的是「代码还能不能跑」，declaration 判的是「承诺还成不成立」。
 #
 # 不挂 push：这条线看的是**上游**动没动，本地提交改不了结论。
 name: Compat
@@ -34,7 +39,7 @@ permissions:
   contents: read
 
 jobs:
-  # 声明面：peer 范围还罩不罩得住 next 线。
+  # 声明面：peer 范围还罩不罩得住**我们告诉用户去装的那两条线**（next / alpha）。
   #
   # 单独成 job 的理由：它只读 package.json 再问 npm，几十秒出结果；而且它的结论
   # 与「代码还能不能跑」是两件事 —— 混在 next job 里会被后者的红遮住，反过来也一样。
@@ -48,7 +53,45 @@ jobs:
           node-version-file: .node-version
 
       # 不装任何东西：判据是「我们声明的区间能取到的最新版本」与「tag 指向的版本」是否同一个。
-      - run: node scripts/compat-swap.mjs check next
+      #
+      # 两条线都查。理由是**文档**而不是对称：根 README 的「版本兼容」告诉使用者，需要配置界面
+      # 就把宿主升到 package.json 的 engines.dsh 声明的版本 —— 那个版本只在 alpha 线上。
+      # 判据是「声明区间必须罩得住我们告诉用户去装的那条线」，少查一条就是漏检。
+      - name: Declaration surface — the committed line (next)
+        id: next
+        continue-on-error: true
+        run: node scripts/compat-swap.mjs check next
+
+      - name: Declaration surface — the line the README points users at (alpha)
+        id: alpha
+        continue-on-error: true
+        run: node scripts/compat-swap.mjs check alpha
+
+      # 两步都是 continue-on-error（为了两条线都拿到信号），所以成败在这里显式汇总。
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## DSH 兼容性 · 声明面"
+            echo ""
+            echo "| 线 | check 结果 |"
+            echo "| --- | --- |"
+            echo "| next（承诺支持的线） | ${{ steps.next.outcome }} |"
+            echo "| alpha（README 让用户去装配置界面的那条线） | ${{ steps.alpha.outcome }} |"
+            echo ""
+            echo "判据：声明区间必须能覆盖**我们告诉用户去装的那条线**（见根 README 的「版本兼容」）。"
+            echo ""
+            echo "红了怎么办：核对上游变更 → 放宽 peer 范围 → 同步两份 README 的「前置」→ 按 docs/PUBLISHING.md 的 Q1/Q2 定档。"
+            echo "范围放宽不改行为，Q1/Q2 全否即 **patch**，但必须发版（声明在产物里）。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verdict
+        if: always()
+        run: |
+          if [ "${{ steps.next.outcome }}" != "success" ] || [ "${{ steps.alpha.outcome }}" != "success" ]; then
+            echo "::error::声明面罩不住：next=${{ steps.next.outcome }}，alpha=${{ steps.alpha.outcome }}。处理链见本次运行的 Summary。"
+            exit 1
+          fi
 
   next:
     runs-on: ubuntu-latest
@@ -225,4 +268,63 @@ jobs:
           if [ "${{ steps.verify.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ] || [ "${{ steps.suite.outcome }}" != "success" ]; then
             echo "::error::alpha 线漂移（换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}）。这是**记录**不是告警：处理链见本次运行的 Summary。"
             exit 1
+          fi
+
+  # 失败可见：定时任务的失败邮件 GitHub 自带，但它只发给最后改过 cron 的人，**不能当作主通知**。
+  # 这里把「哪条线、哪一步红」写进一个**固定标题**的跟踪 issue：已存在就追加评论，不刷屏。
+  #
+  # 只收会红到使用者身上的两个 job：declaration（承诺还成不成立）与 next（代码还能不能跑）。
+  # alpha 刻意不进：它按设计落在声明范围之外，红是**记录**不是告警（见文件头与 alpha job）。
+  report:
+    needs: [declaration, next]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout
+      issues: write # 建 / 改跟踪 issue
+    steps:
+      - uses: actions/checkout@v7
+
+      # 正文用英文（issue 是仓库对外的门面）；标题与标签固定，靠它们幂等。
+      - name: Open or update the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DECLARATION: ${{ needs.declaration.result }}
+          NEXT: ${{ needs.next.result }}
+        run: |
+          set -euo pipefail
+          title='DSH compatibility patrol failed'
+          label='compat'
+          gh label create "$label" --description 'DSH compatibility patrol (see docs/PUBLISHING.md)' --color BFD4F2 --force >/dev/null
+
+          body=$(cat <<EOF
+          The DSH compatibility patrol failed. This fixed issue is updated instead of re-created.
+
+          | Job | What it watches | Result |
+          | --- | --- | --- |
+          | declaration | the declared ranges vs the lines the README points users at | ${DECLARATION} |
+          | next | the committed line: swap, typecheck, full suite | ${NEXT} |
+
+          Run: ${RUN_URL}
+
+          Criterion: the declared range must cover the line we tell users to install - the committed line (next)
+          and the line the README sends users to for the configuration UI (alpha). A red declaration means the
+          declared range no longer reaches that line; a red next means the code no longer compiles or behaves
+          on the committed line.
+
+          Recovery: open the run summary, classify the failure, then widen the peer ranges, sync both READMEs,
+          and ship a release - see docs/PUBLISHING.md, section "Compatibility" (兼容性). Close this issue once
+          a patrol run is green again.
+          EOF
+          )
+
+          number=$(gh issue list --state open --label "$label" --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [ -n "$number" ]; then
+            echo "Updating existing issue #$number"
+            gh issue comment "$number" --body "$body"
+          else
+            echo "Creating the tracking issue"
+            gh issue create --title "$title" --label "$label" --body "$body"
           fi

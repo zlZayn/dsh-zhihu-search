@@ -3,6 +3,7 @@
 - 职责：在侧边栏「插件（Plugins）」→「已安装（Installed）」组 → 本插件详情页里渲染「知乎搜索」配置卡片（槽 `plugins.bundle.config`，`key` 取本包包名）。设置段只承载凭据引用名与开关；**密钥经 `ctx.remote.credentials` 写进凭据存储**（`$DSH_HOME/.credentials.yaml`），不经过设置文档。
 - 文件索引：`index.tsx` 卡片本体与注册；[credential-store.ts](credential-store.ts) 凭据状态源（纯逻辑，无 React）；[locales.ts](locales.ts) 中英字典，并导出 `LOCALE_NS`、`ZhihuLocaleKey` 与 `LocaleNamespaceMap` 增强声明（key 拼错或漏一种语言即编译错误）。
 - 关键导出：`apply`（注册字典与卡片）、`inject`（`['slots', 'settingsScope', 'remote', 'remote.credentials', 'locale']` —— **`remote` 与 `remote.credentials` 缺一不可**，理由见 [AGENTS.md](AGENTS.md)）、`createCredentialStore`（纯函数，跟踪引用名当下的配置状态）。
+- 能力探测：`plugins.bundle.config` 槽缺席（更早的宿主）时 `ctx.slots.inject` 的回调不会来，界面静默缺席 —— 注册处因此带一个超时窗口，超时后往**客户端控制台**写一条英文 WARN 提示；槽迟到则补一条 INFO 撤销它。只加提示路径，注册的槽名 / key / 时机一字不改，探测失败不影响任何既有功能。
 - 被谁依赖：DSH Web 的客户端模块系统按包清单的 `dsh.client` 扫描并加载 `lib/client.js`。
 - 改后必测：`npm test` 的 [产物契约](../../test/README.md)（信封 id、导出面、inject 装配、注册 key）与 [credential-store 单测](../../test/credential-store.test.ts)。
 
@@ -31,6 +32,7 @@
 - 加文案 → 只改 [locales.ts](locales.ts) 的 key 与两份字典；两处都补齐才编得过。
 - 改**渲染面**（文案值、JSX 结构、样式对象、可见状态）→ **必须同批重截** [assets/](../../assets/) 的两张卡片图；触发判据、步骤与验收见 [assets/AGENTS.md](../../assets/AGENTS.md)。
 - 改 locale 命名空间 → 必须与槽位注册的 `locale:` 一致，否则 `t` 取不到值、界面显示 key 本身。
+- 改探测窗口或提示文案 → 跑 [产物测试](../../test/client-bundle.test.ts) 的「配置槽能力探测」一组（三条：按时到达不发声 / 缺席时恰一条英文提示 / 迟到时撤销），并同步根 [README.md](../../README.md) 的「版本兼容」。
 - 改完必须 `npm run build`。客户端半体由 `dsh-client-hmr` 轮询 `lib/client.js` 就地换装；**host 半体换不了**。
   生效链**取决于本机 profile 怎么挂的**（先 `Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`）：符号链接到仓库时构建**直接写线上浏览器半体**；版本化副本则要 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>`。两种模式下 host 半体都要重启 → 见 [../AGENTS.md](../AGENTS.md) 的活跃坑。
 

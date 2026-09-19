@@ -13,7 +13,7 @@
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { Context } from '@deepseek-ai/cordis';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const require_ = createRequire(import.meta.url);
 
@@ -203,6 +203,144 @@ describe('client bundle 注册行为', () => {
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(ctx);
     expect(credentialReads).toEqual([['ZHIHU_ACCESS_SECRET']]);
+  });
+});
+
+/**
+ * 配置槽的能力探测（不查版本号）。
+ *
+ * 槽缺席时 `ctx.slots.inject` 的回调永远不来，且宿主不报错 —— 症状是「插件页里什么都没有」。
+ * 这三条钉住提示路径：只对缺席的宿主发声、格式是英文 `[WARN]`（无 emoji）、
+ * 且**可撤销**（槽迟到就补一条 `[INFO]`），注册语义一字不动。
+ */
+describe('client bundle 配置槽能力探测', () => {
+  /** 跨过任意合理窗口宽度的推进量；测试不依赖真实时钟。 */
+  const PAST_PROBE_WINDOW_MS = 60_000;
+
+  /** 探测用例的最小服务面：卡片外壳要的替身，槽由各用例自己给。 */
+  function probeContext(slots: { inject: unknown; register: unknown }): Record<string, unknown> {
+    const scope = {
+      subscribe: () => () => undefined,
+      getSnapshot: () => ({ status: 'ready', writable: true, value: undefined, user: undefined, base: undefined }),
+      set: async () => undefined,
+      unset: async () => undefined,
+    };
+    const credentials = {
+      describe: async () => ({ ok: true as const, value: {} }),
+      set: async () => ({ ok: true as const, value: undefined }),
+    };
+    return {
+      settingsScope: { bind: () => scope },
+      locale: { register: () => () => undefined },
+      remote: { credentials, $on: () => () => undefined },
+      effect(callback: () => unknown) {
+        callback();
+        return () => undefined;
+      },
+      slots,
+    };
+  }
+
+  /** 捕获控制台输出，返回恢复函数与两条通道。 */
+  function spyConsole(): { warnings: string[]; infos: string[]; restore: () => void } {
+    const warnings: string[] = [];
+    const infos: string[] = [];
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+      warnings.push(args.map(String).join(' '));
+    });
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation((...args: unknown[]) => {
+      infos.push(args.map(String).join(' '));
+    });
+    return {
+      warnings,
+      infos,
+      restore: () => {
+        warnSpy.mockRestore();
+        infoSpy.mockRestore();
+      },
+    };
+  }
+
+  it('槽声明按时到达：不发声（探测只对缺席的宿主说话）', () => {
+    vi.useFakeTimers();
+    const captured = spyConsole();
+    try {
+      const ctx = probeContext({
+        inject: (_name: string, callback: () => unknown) => {
+          callback();
+          return () => undefined;
+        },
+        register: () => () => undefined,
+      });
+      const mod = materialize(loadBundleRow());
+      (mod['apply'] as (ctx: unknown) => void)(ctx);
+      vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
+      expect(captured.warnings).toEqual([]);
+      expect(captured.infos).toEqual([]);
+    } finally {
+      captured.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('槽声明缺席：超时后恰有一条英文 [WARN]，不注册也不抛错', () => {
+    vi.useFakeTimers();
+    const captured = spyConsole();
+    try {
+      let silentRegistrations = 0;
+      const silent = probeContext({
+        inject: () => undefined,
+        register: () => {
+          silentRegistrations += 1;
+          return () => undefined;
+        },
+      });
+      const mod = materialize(loadBundleRow());
+      (mod['apply'] as (ctx: unknown) => void)(silent);
+      expect(captured.warnings).toEqual([]);
+      vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
+      expect(captured.warnings).toHaveLength(1);
+      const line = captured.warnings[0] ?? '';
+      expect(line).toMatch(/^\[WARN\] /);
+      // 英文、无 emoji：整条提示必须是纯 ASCII。
+      expect(line).toMatch(/^[\x20-\x7E]+$/);
+      expect(silentRegistrations).toBe(0);
+    } finally {
+      captured.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('槽迟于窗口才声明：补一条 [INFO] 撤销提示，注册照常发生', () => {
+    vi.useFakeTimers();
+    const captured = spyConsole();
+    try {
+      const registrations: Array<Record<string, unknown>> = [];
+      let pending: (() => unknown) | undefined;
+      const late = probeContext({
+        inject: (_name: string, callback: () => unknown) => {
+          pending = callback;
+          return () => undefined;
+        },
+        register: (options: Record<string, unknown>) => {
+          registrations.push(options);
+          return () => undefined;
+        },
+      });
+      const mod = materialize(loadBundleRow());
+      (mod['apply'] as (ctx: unknown) => void)(late);
+      vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
+      expect(captured.warnings).toHaveLength(1);
+      expect(typeof pending).toBe('function');
+      pending?.();
+      expect(captured.infos).toHaveLength(1);
+      expect(captured.infos[0]).toMatch(/^\[INFO\] /);
+      expect(registrations).toHaveLength(1);
+      expect(registrations[0]).toMatchObject({ name: 'plugins.bundle.config', key: 'dsh-zhihu-search' });
+    } finally {
+      captured.restore();
+      vi.useRealTimers();
+    }
   });
 });
 

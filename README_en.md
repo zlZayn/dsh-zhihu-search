@@ -100,10 +100,10 @@ The three sections below are each tool's full parameter set and limits. The mode
 
 ### Requirements
 
-- **DSH `0.1.5-rc.2` or newer, below `0.2.0`** — the range declared in [package.json](package.json)'s `peerDependencies`.
+- **DSH `0.1.5-rc.2` or newer, below `0.2.0`** — the range declared in [package.json](package.json)'s `peerDependencies`; `engines.dsh` separately records the Host version actually tested.
 - Node `>= 20`
 
-Install the host from an **explicit dist-tag**: `latest` for `@deepseek-ai/dsh` points at `0.1.5-rc.1`, **one prerelease below what this plugin requires**, so a default install lands outside the declared range.
+Install the Host from an **explicit dist-tag**: `latest` is not trustworthy across this family (on most `@deepseek-ai/dsh-*` packages it points at a much older version), so a default install can land outside the declared range — check it live with `npm view @deepseek-ai/dsh dist-tags`.
 
 ```bash
 npm install -g @deepseek-ai/dsh@next     # the line this plugin commits to
@@ -136,9 +136,19 @@ dsh plugin --profile web add dsh-zhihu-search
 
 The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin), which is how plugin marketplaces discover plugins.
 
+## Version compatibility
+
+The configuration UI registers into the Host's `plugins.bundle.config` slot, and that slot arrives with the **lower bound** of the range declared by `engines.dsh` in [package.json](package.json) — that declaration is the single source of truth, and this document does not copy version numbers.
+
+- **Host provides the slot**: the configuration area shows up on this plugin's details page, and both the key and the switch are edited there.
+- **Earlier Host without the slot**: the three tools keep working, and the Plugins page simply **shows no configuration area** — silently, with no error. That is the watershed; the browser console keeps one WARN-level English note about it.
+- **Want in-place configuration**: upgrade the Host to the version declared by `engines.dsh` or newer — that version currently lives on the `alpha` line only, so install it with `npm install -g @deepseek-ai/dsh@alpha`; which line points at which version is one command away: `npm view @deepseek-ai/dsh dist-tags`.
+
+How to install the Host from the right line: [Install → Requirements](#requirements). Weekly measurements and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
+
 ## Configuration
 
-The configuration UI registers into the Host's `plugins.bundle.config` slot, and **that slot arrives with DSH 0.1.6**: on an earlier Host the three tools keep working, but the configuration area never appears on the Plugins page (silently, with no error) — that is the watershed. To configure in place, run the Host at **`0.1.6-alpha.2` or newer**.
+The configuration UI lives in the Host's `plugins.bundle.config` slot; whether that slot is there, and what happens without it, is covered in [Version compatibility](#version-compatibility).
 
 ### On the Plugins page
 

@@ -100,10 +100,10 @@
 
 ### 前置
 
-- **DSH `0.1.5-rc.2` 或更高，且低于 `0.2.0`** —— 即 [package.json](package.json) 的 `peerDependencies` 声明的范围。
+- **DSH `0.1.5-rc.2` 或更高，且低于 `0.2.0`** —— 即 [package.json](package.json) 的 `peerDependencies` 声明的范围；`engines.dsh` 另记我们实际测试过的宿主版本。
 - Node `>= 20`
 
-装宿主时**要显式指定版本线**：`@deepseek-ai/dsh` 的 `latest` 标签指向 `0.1.5-rc.1`，**比本插件要求的版本还低一格** —— 按默认方式装会直接落在声明范围之外。
+装宿主时**要显式指定版本线**：本家族的 `latest` 标签不可靠（多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本），按默认方式装可能落在声明范围之外 —— 现查 `npm view @deepseek-ai/dsh dist-tags`。
 
 ```bash
 npm install -g @deepseek-ai/dsh@next     # 本插件承诺支持的线
@@ -136,9 +136,19 @@ dsh plugin --profile web add dsh-zhihu-search
 
 仓库带有 GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin)，插件市场据此自动发现插件。
 
+## 版本兼容
+
+配置界面注册在宿主的 `plugins.bundle.config` 槽，该槽由 [package.json](package.json) 的 `engines.dsh` 所声明的**下限版本**引入 —— 那份声明是唯一事实来源，本文件不抄版本号。
+
+- **槽在的宿主**：插件页的本插件详情页里出现配置区，密钥与开关都在那里改。
+- **槽不在的更早宿主**：三个工具照常工作，插件页里**不会出现配置区** —— 静默，不报错。这就是分水岭；浏览器控制台会留一条 WARN 级英文提示说明这件事。
+- **需要就地配置**：把宿主升到 `engines.dsh` 声明的版本或更高 —— 那个版本目前只在 `alpha` 线上，装法 `npm install -g @deepseek-ai/dsh@alpha`；哪条线指向哪个版本现查 `npm view @deepseek-ai/dsh dist-tags`。
+
+宿主版本线怎么装见[安装 → 前置](#前置)；每周的实测结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+
 ## 配置
 
-配置界面注册在宿主的 `plugins.bundle.config` 槽，**该槽由 DSH 0.1.6 引入**：更早的宿主上三个工具照常工作，但**插件页里不会出现配置区**（静默，不报错）—— 这就是分水岭。需要就地配置请把宿主升到 **`0.1.6-alpha.2` 或更高**。
+配置界面挂在宿主的 `plugins.bundle.config` 槽上；该槽在不在、不在时会发生什么，见[版本兼容](#版本兼容)。
 
 ### 在插件页填写
 

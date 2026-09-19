@@ -114,6 +114,8 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 - Host 半体用 `ctx.settings.installSection` 注册设置命名空间，使 Host 透过 describe 线路把它暴露出来。
 - 浏览器半体声明 `dsh.client`，并向插件页的 `plugins.bundle.config` 注册一张 `key` 等于**本包包名**的卡片（该槽只向条目要 `view: 'page'`）。
 
+更早的宿主没有这个槽：`ctx.slots.inject` 的回调不会来，宿主也不报错 —— 界面**静默缺席**。浏览器半体因此带一个超时的能力探测（不查版本号，只问槽在不在）：超时后在客户端控制台留一条英文 WARN，槽迟到再补一条 INFO 撤销；探测不改变注册语义，也不影响任何既有功能。分水岭与升级指引见根 [README.md](../README.md) 的「版本兼容」。
+
 页面渲染的是两者同时在场：已服务的命名空间提供值，已注册的条目提供界面。**没有通用 schema 表单回退**，因此「注册了命名空间」与「页面里看得见」是两件事。命名空间是 Host 与卡片之间的连接键，包名是插件页取条目的连接键 —— 任一侧拼错都是静默不显示。
 
 卡片文案走 DSH 的 locale 服务，不硬编码：字典在 [src/client/locales.ts](../src/client/locales.ts)，槽位注册声明 `locale:` 之后框架才把类型化的 `t` 座位注入组件 props。代价是一个**硬依赖**——声明了 `locale:` 的条目在渲染时要求已安装的 locale 面，缺席即报错而不是降级。标准 `dsh web` 装配必然带它（DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`，多个核心客户端包也依赖它）。

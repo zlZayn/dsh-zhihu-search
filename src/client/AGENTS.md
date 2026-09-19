@@ -14,5 +14,6 @@
 - 样式只用 `--dsw-alias-*` 语义令牌（见 DSH `docs/web-styling.md`），不写字面色值、不引外部 UI 库；**没有** `--dsw-color-*` 系列，写了不会报错但不会生效。
 - **错误色用 `--dsw-alias-state-error-primary`**：官方 `PluginConfigForm.module.css` 写的 `--dsw-alias-label-error` 在 `ui-theme` 里**从未定义**（实测 0 处），照抄原生会静默不着色 —— 抄官方 CSS 时要顺带核令牌是否存在。
 - 注册必须走 `ctx.slots.inject(name, () => ctx.slots.register(...))`，禁止模块级副作用。
+- 配置槽的能力探测只**新增提示路径**：槽名 / key / 注册时机一字不改，不查版本号，不因探测失败改动任何既有功能；提示英文、WARN 前缀、落客户端控制台，且**槽迟到必须撤销**（补一条 INFO）。改它要跑产物测试的「配置槽能力探测」一组。
 - 改完必须重新 build；产物格式由 [../../scripts/build-client.mjs](../../scripts/build-client.mjs) 负责，不得手改 `lib/client.js`。
 - **改渲染面（文案值 / JSX / 样式对象 / 可见状态）必须同批重截卡片图**，中英两张一起；截图占用维护者的浏览器，**先问再动** → [assets/AGENTS.md](../../assets/AGENTS.md)。

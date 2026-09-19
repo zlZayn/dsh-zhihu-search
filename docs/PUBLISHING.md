@@ -226,5 +226,7 @@ DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三�
 ### 声明面变动要同步的地方
 
 - `peerDependencies` 的区间 → [README.md](../README.md) 与 [README_en.md](../README_en.md) 的「前置」版本（两份必同改）。
+- `engines.dsh` 的区间 → 两份 README 的「版本兼容」章节（那份章节只指真源，不抄版本）：它声明的是**实际验证过的最低宿主版本**与**排除下一个大版本的上界**。
+- 声明面与「README 让用户去装的那条线」由 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业对账：它红了就是声明面落后，失败会开一条固定标题的跟踪 issue。
 - 区间放宽本身不改行为（旧用法仍正确，只是允许更新的宿主）→ 按[版本号](#版本号)的 Q1/Q2 全否 → **patch**；但**必须发版**，声明在产物里。
 - 已知缺口与待办见 [AGENTS.md](../AGENTS.md)。
