@@ -48,6 +48,17 @@ describe('发布流程：版本驱动', () => {
     expect(workflow).toContain('npm view');
     expect(workflow).toContain('published=true');
   });
+
+  it('tag 名带 v 前缀，与历史 tag 同形', () => {
+    // 2026-09-22 实测踩过：版本号从 npm version 的输出（自带 v）改成读 package.json（没有 v）之后，
+    // 那个字符串被直接当 tag 名用，建出 2.0.0-alpha.1 —— 与 v1.6.x / v2.0.0-alpha.0 全部不同形，
+    // 而守卫用的是 git describe --match 'v[0-9]*'，**看不见它**。
+    expect(workflow).toContain('tag="v${{ steps.version.outputs.version }}"');
+    expect(workflow).toContain('gh release create "$tag"');
+    expect(workflow).toContain('--title "$tag"');
+    // 反向判据：不能有任何一处把裸版本号直接当 tag 名用。
+    expect(workflow).not.toContain('gh release create "${{ steps.version.outputs.version }}"');
+  });
 });
 
 describe('发布流程守卫：反向控制（喂合成文本）', () => {
@@ -63,6 +74,26 @@ describe('发布流程守卫：反向控制（喂合成文本）', () => {
     expect(findVersionWrites('run: npm pkg set version=2.0.0-alpha.1')).toHaveLength(1);
     // 直接改写清单里那一行也算。
     expect(findVersionWrites('  "version": "2.0.0-alpha.1",')).toHaveLength(1);
+  });
+
+  it('反向控制：裸版本号当 tag 名的写法判红（合成文本，模拟改回旧写法）', () => {
+    // 上一轮真实存在过的那两行（没有 v 前缀），直接喂给同一条判据：
+    const broken = [
+      '          gh release create "${{ steps.version.outputs.version }}" \\',
+      '            --title "${{ steps.version.outputs.version }}" \\',
+    ].join('\n');
+    expect(broken).toContain('gh release create "${{ steps.version.outputs.version }}"');
+    expect(broken).not.toContain('tag="v${{ steps.version.outputs.version }}"');
+    // 而修好之后的那两行必须过 —— 判据不是「永远为真」。
+    expect(workflow).toContain('tag="v${{ steps.version.outputs.version }}"');
+  });
+
+  it('工作流文本里没有过期指针（head 注释承诺的入口与真实 input 集一致）', () => {
+    // 2026-09-22 实测：head 注释还写着 `gh workflow run release.yml -f tier=patch`，
+    // 而 tier 输入早被撤掉了 —— 文档漂移「不报错」，所以钉在这里。
+    expect(workflow).not.toContain('-f tier=');
+    expect(workflow).not.toContain('inputs.tier');
+    expect(workflow).toContain('gh workflow run release.yml');
   });
 
   it('把真 workflow 改坏一处，判据就红（端到端反向控制）', () => {

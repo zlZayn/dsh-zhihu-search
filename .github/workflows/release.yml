@@ -1,4 +1,5 @@
-# 发布：唯一入口是手动触发（Actions → Release → Run workflow，或 gh workflow run release.yml -f tier=patch）。
+# 发布：唯一入口是手动触发（Actions → Release → Run workflow，或 gh workflow run release.yml）。
+# **没有输入参数**（`force` 除外）—— 版本号来自 package.json，档位在本地 bump 时定。
 #
 # ⚠ 改本文件后**必须手动 dispatch 实跑一次**：PR 上的 CI 只跑 ci.yml，动 release.yml 的 PR
 # 就算绿勾也不代表发布链路验过。理由与 CI 全貌见 docs/PUBLISHING.md 的「CI」节。
@@ -20,6 +21,8 @@
 # 预发布：版本号里带预发布段（2.0.0-alpha.1）时，**按版本自己那段**发到同名 dist-tag（alpha），
 # latest 保持不动；不带预发布段时发默认 latest。判据是**结果版本**，不是任何输入参数，
 # 所以 publish 与 GitHub Release 两步读同一个输出，不会各判各的。
+# **tag 名 = v + package.json 里的版本号**（v2.0.0-alpha.1）。前缀是**显式补**的，不从值里推 ——
+# npm version 的输出自带 v，而 package.json 里没有；换来源时形状变了会把 tag 名带歪。
 # 换版本线在本地做：npm version <patch|minor|major|prerelease|premajor> --preid=alpha --no-git-tag-version
 # （premajor 开新线，prerelease 在同一条 X.Y.Z 线上 +1；别拿 premajor 推同一线上的下一个 alpha）。
 #
@@ -195,7 +198,13 @@ jobs:
           # 与 publish 同一判据（版本带预发布段即预发布），不按任何输入参数判。
           extra=""
           if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then extra="--prerelease"; fi
-          gh release create "${{ steps.version.outputs.version }}" \
+          # **tag 名必须带 v 前缀**，与本仓全部历史 tag 同形。
+          # 换数据来源时形状会跟着变：旧写法 version=$(npm version …) 的输出**自带 v**，
+          # 改成读 package.json 之后拿到的是裸版本号，直接当 tag 名用就与历史 tag 不同形 ——
+          # 而守卫用的是 git describe --match v[0-9]*，**它看不见不带 v 的 tag**（2026-09-22 真踩过）。
+          # 前缀在这里显式补，并由 test/release-workflow.test.ts 断言住。
+          tag="v${{ steps.version.outputs.version }}"
+          gh release create "$tag" \
             --target "$(git rev-parse HEAD)" \
-            --title "${{ steps.version.outputs.version }}" \
+            --title "$tag" \
             --generate-notes $extra
