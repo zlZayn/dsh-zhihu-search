@@ -35,9 +35,10 @@
 搜索不幻觉，引用有出处。给 DSH 装上知乎：站内检索、全网检索与直答三个工具，返回可引用的来源列表，而不是一段无法核对的摘要。
 
 <p align="center">
-  <img src="assets/settings-card.png" alt="插件详情页中的「知乎搜索」配置卡片" width="600">
+  <img src="assets/settings-card.png" alt="插件详情页中的「知乎检索」配置卡片" width="600">
   <br>
-  <em>在侧边栏 <strong>插件（Plugins）</strong> →「已安装（Installed）」组的本插件详情页里，Access Secret 就地填写、立即生效。</em>
+  <em>在侧边栏 <strong>插件（Plugins）</strong> →「已安装（Installed）」组里点<strong>「知乎检索」</strong>进详情页（标题下方那行代码体是技术名 <code>dsh-zhihu-search</code>），
+  Access Secret 就地填写、立即生效。</em>
 </p>
 
 ## 工具一览

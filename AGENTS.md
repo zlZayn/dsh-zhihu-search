@@ -52,16 +52,11 @@
 
 ## 待办
 
-- **卡片图重拍时要连页面上的名字与图标一起核对**：2026-09-22 起插件页与设置里显示的是 `locale` 里的
-  `meta.title` / `meta.description`（详情页标题从 `zhihu-search` 变成 `知乎检索` / `Zhihu Search`，
-  标题下方仍留着技术名 `dsh-zhihu-search`，描述那一行从空变成一句话），左上角那格图标也换成
-  [icon.svg](icon.svg)（36 视口里的「鲸鱼 + 知」同色双拼）。这几处都在两张卡片图的画面里，因此重拍时它们是新的**判废项** ——
-  拍前按 [locale/](locale/) 与 [icon.svg](icon.svg) 各 diff 一次，判据与拍摄路径见 [assets/AGENTS.md](assets/AGENTS.md)
-  与 [assets/README.md](assets/README.md)
+- **卡片图已随 2026-09-22 那批改动重截完毕**（配置入口回到 bundle 详情页内联、显示名与描述改读 `locale`、
+  左上角图标换成 [icon.svg](icon.svg) 的「鲸鱼 + 知」同色双拼 —— 三处都在新图里）。
+  **下一次动渲染面时按判据重来**：改 `locale` 的文案、改 [icon.svg](icon.svg)、或改卡片的 JSX / 样式 / 可见状态
+  都要**同批重截**两张（中英各一），判废项与拍摄路径见 [assets/AGENTS.md](assets/AGENTS.md) 与 [assets/README.md](assets/README.md)
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）。2026-09-22 起它服务的只剩**组合配置**一条来源
-- **卡片图待重截（降级为「更新」）**：配置入口**回到了 bundle 详情页内联**（点插件名进去就是配置区，行上没有 Configure），
-  也就是现有两张旧图拍的**正是**这个形态 —— 卡片本体 JSX / 样式 / 可见状态一字未改，要更新的只有图里的**版本 tag** 与开关 / 徽标现状。
-  本轮不重截（截图排在发布之后的独立一步）；判据（含三条新的**判废项**）与拍摄路径见 [assets/README.md](assets/README.md) 与 [assets/AGENTS.md](assets/AGENTS.md) 第 3 步
 - **真机验收未做**：迁移后的卡片只有在「插件装回 profile + 宿主重启」之后才谈得上验收，装回由主 agent 收尾统一做；验收口径见 [scripts/README.md](scripts/README.md) 与 [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - **npm 上已发布版本的头图会断**：npm 页面按 `main`（HEAD）取 README 里的图，而 v1.6.3 及更早的 README 写的是 `assets/cover.svg` —— 该文件已随头图换新（`banner.svg`）删除。**最新**那页会随下次发版自动修好；更早版本的页面文字在发布时就定死，除非把 `cover.svg` 补回。下次发版后顺手看一眼 npm 页面头图即可
 

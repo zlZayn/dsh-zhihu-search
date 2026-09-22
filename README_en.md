@@ -37,7 +37,8 @@ Grounded search. Cited answers. Three Zhihu tools for DSH: in-site search, globa
 <p align="center">
   <img src="assets/settings-card_en.png" alt="Zhihu Search config card on the plugin page" width="600">
   <br>
-  <em>Lives on the <strong>Plugins</strong> panel, on the bundle's details page under Installed. Enter your Access Secret and it takes effect immediately.</em>
+  <em>Lives on the <strong>Plugins</strong> panel: under Installed, click <strong>Zhihu Search</strong> to open its details page
+  (the technical name <code>dsh-zhihu-search</code> sits right below the title). Enter your Access Secret and it takes effect immediately.</em>
 </p>
 
 ## Tools
