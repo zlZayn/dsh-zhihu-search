@@ -15,15 +15,15 @@ import type { LocaleNamespaceMap } from '@deepseek-ai/dsh-client-ui-slots';
 /**
  * 字典命名空间。
  *
- * 与卡片的分派 key **同名但是两件事**：分派 key 是 `<包名>#<行 id>`（描述「哪一行的配置」），
+ * 与卡片的分派 key **同名但是两件事**：分派 key 是**包名**（描述「哪个 bundle 的配置」），
  * 这个命名空间只标识本卡片的文案归属，由注册时的 `locale:` 座位用。
- * 两者今天恰好都含包名，改一处不该顺手改另一处 —— 谁都不是谁的真源。
+ * 两者今天恰好同串，改一处不该顺手改另一处 —— 谁都不是谁的真源。
+ * 同理，它也不是 `ctx.configForms.get()` 要的那个 loader entry id（见 index.tsx 的 ENTRY_ID）。
  */
 export const LOCALE_NS = 'zhihu-search';
 
 /** 本卡片全部文案的 key。 */
 export type ZhihuLocaleKey =
-  | 'rowSummary'
   | 'readOnly'
   | 'secretLabel'
   | 'secretConfigured'
@@ -52,8 +52,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** 简体中文文案。 */
 const zh: Record<ZhihuLocaleKey, string> = {
-  // 行缺描述时的回退文案（插件管理页 那一行标题下面）。
-  rowSummary: '知乎站内搜索、全网搜索与直答。点 Configure 填写 Access Secret 与引用名。',
   readOnly: '当前连接不允许写入设置。',
   secretLabel: 'Access Secret',
   secretConfigured: '已配置',
@@ -77,7 +75,6 @@ const zh: Record<ZhihuLocaleKey, string> = {
 
 /** English copy. */
 const en: Record<ZhihuLocaleKey, string> = {
-  rowSummary: 'Zhihu in-site search, global web search, and Zhida. Open Configure to set the Access Secret and its reference.',
   readOnly: 'This connection does not allow writing settings.',
   secretLabel: 'Access Secret',
   secretConfigured: 'Configured',

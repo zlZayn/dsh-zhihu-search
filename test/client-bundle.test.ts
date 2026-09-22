@@ -3,7 +3,7 @@
  *
  * 为什么需要它：client 半体只有装进浏览器才能跑通，普通单测覆盖不到；
  * 但**产物格式**与**装配能否跑起来**是可以在这里钉死的 —— 信封 id、factory 形状、
- * 导出面、注册进 `plugins.row.config` 的 key（`<包名>#<行 id>`，两半都从仓内声明文件里读），
+ * 导出面、注册进 `plugins.bundle.config` 的 key（**包名**，从仓内声明文件里读），
  * 以及本模块最后那组「按真实 Cordis 语义挂载」。这几处任何一处错了，
  * 症状都是「插件页里什么都没有」，排查代价极高。
  *
@@ -18,10 +18,32 @@ import { readPackageName, readPatchRow } from './declaration.js';
 
 const require_ = createRequire(import.meta.url);
 
-/** 本包的包名与 bundle patch 的行；key 由它们拼出来（见 [declaration.ts](declaration.ts)）。 */
+/** 本包的包名与 bundle patch 的行；槽 key 与 get() 的实参取自它们（见 [declaration.ts](declaration.ts)）。 */
 const PACKAGE_NAME = readPackageName();
 const PATCH_ROW = readPatchRow();
-const ROW_KEY = `${PACKAGE_NAME}#${PATCH_ROW.id}`;
+/** `plugins.bundle.config` 的分派 key —— 就是这个 bundle 的**包名**。 */
+const BUNDLE_KEY = PACKAGE_NAME;
+/** `ctx.configForms.get()` 的实参 —— loader entry id。今天与包名同串，但不是一回事。 */
+const ENTRY_ID = PATCH_ROW.id;
+
+/**
+ * `ctx.configForms.get()` 交回的表单替身。
+ *
+ * 只要够卡片读 props 用：JSX 不求值组件体（本文件不装 React 渲染器），所以它的方法在
+ * 这些用例里不会被调用 —— 但形状必须与源码里的 `ConfigFormFace` 一致，否则 JSX 那一步的
+ * 类型检查会红。
+ */
+const formStub = {
+  getSnapshot: () => ({
+    status: 'ready' as const,
+    value: {},
+    user: undefined,
+    revision: 1,
+    writable: true,
+  }),
+  subscribe: () => () => undefined,
+  mutate: async () => true,
+};
 
 /** 一条被模块表接收的注册行。 */
 interface LoaderRow {
@@ -92,28 +114,41 @@ describe('client bundle 信封', () => {
     // `remote` 与 `remote.credentials` 都必须有：前者让 `ctx.remote` 属性访问合法，
     // 后者等命名空间就绪。漏掉 `remote` 会让整张卡片装不上（见本文件最后一组测试）。
     //
-    // 0.1.7 起 `settingsScope` 这个服务被删了：它曾经是卡片的读写面，现在换成宿主经槽位
-    // props 递过来的 `form`。声明一个不存在的服务不会降级 —— inject 是**激活门禁**，
+    // 0.1.7 起 `settingsScope` 这个服务被删了：它曾经是卡片的读写面，现在换成卡片自己经
+    // `ctx.configForms.get(ENTRY_ID)` 取。声明一个不存在的服务不会降级 —— inject 是**激活门禁**，
     // 少一个服务整个 apply 不执行（用户看到的是「pending (waiting for service)」）。
+    // `configForms` 也**不在**这张名单里：它是 0.1.7 才有的，写进模块级 inject 会让更早宿主上
+    // 整个客户端半体 pending；本文件用嵌套 `ctx.inject` 给它把门（见 apply）。
     expect(mod['inject']).toEqual(['slots', 'remote', 'remote.credentials', 'locale']);
     expect(mod['inject']).not.toContain('settingsScope');
   });
 });
 
 describe('client bundle 注册行为', () => {
-  /** 槽位注册交出的组件；本组只关心它的 view 分支返回值。 */
-  type CardComponent = (seat: { t: (key: string) => string; view: 'summary' | 'page'; form?: unknown }) => unknown;
+  /** 槽位注册交出的组件；本组只关心它拿到的座位。 */
+  type CardComponent = (seat: { t: (key: string) => string; view: 'page' }) => unknown;
 
   /** 取出一个注册元素的 props（槽位交出来的是 React 元素，不渲染就看不到它的座位）。 */
   function propsOf(element: unknown): Record<string, unknown> {
     return (element as { props?: Record<string, unknown> }).props ?? {};
   }
 
-  /** 记录槽位注册与字典注册的替身上下文。 */
-  function makeContext() {
+  /**
+   * 记录槽位注册与字典注册的替身上下文。
+   *
+   * @param configForms - 要提供的配置服务；传 `undefined` 模拟「更早的宿主没有这个服务」
+   *   —— 那时嵌套的 `ctx.inject` 回调**不会**来，卡片整个不注册。
+   */
+  function makeContext(
+    configForms: { get: (id: string) => unknown } | null = { get: () => formStub },
+  ) {
     const registrations: Array<Record<string, unknown>> = [];
     const components: CardComponent[] = [];
     const injected: string[] = [];
+    /** 嵌套 `ctx.inject` 请求过的服务名。 */
+    const scopedInjections: string[] = [];
+    /** `configForms.get()` 收到过的实参。 */
+    const formRequests: string[] = [];
     const dictionaries: Array<{ ns: string; locales: string[] }> = [];
     /** 读凭据域的记账。写路径由 [credential-store 单测](credential-store.test.ts) 覆盖。 */
     const credentialReads: string[][] = [];
@@ -141,78 +176,136 @@ describe('client bundle 注册行为', () => {
         return () => undefined;
       },
     };
-    const ctx = {
-      ...base,
-      slots: {
-        inject(name: string, callback: () => unknown) {
-          injected.push(name);
-          callback();
-        },
-        register(options: Record<string, unknown>, component: unknown) {
-          registrations.push(options);
-          components.push(component as CardComponent);
-          return () => undefined;
-        },
+    const slots = {
+      inject(name: string, callback: () => unknown) {
+        injected.push(name);
+        callback();
+      },
+      register(options: Record<string, unknown>, component: unknown) {
+        registrations.push(options);
+        components.push(component as CardComponent);
+        return () => undefined;
       },
     };
-    return { ctx, base, registrations, components, injected, dictionaries, credentialReads };
+    // 记下每次取表单的实参：槽 key 取包名、get() 取 entry id，两者**今天同串但不是一回事**，
+    // 所以这里必须能看见实际传进去的那个字符串。
+    const service = configForms === null
+      ? undefined
+      : { get: (id: string) => { formRequests.push(id); return configForms.get(id); } };
+    const ctx = {
+      ...base,
+      inject(names: string[], callback: (scoped: unknown) => unknown) {
+        scopedInjections.push(...names);
+        if (service === undefined) return;
+        callback({ ...base, slots, configForms: service });
+      },
+      slots,
+    };
+    return {
+      ctx,
+      base,
+      registrations,
+      components,
+      injected,
+      scopedInjections,
+      formRequests,
+      dictionaries,
+      credentialReads,
+    };
   }
 
-  it('注册进 plugins.row.config，key 逐字等于「包名#行 id」', () => {
-    const { ctx, registrations, injected } = makeContext();
+  it('注册进 plugins.bundle.config，key 就是这个 bundle 的包名', () => {
+    const { ctx, registrations, injected, scopedInjections } = makeContext();
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(ctx);
 
-    expect(injected).toEqual(['plugins.row.config']);
+    // 服务走嵌套 inject、槽走 slots.inject —— 两条都要看得见。
+    expect(scopedInjections).toEqual(['configForms']);
+    expect(injected).toEqual(['plugins.bundle.config']);
     expect(registrations).toHaveLength(1);
-    expect(registrations[0]).toMatchObject({ name: 'plugins.row.config', key: ROW_KEY });
-    // 反向控制：那两个文件真的能拼出这个 key —— 而不是这边写死一个、那边也写死一个。
-    // 行 id 与包名今天恰好同名，所以这条同时钉住「patch 的 name 必须等于本包包名」。
+    expect(registrations[0]).toMatchObject({ name: 'plugins.bundle.config', key: BUNDLE_KEY });
+    // 反向控制：那个 key 真的就是 package.json 的 name —— 而不是这边写死一个、那边也写死一个。
+    expect(BUNDLE_KEY).toBe('dsh-zhihu-search');
     expect(PATCH_ROW.name).toBe(PACKAGE_NAME);
-    expect(ROW_KEY).toBe('dsh-zhihu-search#dsh-zhihu-search');
   });
 
-  it('page 视图把宿主的 form 座位原样交给卡片，summary 视图交出行描述', () => {
+  it('取表单用 loader entry id，不是槽 key（两者今天同串，但不是一回事）', () => {
+    const { ctx, formRequests } = makeContext();
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(ctx);
+
+    // 槽按**包名**寻址、get() 按**entry id** 取名空间。写成包名在今天是等价的，
+    // 所以只有这条断言能在 patch 的 id 改掉之后把人叫醒（那时卡片会变成永远只读且不报错）。
+    expect(formRequests).toEqual([ENTRY_ID]);
+    expect(ENTRY_ID).toBe(PATCH_ROW.id);
+  });
+
+  it('page 视图把 apply 期取到的表单面交给卡片（座位里没有 form）', () => {
     const { ctx, components } = makeContext();
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(ctx);
 
     expect(components).toHaveLength(1);
-    const form = { state: { status: 'ready', writable: true }, mutate: async () => true };
-
-    // page 分支交出的是卡片元素（JSX 不求值组件体，所以这里不碰 React）；
-    // 断言的是**座位透传**：宿主给的 form 必须原样进去，不能在调用点上被解引用 ——
-    // `seat.form.state` 这种写法在 form 缺席时就是一次 TypeError，整块页面白屏。
-    expect(propsOf(components[0]?.({ t: (key) => key, view: 'page', form })).form).toBe(form);
-
-    // summary 分支不渲染表单，只回一行文案：插件管理页拿它当**行缺描述时的回退**
-    // （DSH `PluginManagerPage.tsx:496`），本插件 patch 的行没有 description，所以一定可见。
-    expect(components[0]?.({ t: (key) => key, view: 'summary' })).toBe('rowSummary');
-  });
-
-  it('form 缺席时不抛错：原样透传 undefined（宿主还没描述好，或这一行不可配置）', () => {
-    const { ctx, components } = makeContext();
-    const mod = materialize(loadBundleRow());
-    (mod['apply'] as (ctx: unknown) => void)(ctx);
-
-    // 两种成因表现相同：这一行不在 describe 镜像里（没有 volatile 字段、或连接是 memory 模式），
-    // 或者描述还没回来。卡片按「不可写」渲染，注册这条路径不该有任何区别。
+    // `plugins.bundle.config` 的座位**只有 view**（DSH PluginManagerPage.tsx:584 只递 view 与
+    // entryKey），表单是 apply 期自己取的。这条同时钉住「卡片不再从座位读 form」。
     const element = components[0]?.({ t: (key) => key, view: 'page' });
-    expect(propsOf(element).form).toBeUndefined();
+    expect(propsOf(element).form).toBe(formStub);
     expect(propsOf(element).store).toBeDefined();
     expect(typeof propsOf(element).trackSavedRef).toBe('function');
   });
 
-  it('注册是惰性的：只在声明到账后才发生', () => {
-    const { base, registrations } = makeContext();
-    // 槽位声明缺席时 inject 不应回调 —— 用不触发回调的替身验证。
+  it('只注册 page：该槽没有任何渲染 summary 的路径，不留死文案', () => {
+    const { ctx, registrations } = makeContext();
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(ctx);
+
+    // DSH `slot-contract.ts:12-16`：「Bundle configuration renders only `page`」，
+    // 且全仓只有 `PluginManagerPage.tsx:584` 一处用该槽、只传 `view: 'page'`。
+    expect(registrations).toHaveLength(1);
+    expect(registrations[0]).not.toHaveProperty('views');
+  });
+
+  it('注册是惰性的：槽声明不到账就不注册', () => {
+    // 服务在、槽不在：slots.inject 的回调永远不来 —— 用不触发回调的替身验证。
+    const { ctx, registrations, injected } = makeContext();
     const silent = {
-      ...base,
-      slots: { inject: () => undefined, register: () => () => undefined },
+      ...ctx,
+      slots: {
+        inject(name: string, _callback: () => unknown) {
+          injected.push(name);
+        },
+        register: () => () => undefined,
+      },
     };
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(silent);
+    expect(injected).toEqual(['plugins.bundle.config']);
     expect(registrations).toHaveLength(0);
+  });
+
+  it('configForms 缺席时 apply 仍跑完，且不发生任何槽注册（降级路径）', () => {
+    // 这是「嵌套 inject」那个取舍的**唯一证据位**：更早的宿主没有 configForms，
+    // 模块级 inject 会因为激活门禁让整个半体 pending（字典、凭据订阅、探测全都不跑）；
+    // 嵌套 inject 则是 apply 照跑、只有卡片不注册。
+    const { ctx, base, registrations, dictionaries, scopedInjections } = makeContext(null);
+    let effects = 0;
+    const counting = {
+      ...ctx,
+      effect(callback: () => unknown) {
+        effects += 1;
+        return base.effect(callback);
+      },
+    };
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(counting);
+
+    expect(registrations).toHaveLength(0);
+    // 字典照常注册 —— 这正是「半体没被整个关掉」的证据。
+    expect(dictionaries).toHaveLength(1);
+    expect(effects).toBeGreaterThan(0);
+    // `inject` 那句确实被求值了 —— 服务的缺席表现为**这个回调不来**（下面那个赋值），
+    // 而不是压根没去问。这两件事的差别就是这个取舍的意义所在。
+    expect(scopedInjections).toEqual(['configForms']);
   });
 
   it('注册时声明 locale 命名空间，框架才会注入 t 座位', () => {
@@ -243,24 +336,59 @@ describe('client bundle 注册行为', () => {
 });
 
 /**
- * 配置槽的能力探测（不查版本号）。
+ * 能力探测（不查版本号）。
  *
- * 槽缺席时 `ctx.slots.inject` 的回调永远不来，且宿主不报错 —— 症状是「插件页里什么都没有」。
- * 它盯的是一个**真实故障**：宿主把本插件当普通 entry 挂载（不是 bundle 行）时没有行、
- * 没有 Configure 控件。这三条钉住提示路径：只对缺席的宿主发声、格式是英文 `[WARN]`（无 emoji）、
- * 且**可撤销**（槽迟到就补一条 `[INFO]`），注册语义一字不动。
+ * 「卡片拿不到表单」这条链上有**两环**：服务 `configForms`（0.1.7 才有的客户端服务）与槽
+ * `plugins.bundle.config`。任一环缺席都不报错 —— 症状是「插件页里什么都没有」。
+ *
+ * **它盯的不是「槽名换没换」**：`plugins.bundle.config` 在 0.1.6 与 0.1.7 上都不传 `form`
+ * （DSH `PluginManagerPage.tsx` 两版同形），所以在这个槽上「槽在不在」推不出「拿不拿得到表单」。
+ * 真正会断的那一环是**服务缺席**（更早的宿主里没有 `configForms`）。
+ *
+ * 这几条钉住提示路径：只对缺席的那一环发声、格式是英文 `[WARN]`（无 emoji）、
+ * 且**可撤销**（迟到就补一条 `[INFO]`），注册语义一字不动。
  */
-describe('client bundle 配置槽能力探测', () => {
+describe('client bundle 配置能力探测', () => {
   /** 跨过任意合理窗口宽度的推进量；测试不依赖真实时钟。 */
   const PAST_PROBE_WINDOW_MS = 60_000;
 
-  /** 探测用例的最小服务面：卡片外壳要的替身，槽由各用例自己给。 */
-  function probeContext(slots: { inject: unknown; register: unknown }): Record<string, unknown> {
+  /**
+   * 一个服务的三种到场方式。
+   *
+   * `auto` = 当场回调（正常装配）；`manual` = 留住回调由用例决定何时触发（迟到）；
+   * `absent` = 永不回调（服务/槽不存在）。
+   */
+  type Arrival = 'auto' | 'manual' | 'absent';
+
+  /** 探测用例的最小服务面：卡片外壳要的替身，两环由各用例给到场方式。 */
+  function probeContext(
+    arrival: { configForms: Arrival; slots: Arrival },
+  ): { ctx: Record<string, unknown>; fireConfigForms: () => void; fireSlots: () => void } {
     const credentials = {
       describe: async () => ({ ok: true as const, value: {} }),
       set: async () => ({ ok: true as const, value: undefined }),
     };
-    return {
+    const registrations: Array<Record<string, unknown>> = [];
+    const scopedInjections: string[] = [];
+    const slotInjections: string[] = [];
+    let pendingConfigForms: (() => void) | undefined;
+    let pendingSlots: (() => void) | undefined;
+
+    const slots = {
+      inject(name: string, callback: () => unknown) {
+        slotInjections.push(name);
+        if (arrival.slots === 'auto') callback();
+        else if (arrival.slots === 'manual') pendingSlots = callback;
+      },
+      register(options: Record<string, unknown>) {
+        registrations.push(options);
+        return () => undefined;
+      },
+    };
+    // **不提前清窗口**：注册发生才算「卡片能被看见」。服务到账就清的话，
+    // 「服务在、槽缺席」这一档会变成静默 —— 正是探测要报的那件事。
+    const service = { get: () => formStub };
+    const base = {
       locale: { register: () => () => undefined },
       remote: { credentials, $on: () => () => undefined },
       effect(callback: () => unknown) {
@@ -268,6 +396,21 @@ describe('client bundle 配置槽能力探测', () => {
         return () => undefined;
       },
       slots,
+    };
+    const ctx = {
+      ...base,
+      inject(names: string[], callback: (scoped: unknown) => unknown) {
+        scopedInjections.push(...names);
+        if (arrival.configForms === 'auto') callback({ ...base, configForms: service });
+        else if (arrival.configForms === 'manual') {
+          pendingConfigForms = () => callback({ ...base, configForms: service });
+        }
+      },
+    };
+    return {
+      ctx,
+      fireConfigForms: () => pendingConfigForms?.(),
+      fireSlots: () => pendingSlots?.(),
     };
   }
 
@@ -291,19 +434,20 @@ describe('client bundle 配置槽能力探测', () => {
     };
   }
 
-  it('槽声明按时到达：不发声（探测只对缺席的宿主说话）', () => {
+  /** 一条英文、无 emoji 的提示。 */
+  function expectPlainEnglish(line: string): void {
+    expect(line).toMatch(/^\[WARN\] /);
+    // 英文、无 emoji：整条提示必须是纯 ASCII。
+    expect(line).toMatch(/^[\x20-\x7E]+$/);
+  }
+
+  it('两环都按时到达：不发声（探测只对缺席的那一环说话）', () => {
     vi.useFakeTimers();
     const captured = spyConsole();
     try {
-      const ctx = probeContext({
-        inject: (_name: string, callback: () => unknown) => {
-          callback();
-          return () => undefined;
-        },
-        register: () => () => undefined,
-      });
+      const probe = probeContext({ configForms: 'auto', slots: 'auto' });
       const mod = materialize(loadBundleRow());
-      (mod['apply'] as (ctx: unknown) => void)(ctx);
+      (mod['apply'] as (ctx: unknown) => void)(probe.ctx);
       vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
       expect(captured.warnings).toEqual([]);
       expect(captured.infos).toEqual([]);
@@ -313,62 +457,107 @@ describe('client bundle 配置槽能力探测', () => {
     }
   });
 
-  it('槽声明缺席：超时后恰有一条英文 [WARN]，不注册也不抛错', () => {
+  it('服务缺席（更早的宿主）：超时后恰有一条英文 [WARN]，报的是服务', () => {
     vi.useFakeTimers();
     const captured = spyConsole();
     try {
-      let silentRegistrations = 0;
-      const silent = probeContext({
-        inject: () => undefined,
-        register: () => {
-          silentRegistrations += 1;
-          return () => undefined;
-        },
-      });
+      const probe = probeContext({ configForms: 'absent', slots: 'absent' });
       const mod = materialize(loadBundleRow());
-      (mod['apply'] as (ctx: unknown) => void)(silent);
+      (mod['apply'] as (ctx: unknown) => void)(probe.ctx);
       expect(captured.warnings).toEqual([]);
       vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
       expect(captured.warnings).toHaveLength(1);
       const line = captured.warnings[0] ?? '';
-      expect(line).toMatch(/^\[WARN\] /);
-      // 英文、无 emoji：整条提示必须是纯 ASCII。
-      expect(line).toMatch(/^[\x20-\x7E]+$/);
-      // 文案里点名的槽必须是实际注册的那个 —— 探测说要装 A、卡片装进 B，是最坏的一种「说谎」。
-      expect(line).toContain('plugins.row.config');
-      expect(silentRegistrations).toBe(0);
+      expectPlainEnglish(line);
+      // 报的必须是**实际断掉的那一环**：这里是服务，不是槽。
+      expect(line).toContain('configForms');
+      expect(line).not.toContain('plugins.bundle.config');
     } finally {
       captured.restore();
       vi.useRealTimers();
     }
   });
 
-  it('槽迟于窗口才声明：补一条 [INFO] 撤销提示，注册照常发生', () => {
+  it('服务在、槽缺席：报的是槽，且点名的槽就是实际注册的那个', () => {
     vi.useFakeTimers();
     const captured = spyConsole();
     try {
-      const registrations: Array<Record<string, unknown>> = [];
-      let pending: (() => unknown) | undefined;
-      const late = probeContext({
-        inject: (_name: string, callback: () => unknown) => {
-          pending = callback;
-          return () => undefined;
-        },
-        register: (options: Record<string, unknown>) => {
-          registrations.push(options);
-          return () => undefined;
-        },
-      });
+      const probe = probeContext({ configForms: 'auto', slots: 'absent' });
       const mod = materialize(loadBundleRow());
-      (mod['apply'] as (ctx: unknown) => void)(late);
+      (mod['apply'] as (ctx: unknown) => void)(probe.ctx);
       vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
       expect(captured.warnings).toHaveLength(1);
-      expect(typeof pending).toBe('function');
-      pending?.();
+      const line = captured.warnings[0] ?? '';
+      expectPlainEnglish(line);
+      // 探测说要装 A、卡片装进 B，是最坏的一种「说谎」。
+      expect(line).toContain('plugins.bundle.config');
+    } finally {
+      captured.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('服务与槽都迟到：各补一条 [INFO] 撤销，注册照常发生', () => {
+    vi.useFakeTimers();
+    const captured = spyConsole();
+    try {
+      const probe = probeContext({ configForms: 'manual', slots: 'manual' });
+      const mod = materialize(loadBundleRow());
+      (mod['apply'] as (ctx: unknown) => void)(probe.ctx);
+      vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
+      expect(captured.warnings).toHaveLength(1);
+      expect(captured.warnings[0]).toContain('configForms');
+
+      // 服务到账：撤掉自己那一条。此时槽仍未到，所以下面还会再补一条。
+      probe.fireConfigForms();
       expect(captured.infos).toHaveLength(1);
-      expect(captured.infos[0]).toMatch(/^\[INFO\] /);
-      expect(registrations).toHaveLength(1);
-      expect(registrations[0]).toMatchObject({ name: 'plugins.row.config', key: ROW_KEY });
+      expect(captured.infos[0]).toContain('configuration service');
+
+      // 槽也到了：撤掉它自己那一条，注册照常发生。两条 INFO 各说各的那一环。
+      probe.fireSlots();
+      expect(captured.infos).toHaveLength(2);
+      expect(captured.infos[1]).toMatch(/^\[INFO\] /);
+      expect(captured.infos[1]).toContain('plugins.bundle.config');
+    } finally {
+      captured.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('服务迟到、窗口内没有槽：撤的是服务那条，槽那条照发', () => {
+    // 两环**各自**持有窗口与标记 —— 这一条钉住「一环到账不误撤另一环」。
+    // 构造方式：服务窗口内到账（所以服务那条不发），槽窗口内始终没到。
+    vi.useFakeTimers();
+    const captured = spyConsole();
+    try {
+      const probe = probeContext({ configForms: 'auto', slots: 'absent' });
+      const mod = materialize(loadBundleRow());
+      (mod['apply'] as (ctx: unknown) => void)(probe.ctx);
+      vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
+      expect(captured.warnings).toHaveLength(1);
+      expect(captured.warnings[0]).toContain('plugins.bundle.config');
+
+      // 服务那一条窗口已经收工（内到账），所以这里补不出任何 INFO ——
+      // 「没发过警告就不撤销」是刻意的：一条不存在的提示不该被「撤销」。
+      expect(captured.infos).toEqual([]);
+      expect(probe.fireConfigForms).toBeTypeOf('function');
+    } finally {
+      captured.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('服务缺席：槽那一环不跟着喊（一次超时只发一条）', () => {
+    // 服务都没到，「槽在不在」还没到判的时候 —— 报它是替另一环说话，而且会变成两条噪音。
+    vi.useFakeTimers();
+    const captured = spyConsole();
+    try {
+      const probe = probeContext({ configForms: 'absent', slots: 'absent' });
+      const mod = materialize(loadBundleRow());
+      (mod['apply'] as (ctx: unknown) => void)(probe.ctx);
+      vi.advanceTimersByTime(PAST_PROBE_WINDOW_MS);
+      expect(captured.warnings).toHaveLength(1);
+      expect(captured.warnings[0]).toContain('configForms');
     } finally {
       captured.restore();
       vi.useRealTimers();
@@ -398,10 +587,17 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
       set: async () => ({ ok: true as const, value: undefined }),
     };
     return {
-      slots: { inject: () => undefined, register: () => () => undefined },
+      // 替身要**当场回调**：`inject` 的语义是「依赖齐了就注册」，不回调等于槽缺席。
+      // 原先是 `inject: () => undefined`，所以那一组从来没验过注册路径 ——
+      // 它只验了「apply 跑起来」。
+      slots: { inject: (_name: string, callback: () => unknown) => callback(), register: () => () => undefined },
       locale: { register: () => () => undefined },
       remote: { credentials, $on: () => () => undefined },
       'remote.credentials': credentials,
+      // 卡片经**嵌套** `ctx.inject(['configForms'])` 取它 —— 它不在模块级 inject 里，
+      // 所以「服务由兄弟 fiber 提供时那次嵌套 inject 会不会回调」必须在这里实测，
+      // 普通替身（传普通对象）结构性地看不见这件事。
+      configForms: { get: () => formStub },
     };
   }
 
@@ -419,7 +615,9 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
    * @param available - 要提供哪些服务；用来对比「少一个会怎样」。
    * @returns 是否真的执行到了 `apply`。
    */
-  async function mount(available: Record<string, unknown>): Promise<{ applied: boolean; failure?: string }> {
+  async function mount(
+    available: Record<string, unknown>,
+  ): Promise<{ applied: boolean; failure?: string; slotsInjected: string[]; registrations: number }> {
     const ctx = new Context();
     await ctx.plugin({
       name: 'test-environment',
@@ -430,6 +628,8 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
     });
 
     const mod = materialize(loadBundleRow());
+    const slotsInjected: string[] = [];
+    let registrations = 0;
     let applied = false;
     let failure: string | undefined;
     try {
@@ -437,20 +637,72 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
         name: 'dsh-zhihu-search',
         inject: mod['inject'] as string[],
         apply: (inner: unknown) => {
-          (mod['apply'] as (context: unknown) => void)(inner);
+          // 只把 `ctx.slots` 包一层代理来记账，其余原样：真实上下文是 Cordis 的属性代理，
+          // **不能往上写属性**（实测 `cannot set property "slots" in multiple fibers`），
+          // 所以这里用 `Object.create` 让它留在原型上，只在那一个键上拦截。
+          // `inject` 必须原样转给真实服务 —— 嵌套 inject 要靠它进 fiber。
+          const wrapped = Object.create(inner as object) as object;
+          Object.defineProperty(wrapped, 'slots', {
+            get() {
+              const slots = Reflect.get(inner as object, 'slots') as {
+                inject: (n: string, cb: () => unknown) => unknown;
+                register: unknown;
+              };
+              return new Proxy(slots, {
+                get(target, key, receiver) {
+                  if (key === 'inject') {
+                    return (name: string, callback: () => unknown) => {
+                      slotsInjected.push(name);
+                      return target.inject(name, callback);
+                    };
+                  }
+                  if (key === 'register') {
+                    return () => {
+                      registrations += 1;
+                      return () => undefined;
+                    };
+                  }
+                  return Reflect.get(target, key, receiver) as unknown;
+                },
+              });
+            },
+          });
+          (mod['apply'] as (context: unknown) => void)(wrapped);
           applied = true;
         },
       });
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
     }
-    return failure === undefined ? { applied } : { applied, failure };
+    return { applied, slotsInjected, registrations, ...(failure === undefined ? {} : { failure }) };
   }
 
   it('声明齐全时 apply 真的跑起来，不再抛 without inject', async () => {
     const run = await mount(services());
     expect(run.failure).toBeUndefined();
     expect(run.applied).toBe(true);
+  });
+
+  it('嵌套 inject 在真实 Cordis 上到账：服务由兄弟 fiber 提供时卡片照常注册', async () => {
+    // 这条是嵌套 `ctx.inject(['configForms'])` 的**唯一**运行时证据位：
+    // 服务不在模块级 inject 里，所以「兄弟 fiber 提供它时那次嵌套 inject 会不会回调」
+    // 只能在这里问。它不回调 = 卡片永远不注册，而其余所有断言仍然是绿的。
+    const run = await mount(services());
+    expect(run.failure).toBeUndefined();
+    expect(run.slotsInjected).toEqual(['plugins.bundle.config']);
+    expect(run.registrations).toBe(1);
+  });
+
+  it('反向控制：少提供 configForms 时 apply 仍跑完，但一次槽注册都不发生', async () => {
+    // 与上面三条反向控制对照：那三条是**激活门禁**（服务不在模块级 inject 里 → apply 不跑），
+    // 这一条是**嵌套把门**（apply 照跑，只有卡片不注册）。两种降级形态完全不同，别混。
+    const partial = services();
+    delete (partial as Record<string, unknown>)['configForms'];
+    const run = await mount(partial);
+    expect(run.failure).toBeUndefined();
+    expect(run.applied).toBe(true);
+    expect(run.slotsInjected).toEqual([]);
+    expect(run.registrations).toBe(0);
   });
 
   it('反向控制：少提供 remote 时 apply 不跑（证明上面那条断言有区分力）', async () => {

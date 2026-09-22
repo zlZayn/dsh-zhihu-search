@@ -24,7 +24,7 @@
 - `index.ts` 是**唯一**接触 Cordis 的模块，也是唯一创建状态的模块。其余模块都不认识框架，因此可脱离框架单测。
 - `present/` 与 `utils/` 是**叶子**：不反向依赖任何模块，也不做运行时 `@deepseek-ai/*` 导入。前者的理由是纯度必须可测，后者同理。
 - `transport.ts` 位于编译器的**下游**而非上游——它不认识语义化参数（见「不可破坏的约束」）。
-- 浏览器半体 `client/` 与 Node 侧**不共享任何模块**：它通过 `ctx.slots` 的 `plugins.row.config` 槽与 Host 通信 —— Host 把「这一行的配置表单」当作座位 props 递进来，它不 import `src/` 下的实现。
+- 浏览器半体 `client/` 与 Node 侧**不共享任何模块**：它通过 `ctx.slots` 的 `plugins.bundle.config` 槽与 Host 通信，表单则由它自己向 `ctx.configForms.get(<loader entry id>)` 取 —— **该槽的座位里没有 form**（见下方「两半体约束」）。它不 import `src/` 下的实现。
 
 逐文件的箭头清单与职责见 [src/README.md](../src/README.md)。
 
@@ -113,13 +113,23 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 插件在面板中出现，需要**两个半体同时存在**：
 
 - Host 半体把配置标成**活引用**（volatile）：`accessSecretRef` 与 `disableNativeWebSearch` 两个字段带 `.volatile()`，插件因此不重新挂载就能读到新值（`.get()`），并用一条 `ctx.on('loader/volatile-update', …)` 做写入后的就地生效。它再用 `settings.configure({ auto: false }, ctx.fiber)` 声明「这一行自带页面」。
-- 浏览器半体声明 `dsh.client`，并向插件页的 `plugins.row.config` 注册一张卡片，`key` 是 `<包名>#<行 id>`（两半分别取自 `package.json` 与 `cordis.patch.yml`）。
+- 浏览器半体声明 `dsh.client`，并向插件页的 `plugins.bundle.config` 注册一张卡片，`key` 是**包名**（`package.json` 的 `name`）；页面把它内联渲染在 bundle 详情页的描述与「包含的组件」之间，**没有多一次 Configure**。
+- **这个槽的座位里没有 `form`**（DSH 契约原文「Bundle configuration renders only `page`」，且渲染点只递 `view` 与 `entryKey`），所以卡片自己经客户端服务取：`ctx.configForms.get(<loader entry id>)` —— 该服务的命名空间就是 Host 插件条目的 id，取值即 `cordis.patch.yml` 那条 insert 的 `id`。
+- 于是有**两个今天同串、却不是一回事**的 id：槽 key 取**包名**、`get()` 取**loader entry id**。写错前者 = 整块配置不出现（页面不报错）；写错后者 = 卡片照常出现、**永远只读且不报错**。这是本设计唯一新引入的静默耦合点，防线是 [test/settings-seam.test.ts](../test/settings-seam.test.ts) 从源码与 `cordis.patch.yml` 解析后对账。
 
-拿不到这个槽（更早的宿主，或本插件被当成普通 entry 而不是 bundle 行挂载）时：`ctx.slots.inject` 的回调不会来，宿主也不报错 —— 界面**静默缺席**。浏览器半体因此带一个超时的能力探测（不查版本号，只问槽在不在）：超时后在客户端控制台留一条英文 WARN，槽迟到再补一条 INFO 撤销；探测不改变注册语义，也不影响任何既有功能。分水岭与升级指引见根 [README.md](../README.md) 的「版本兼容」。
+拿不到表单这条链上有**两环**，各自缺席都不报错 —— 界面**静默缺席**：
 
-页面渲染的是三者同时在场：**这一行的配置表单**（`form`，宿主在渲染期算好、经座位 props 递进来）、已注册的条目、以及条目要的那个视图。**没有通用 schema 表单回退**，因此「注册了条目」与「页面里看得见」是两件事。`<包名>#<行 id>` 是插件页取这一行配置的连接键，任一半拼错都是静默不显示。
+- `configForms` 服务不在（更早的宿主）：`ctx.inject(['configForms'], …)` 的回调不会来。
+  **这个服务刻意不进模块级 `inject`** —— 那是**激活门禁**，写进去会让更早宿主上的整个客户端半体 pending，连控制台提示都发不出来。嵌套 `inject` 把降级限制在「卡片不注册」这一件事上。
+- 槽 `plugins.bundle.config` 不在（宿主没装插件管理页，或本插件被当成普通 entry 挂载）：`ctx.slots.inject` 的回调不会来。
 
-**卡片刻意不订阅表单值**：`form.state` 是页面渲染期取的一份快照（DSH 原文「refreshed by the page owner」），不是订阅源。保存成功后由页面重渲染把新值推进来（`mutate` 会把宿主应答折回镜像）。所以卡片是「受控 + 本地草稿」，订阅只用于凭据状态那一小块。
+浏览器半体因此带一个超时的能力探测（不查版本号），**两环各给一个窗口、各报实际断掉的那一环**：超时后在客户端控制台留一条英文 WARN，那一环迟到再补一条 INFO 撤销；探测不改变注册语义，也不影响任何既有功能。分水岭与升级指引见根 [README.md](../README.md) 的「版本兼容」。
+
+**为什么探测不能只盯槽名**：`plugins.bundle.config` 在接缝换代前后的两版宿主上**都不传 `form`**（该槽的座位始终只有 `view`），所以在这个槽上「槽在不在」与「拿不拿得到表单」结构性地无关 —— 只把槽名换一换会得到一个自相矛盾的探测。真正会断的那一环是**服务缺席**。（版本号现查 `package.json` 的 `engines.dsh` 与 `npm view @deepseek-ai/dsh dist-tags`，本文不抄。）
+
+页面渲染的是三者同时在场：**配置表单**、已注册的条目、以及条目要的那个视图。**没有通用 schema 表单回退**，因此「注册了条目」与「页面里看得见」是两件事。包名是插件页取这个 bundle 配置的连接键，写错就是静默不显示。注册只给 `page`：该槽没有 `summary` 的渲染路径，所以不留那条回退文案。
+
+**快照归卡片自己订阅**（这是换回本槽唯一的架构级行为变化）：`configForms.get()` 返回的 `ConfigForm` 有 `getSnapshot` 与 `subscribe`（DSH 保证快照引用在下次变化前稳定），所以卡片用 `useSyncExternalStore` 订阅；宿主在别处改了配置（或 `mutate` 把应答折回镜像）时卡片会自己更新，不必等页面重渲染。挂在 `plugins.row.config` 上时相反 —— 那里的 `form` 由页面在渲染期递进来，`form.state` 是一份「由页面 owner 刷新」的快照，页面重渲染才是推进源。
 
 卡片文案走 DSH 的 locale 服务，不硬编码：字典在 [src/client/locales.ts](../src/client/locales.ts)，槽位注册声明 `locale:` 之后框架才把类型化的 `t` 座位注入组件 props。代价是一个**硬依赖**——声明了 `locale:` 的条目在渲染时要求已安装的 locale 面，缺席即报错而不是降级。标准 `dsh web` 装配必然带它（DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`，多个核心客户端包也依赖它）。
 
@@ -198,7 +208,7 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 ### 宿主版本（DSH 侧，不随我们改）
 
 - **声明面只有一个**：`package.json` 的 `peerDependencies`。它同时是安装器的判据与 npm 页面上的对外承诺 —— 改它等于改对外契约，因此必须与实测对齐，不能凭文档推断。
-- **依赖的是运行时行为，不是 API 形状**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)` 的页面策略、`ctx.on('loader/volatile-update', …)` 的就地对账、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.row.config` 的 keyed 分派与 `form` 座位、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、开关不生效、密钥读不到）。
+- **依赖的是运行时行为，不是 API 形状**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)` 的页面策略、`ctx.on('loader/volatile-update', …)` 的就地对账、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派（key = 包名，且**该槽不传 `form`**）、客户端服务 `ctx.configForms` 的 `get`/`getSnapshot`/`subscribe`/`mutate`、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、开关不生效、密钥读不到）。
 - **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`），**`alpha` 才是当前承诺线**（2026-09-22 起；在那之前是 `next`，而 `next` 现在已低于我们的下限）。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
 - **类型面会先于行为面动**：宿主收紧 API 签名时 `npm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
 

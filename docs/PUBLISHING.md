@@ -198,7 +198,7 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 ## 兼容性
 
-**声明面**只有一个事实来源：[package.json](../package.json) 的 `engines.dsh` 与 `peerDependencies`（两处形状必须一致，由 [test/redlines.test.ts](../test/redlines.test.ts) 断言）。依赖的是 DSH 的**运行时行为**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)`、`ctx.on('loader/volatile-update', …)`、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.row.config` 的 keyed 分派与 `form` 座位、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、开关不生效、密钥读不到）。判断依据始终以 DSH 源码为准，不凭文档推断。
+**声明面**只有一个事实来源：[package.json](../package.json) 的 `engines.dsh` 与 `peerDependencies`（两处形状必须一致，由 [test/redlines.test.ts](../test/redlines.test.ts) 断言）。依赖的是 DSH 的**运行时行为**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)`、`ctx.on('loader/volatile-update', …)`、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派（key = 包名，且**该槽不传 `form`**）、客户端服务 `ctx.configForms` 的 `get`/`getSnapshot`/`subscribe`/`mutate`、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、开关不生效、密钥读不到）。判断依据始终以 DSH 源码为准，不凭文档推断。
 
 **验证面**是 [compat.yml](../.github/workflows/compat.yml)。声明与验证必须对齐 —— 改动任意一边都要同步另一边。
 
@@ -212,7 +212,7 @@ DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三�
 | `next` | **已低于本仓声明的下限** | 换包 + 跑全套；红了**只记录**（job 红、run 绿） |
 | `latest` | **不可用** | 不碰 |
 
-**2026-09-22 两个 job 的角色对调了**（此前 next 承诺、alpha 前瞻）。理由不是口味：本仓的配置接缝只存在于 alpha 线上 —— 接缝换代之前 `next` 线上没有 `plugins.row.config` 那套配置面，声明面因此只能跟着 alpha 走。而一条**长期必红**的周更任务会让「红 = 出事」这个信号失效，所以判断哪条线是承诺线，判据是「声明面落在哪」，不是历史习惯。
+**2026-09-22 两个 job 的角色对调了**（此前 next 承诺、alpha 前瞻）。理由不是口味：本仓的配置接缝只存在于 alpha 线上 —— 接缝换代之前 `next` 线上没有 `configForms` 那套配置面（卡片因此拿不到表单），声明面只能跟着 alpha 走。而一条**长期必红**的周更任务会让「红 = 出事」这个信号失效，所以判断哪条线是承诺线，判据是「声明面落在哪」，不是历史习惯。
 
 `latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本，`@deepseek-ai/dsh` 自己那条也未必落在本插件的声明区间里 —— 逐包对照现查 `node scripts/compat-swap.mjs check latest`（`check` 收任意 dist-tag），宿主自己那条线现查 `npm view @deepseek-ai/dsh dist-tags`。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线。
 

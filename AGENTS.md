@@ -52,7 +52,9 @@
 ## 待办
 
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）。2026-09-22 起它服务的只剩**组合配置**一条来源
-- **卡片图待重截**：接缝换代后配置入口从「插件详情页里的配置区」变成「那一行的 Configure 页」，卡片本体没变但图里的上下文已经不符；本轮不重截（要占用维护者浏览器且真机要等插件装回 profile），判据与拍摄路径见 [assets/README.md](assets/README.md) 与 [assets/AGENTS.md](assets/AGENTS.md) 第 3 步
+- **卡片图待重截（降级为「更新」）**：配置入口**回到了 bundle 详情页内联**（点插件名进去就是配置区，行上没有 Configure），
+  也就是现有两张旧图拍的**正是**这个形态 —— 卡片本体 JSX / 样式 / 可见状态一字未改，要更新的只有图里的**版本 tag** 与开关 / 徽标现状。
+  本轮不重截（截图排在发布之后的独立一步）；判据（含三条新的**判废项**）与拍摄路径见 [assets/README.md](assets/README.md) 与 [assets/AGENTS.md](assets/AGENTS.md) 第 3 步
 - **真机验收未做**：迁移后的卡片只有在「插件装回 profile + 宿主重启」之后才谈得上验收，装回由主 agent 收尾统一做；验收口径见 [scripts/README.md](scripts/README.md) 与 [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - **npm 上已发布版本的头图会断**：npm 页面按 `main`（HEAD）取 README 里的图，而 v1.6.3 及更早的 README 写的是 `assets/cover.svg` —— 该文件已随头图换新（`banner.svg`）删除。**最新**那页会随下次发版自动修好；更早版本的页面文字在发布时就定死，除非把 `cover.svg` 补回。下次发版后顺手看一眼 npm 页面头图即可
 
@@ -73,7 +75,11 @@
 - **redact 是 schema 驱动的**：`redactSecrets` 只剥 schema 里带 `role('secret')` 的字段。把一个「代码已经不读」的密钥字段从 schema 里删掉，redact 会同时停止保护它，而功能测试全绿。接缝换代后下行的配置描述**只投影 volatile 字段**，所以非 volatile 的密钥字段已经不在这条线路上（本仓的 `accessSecret` 就是如此）—— 但这层保护对**任何新加的密钥字段**仍然靠角色声明，删字段前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「密钥解析契约」。
 - **挂载方式**：只用官方 CLI `dsh plugin --profile web add <path>`（它会顺带 reconcile `dsh.profile.bundles`），不要手改 `cordis.patch.yml`。
 - **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：**`alpha` = 当前承诺线**（2026-09-22 起；声明面落在它上面），`next` = 已低于我们声明下限的旧线（只作记录），`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本，具体值一律现查（`npm view @deepseek-ai/dsh dist-tags`）。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
-- **接缝缺席是静默的，两种缺席方式各踩过一次**：宿主早于这次接缝换代（2026-09-22）时，客户端 `inject` 里的 `settingsScope` 让整个 `apply` 不执行（**声明一个已删服务 = 激活门禁不过**，用户只看到 pending）；而接缝换代后的 `plugins.bundle.config` 槽**还在**、只是渲染时不传 `form`（**槽在 ≠ 拿得到读写面**）。两者都不报错。判据是「能不能拿到这一行的 `form`」，所以能力探测必须跟着卡片改槽 —— 说谎的探测比没有探测更坏，见 [src/client/AGENTS.md](src/client/AGENTS.md)。
+- **接缝缺席是静默的，缺法有三种、各踩过一次**：
+  - 宿主早于接缝换代时，客户端 `inject` 里的 `settingsScope` 让整个 `apply` 不执行（**声明一个已删服务 = 激活门禁不过**，用户只看到 pending）；
+  - 客户端服务 `configForms` 缺席（更早的宿主）时**卡片整个不注册** —— 界面里没有任何配置入口；
+  - **`entry id` 与包名不再同串**时卡片照常出现，但 `ctx.configForms.get(<entry id>)` 查不到命名空间 —— **永远只读且不报错**。
+  三者都不报错。判据是「能不能拿到**这一条**的 `form`」，所以能力探测盯的是那条链上真正会断的两环（服务与槽），**不是槽名** —— 说谎的探测比没有探测更坏，见 [src/client/AGENTS.md](src/client/AGENTS.md)。
 - **换包有两个方向相反的假信号，都踩过**：
   - **假红**：`npm install <包>@<tag>` 会把某个恰好没被点名的包**目录清空**（实测 `dsh-client-locale` 与 `dsh-client-ui-primitives` 都中过），随后 typecheck 报「找不到模块」。`--legacy-peer-deps` 也不是解药：它连 npm 的 peer 自动安装一起关掉，`dsh-tools` 自己的 peer 集体缺席。正路是 [scripts/compat-swap.mjs](scripts/compat-swap.mjs) 的「改写 package.json + 裸 `npm install`」。
   - **假绿**：`npm install` 因上游 peer 冲突退出时，`node_modules` 会**原封不动停在旧版本**上，随后 typecheck 与全套测试全绿。所以换包之后必须 `verify` 断言实装版本 —— **「测试全绿」不等于「跑在目标版本上」**。

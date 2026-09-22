@@ -3,7 +3,7 @@
 ## 问题
 
 「`package-lock.json` 的 `resolved` 必须指向 `registry.npmjs.org`」这条规则已经写在
-[docs/PUBLISHING.md 的「前置条件」](../docs/PUBLISHING.md) 里 —— 但它是**散文**：
+[docs/PUBLISHING.md 的「前置条件」](../../docs/PUBLISHING.md) 里 —— 但它是**散文**：
 本仓的锁文件一直是干净的（131/131 官方源），可**没有任何东西在守它**。
 
 同源的另一仓（`dsh-ds-balance`）正是这条规则的失败案例：它的锁文件有 129/131 条指向
@@ -14,7 +14,7 @@
 **在 `test/redlines.test.ts` 新增「锁文件」组**：读 `package-lock.json` 的 `packages[*].resolved`，
 断言 http(s) 来源必须落在 `https://registry.npmjs.org/`；失败信息点出**是哪些包、指向了哪个 host**。
 
-同时把 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 那条前置条件的口径改成「已落成红线，别再靠人核对」。
+同时把 [docs/PUBLISHING.md](../../docs/PUBLISHING.md) 那条前置条件的口径改成「已落成红线，别再靠人核对」。
 
 ## 替代方案
 

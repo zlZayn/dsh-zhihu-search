@@ -1,5 +1,17 @@
 # 设置接缝迁移：从 `settingsScope` 到「行配置 + volatile 活引用」
 
+> **部分已被取代（2026-09-22 同日）**：本文件关于**注册哪个槽**的决策（只注册 `plugins.row.config`）
+> 作废 —— 配置入口已回到 `plugins.bundle.config`（内联在 bundle 详情页里，没有多一次 Configure），
+> 表单改由卡片自己经 `ctx.configForms.get(<entry id>)` 取。
+> 见 [2026-09-22-config-entry-back-to-bundle-config.md](2026-09-22-config-entry-back-to-bundle-config.md)。
+> **正文一字不改**：它记录的是当时的事实（那天旧槽确实拿不到 `form`），那份事实仍然真实 ——
+> 变的只是「因此该注册哪个槽」这个结论，因为取表单的**另一条路**（`configForms`）在同一天被找到了。
+>
+> 本文件里**仍然成立**的部分：`settingsScope` 被删、只有 volatile 字段进配置页、
+> `schema.check()` 不存在、`loader/volatile-update` 要那条 `import type`、
+> `settings.configure({ auto: false })` 的页面策略、`settings` 与 `credentials` 两个平行可选层、
+> `migrate.ts` 的单向迁徙。
+
 **一轮之内改了整条客户端配置面，这是它的决策记录。** 事实核对一律回 DSH 源码
 （tag `dsh-v0.1.7-alpha.1` = `c36a83ff6b`），不凭文档推断。
 

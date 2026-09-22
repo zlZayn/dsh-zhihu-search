@@ -141,7 +141,9 @@ jobs:
         # 对不上时，这一步会失败。
         # --provenance 在 OIDC 下是冗余的显式声明，留着当哨兵：环境产不出 provenance 就红。
         # 预发布走独立 dist-tag（如 alpha），latest 留在上一个稳定版：
-        # 这一版要求宿主提供 plugins.bundle.config 槽（下限见 peerDependencies），在旧宿主上配置界面不会出现，
+        # 这一版要求宿主既有 plugins.bundle.config 槽**又有客户端服务 configForms**（两者缺一，配置界面
+        # 都不会出现）。光有槽不够：该槽不传 form，表单只能经 configForms.get(<entry id>) 取。
+        # 下限见 engines.dsh / peerDependencies，在旧宿主上配置界面静默不出现，
         # 直接推 latest 会让还在旧宿主线上的使用者静默失去配置入口。
         run: |
           if [ "${{ inputs.tier }}" = "premajor" ]; then

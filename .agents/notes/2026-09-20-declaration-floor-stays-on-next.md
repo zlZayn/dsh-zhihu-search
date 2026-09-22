@@ -46,7 +46,7 @@
 - **顺手改一行代码适配 alpha**（`src/index.ts:404` 的 handler 改成返回 `undefined` 或 async）——
   否。那等于**把插件挪到前瞻线**上：前瞻线还会继续动，承诺面就跟着漂；
   而且这次改的是"我们承诺的宿主范围"，不是顺手修一个类型。
-- **用 `--legacy-peer-deps` / `--force` 强行装** —— 否。本仓 [PUBLISHING.md](../docs/PUBLISHING.md) 与
+- **用 `--legacy-peer-deps` / `--force` 强行装** —— 否。本仓 [PUBLISHING.md](../../docs/PUBLISHING.md) 与
   活跃坑里明确写过 `--legacy-peer-deps` 会连 npm 的 peer 自动安装一起关掉，不是解药。
 - **把 `dsh-code-runtime` 一起抬** —— 否，且它抬不了：它在 alpha 线上停在更旧的版本，
   声明抬上去就没有可装的版本（它是 dev-only 且无人引用，删掉那条待办时才一起收）。

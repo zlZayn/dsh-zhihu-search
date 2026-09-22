@@ -138,21 +138,21 @@ dsh plugin --profile web add dsh-zhihu-search
 
 ## 版本兼容
 
-配置界面注册在宿主插件页的 `plugins.row.config` 槽上，分派 `key` 的两半取自本仓的 [package.json](package.json)（包名）与 [cordis.patch.yml](cordis.patch.yml)（行 id）。这张卡片要能读写，宿主还得把**这一行的配置表单**（`form`）递进来 —— 那要求宿主的设置接缝达到 `engines.dsh` 声明的**下限版本**；那份声明是唯一事实来源，本文件不抄版本号。
+配置界面注册在宿主插件页的 `plugins.bundle.config` 槽上，分派 `key` 是**本插件的包名**（[package.json](package.json) 的 `name`）。这个槽**不把表单递给页面**，所以卡片自己向 `ctx.configForms.get(<loader entry id>)` 取 —— `configForms` 是 0.1.7 才有的客户端服务，接缝因此要求宿主的设置接缝达到 `engines.dsh` 声明的**下限版本**；那份声明是唯一事实来源，本文件不抄版本号。
 
-- **宿主够新**：插件页 →「已安装（Installed）」组 → **dsh-zhihu-search** → 该插件的行上出现 **Configure** 控件，密钥与开关都在那个页面里改。
-- **宿主更早，或本插件不是以 bundle 行挂载的**：三个工具照常工作，插件页里**不会出现配置入口** —— 静默，不报错。这就是分水岭；浏览器控制台会留一条 WARN 级英文提示说明这件事。
+- **宿主够新**：插件页 →「已安装（Installed）」组 → **点 dsh-zhihu-search 进它的详情页**，配置区就内联在描述与「包含的组件」之间 —— **没有多一次 Configure**，密钥与开关都在那里改。
+- **宿主更早（没有 `configForms`）**：三个工具照常工作，插件页里**不会出现配置入口** —— 静默，不报错。这就是分水岭；浏览器控制台会留一条 WARN 级英文提示说明这件事。
 - **需要就地配置**：把宿主升到 `engines.dsh` 声明的版本或更高 —— 那个版本目前只在 `alpha` 线上，装法 `npm install -g @deepseek-ai/dsh@alpha`；哪条线指向哪个版本现查 `npm view @deepseek-ai/dsh dist-tags`。
 
 宿主版本线怎么装见[安装 → 前置](#前置)；每周的实测结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 
 ## 配置
 
-配置界面挂在宿主插件页的**行配置**槽（`plugins.row.config`）上；它在什么时候不出现、不出现时会发生什么，见[版本兼容](#版本兼容)。
+配置界面挂在宿主插件页的**组合配置**槽（`plugins.bundle.config`，以包名为键）上；它在什么时候不出现、不出现时会发生什么，见[版本兼容](#版本兼容)。
 
 ### 在插件页填写
 
-打开侧边栏 **插件（Plugins）** →「已安装（Installed）」组的 **dsh-zhihu-search** → 点该插件的行上那个 **Configure**，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
+打开侧边栏 **插件（Plugins）** →「已安装（Installed）」组 → **点 dsh-zhihu-search** 进它的详情页，配置区就在描述与「包含的组件」之间；填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
 
 密钥写进 DSH 的凭据存储（`~/.dsh/.credentials.yaml`），**不写进配置文件** —— 活动 profile 的 Cordis patch 里只有凭据引用名与开关，可以安全地截图或分享。
 

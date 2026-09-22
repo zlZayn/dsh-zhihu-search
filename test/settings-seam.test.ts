@@ -2,8 +2,12 @@
  * 设置接缝不变量（0.1.7-alpha.1 迁移的固化）。
  *
  * 这一组盯的是**两半体与仓内声明之间的对账**，而不是某一侧的行为：
- * 旧机制（`settingsScope` / `installSection` / `plugins.bundle.config`）一旦被谁顺手写回来，
+ * 旧机制（`settingsScope` / `installSection`）一旦被谁顺手写回来，
  * 症状都是**静默**的 —— 卡片不出现、开关不生效，页面与控制台都不报错。所以写成会红的断言。
+ *
+ * **`plugins.bundle.config` 不在这张名单里**（2026-09-22 更正）：它是 0.1.6 与 0.1.7 **都有**的
+ * 合法槽，本插件的配置卡片就注册在它上面，而 `plugins.row.config` 才是这次回退换掉的那个 ——
+ * 把两者搞反会在运行时把一张好卡片判成违规。
  *
  * 全部从 `src/` 与仓内声明文件读，不 import 产物（产物面由
  * [client-bundle.test.ts](client-bundle.test.ts) 负责）。
@@ -66,7 +70,7 @@ describe('接缝不变量：客户端 inject', () => {
   });
 });
 
-describe('接缝不变量：卡片分派 key 的两半', () => {
+describe('接缝不变量：槽 key（包名）', () => {
   const packageName = readPackageName();
   const patchRow = readPatchRow();
 
@@ -75,23 +79,48 @@ describe('接缝不变量：卡片分派 key 的两半', () => {
     expect(patchRow.id.length).toBeGreaterThan(0);
   });
 
-  it('客户端源码里的两个字面量与声明文件逐字相等', () => {
+  it('BUNDLE_NAME 与 package.json 的 name 逐字相等', () => {
     // 产物里的 key 由 client-bundle 验；这里验**源码字面量** —— 两者都红才说明
-    // 「改了 package.json / cordis.patch.yml，源码忘了跟」这件事一定被抓住。
+    // 「改了 package.json，源码忘了跟」这件事一定被抓住。
     const source = effective('src/client/index.tsx');
     const bundleName = /const BUNDLE_NAME = '([^']+)';/.exec(source);
-    const rowId = /const ROW_ID = '([^']+)';/.exec(source);
     expect(bundleName?.[1], 'src/client/index.tsx 的 BUNDLE_NAME').toBe(packageName);
-    expect(rowId?.[1], 'src/client/index.tsx 的 ROW_ID').toBe(patchRow.id);
   });
 
-  it('槽名是 plugins.row.config，且 key 由那两半拼成', () => {
+  it('槽名是 plugins.bundle.config，key = 包名（不是 <包名>#<行 id>）', () => {
     const source = effective('src/client/index.tsx');
-    expect(source).toContain("ctx.slots.inject('plugins.row.config'");
-    expect(source).toContain("name: 'plugins.row.config'");
-    expect(source).toContain('key: ROW_KEY');
-    // 旧槽还在宿主里（渲染它时不传 form），但本插件**不再注册**它：注册了也拿不到读写面。
-    expect(source).not.toContain("'plugins.bundle.config'");
+    expect(source).toContain("ctx.slots.inject('plugins.bundle.config'");
+    expect(source).toContain("name: 'plugins.bundle.config'");
+    expect(source).toContain('key: BUNDLE_NAME');
+    // 行配置槽是这次回退换掉的那一个：它才需要 <包名>#<行 id> 拼串，本插件不再注册它。
+    expect(source).not.toContain("'plugins.row.config'");
+  });
+});
+
+describe('接缝不变量：configForms.get() 的实参', () => {
+  const patchRow = readPatchRow();
+
+  it('取表单用的 entry id 逐字等于 bundle patch 那条 insert 的 id', () => {
+    // 这是本设计唯一新引入的**静默耦合点**：槽 key 取包名、get() 取 loader entry id，
+    // 两者今天同串但是两个不同的东西。改了 patch 的 id 之后槽 key 仍然对得上（卡片照常出现），
+    // get() 却查不到命名空间 —— 卡片永远只读，**且不报错**。所以这里钉住源码字面量。
+    const source = effective('src/client/index.tsx');
+    const entryId = /const ENTRY_ID = '([^']+)';/.exec(source);
+    expect(entryId?.[1], 'src/client/index.tsx 的 ENTRY_ID').toBe(patchRow.id);
+  });
+
+  it('get() 的实参就是那个常量，而不是就地写的一串字面量', () => {
+    // 就地写死的话，上面那条对账会变成一句空话（它只验常量，不验调用点）。
+    const source = effective('src/client/index.tsx');
+    expect(source).toContain('.get(ENTRY_ID)');
+    expect(source).not.toMatch(/\.get\(['"]/);
+  });
+
+  it('服务取用的是嵌套 ctx.inject，不进模块级 inject 门禁', () => {
+    // 模块级 inject 是**激活门禁**：把 0.1.7 才有的 configForms 写进去，更早宿主上整个
+    // 客户端半体 pending —— 字典、凭据订阅、探测连发声机会都没有。上一组已钉住四要素。
+    const source = effective('src/client/index.tsx');
+    expect(source).toContain("ctx.inject(['configForms']");
   });
 });
 
