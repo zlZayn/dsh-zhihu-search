@@ -72,6 +72,10 @@
 - 配置区完整：**插件标题与描述**（由插件页自己画）、三个字段行、状态徽标（已配置 / 未配置）、说明行、**唯一的保存按钮** —— 一样不缺
 - 出现折叠头、「放弃」按钮或卡片外框，说明拍的是旧界面
 - **配置区里没有任何 Configure 控件**，且「包含的组件」那一行**没有右向箭头**（`aria-label` 形如 `配置 zhihu-search` / `Configure zhihu-search` 的按钮必须不存在）；`[data-plugin-row-detail]` 也不得出现 —— 有它们就是拍了 `plugins.row.config` 那一版，判废
+- **图里的版本 tag 等于当前 `package.json` 的 `version`**（拍前 diff 一次）—— **这就是「bump 必须在截图之前」的原因**：
+  宿主实时读清单里那个号，所以号没 bump 就拍，图里必然是**上一个已发布版本**（2026-09-22 踩过：
+  图里那个 `v2.0.0-alpha.0` 正是当时 npm 上已发布的那一版，而工作树以为界面会跟着变）。
+  顺序因此是死的：**bump → 提交 → 再截图 → 最后发布**；流程见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「发版前确认」。
 - 说明文案与当前 [locales.ts](../src/client/locales.ts) **逐字一致**（拍前 diff 一次）
 - **左上角那格图标是包根的 [icon.svg](../icon.svg)**（拍前与它 diff 一次）：36 视口里的**「鲸鱼 + 知」双拼**，
   **两支同为知乎蓝 `#0084FF`**、透明底、**不含 `dsh-zhihu-search` 那行字**、无底板。

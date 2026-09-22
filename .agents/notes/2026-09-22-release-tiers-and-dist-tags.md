@@ -1,5 +1,13 @@
 # 发版档位与 dist-tag：为什么必须有 `prerelease`，以及 dist-tag 凭什么判
 
+> **本文的 workflow 形态已被取代**（2026-09-22，同一天稍后）：用户拍板本仓改成**版本驱动** ——
+> `release.yml` **不再 bump**，发布的就是 `package.json` 里那个号；`tier` / `preid` 输入撤销，
+> dist-tag 由**版本自己那段**推（与 `dsh-ds-balance` 同形）。取代它的是
+> [发布改成版本驱动：bump 是发布前的独立一步](2026-09-22-version-driven-release.md)。
+> **本文仍然有效的部分**：semver 的实测表（`premajor` vs `prerelease`）、
+> 「dist-tag 按结果版本判、不按输入参数判」这条判据、以及「workflow 自己 bump 会让工作树停在旧号」
+> 这个根因 —— 新记录只改形态，不改这些结论。**正文一字未改**（沿用本仓惯例）。
+
 **一轮之内给 `release.yml` 加了一个档、改了 dist-tag 的判据、修了一句自相矛盾的提示，这是它的决策记录。**
 数字一律是本机实测（npm 12.0.1 / Node v24.18.0），不是从文档推断。
 

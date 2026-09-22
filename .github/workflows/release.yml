@@ -11,14 +11,17 @@
 #
 # 幂等：重跑不会重复发布 —— 目标版本已在 npm 上时跳过 publish，只补齐 git 侧（提交 / tag / Release）。
 #
-# 预发布：两个档都用 preid（默认 alpha），产出预发布版本并**发布到 preid 同名 dist-tag**，
-# latest 保持不动；GitHub Release 也标为 prerelease。
-# - tier=prerelease：在**同一个 X.Y.Z 线**上把预发布计数 +1（2.0.0-alpha.0 → 2.0.0-alpha.1）；
-# - tier=premajor：开一条新的 X.Y.Z 预发布线（1.6.3 → 2.0.0-alpha.0）。
-# **别拿 premajor 去推同一线上的下一个 alpha**：semver 见 prerelease 不是 [0] 就把 major 加一，
-# 从 2.0.0-alpha.0 跑 premajor 得到的是 3.0.0-alpha.0（不可覆盖）。
-# **dist-tag 按「结果版本」判、不按 tier 判**：版本号里带 `-` 就发到 <preid>，否则默认 latest。
-# 走哪一档按 docs/PUBLISHING.md 定。
+# **版本驱动：本 workflow 不 bump 版本。** 发布的就是 package.json 里那个号 ——
+# 版本号是发布**之前**的独立一步（bump → 提交 → 再拍截图 → 最后发布），
+# 原因见 docs/PUBLISHING.md 与 .agents/notes/2026-09-22-release-tiers-and-dist-tags.md：
+# 界面上的版本 tag 就是 package.json 里那个号，workflow 自己 bump 会让工作树永远停在
+# 「上一个已发布版本」，**截图必然拍出旧号**。
+#
+# 预发布：版本号里带预发布段（2.0.0-alpha.1）时，**按版本自己那段**发到同名 dist-tag（alpha），
+# latest 保持不动；不带预发布段时发默认 latest。判据是**结果版本**，不是任何输入参数，
+# 所以 publish 与 GitHub Release 两步读同一个输出，不会各判各的。
+# 换版本线在本地做：npm version <patch|minor|major|prerelease|premajor> --preid=alpha --no-git-tag-version
+# （premajor 开新线，prerelease 在同一条 X.Y.Z 线上 +1；别拿 premajor 推同一线上的下一个 alpha）。
 #
 # 防噪音：bump 之前先跑 scripts/release-guard.mjs —— 上个 tag 以来若只剩非产物改动
 # （文档 / 测试 / CI / 工具脚本），说明没有可发布的行为变化，直接红。确需发版用 force 输入越过。
@@ -30,15 +33,6 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      tier:
-        description: 'SemVer 档位，按 docs/PUBLISHING.md 的问题链定档'
-        type: choice
-        required: true
-        options: [patch, minor, major, prerelease, premajor]
-      preid:
-        description: '预发布标识；仅当 tier=prerelease 或 premajor 时使用。版本发到同名 dist-tag，latest 不动'
-        type: string
-        default: alpha
       force:
         description: '越过「无行为变更不发版」守卫（仅在确需为文档/工具类改动发版时勾选）'
         type: boolean
@@ -101,53 +95,55 @@ jobs:
       # 发布态不变量：dsh.bundle 在、private 没设、engines.dsh 声明了、files 带 cordis.patch.yml。
       - run: npm run check:release
 
-      # bump 前先拦两处版本号漂移：npm version 会同时写两处，漂移只可能来自手工改动。
+      # 版本驱动的第一道闸：发布号写在两处，package.json 决定发什么、lockfile 决定 npm ci 装什么。
+      # 它不再拦「忘了 bump」—— 忘 bump 的症状是「这个版本已经在 npm 上」，由下面那步的幂等判据兜住。
       - name: Verify the lockfile version matches package.json
         run: |
           pkg=$(node -p "require('./package.json').version")
           lock=$(node -p "require('./package-lock.json').version")
           if [ "$pkg" != "$lock" ]; then
             echo "::error::package-lock.json version $lock does not match package.json version $pkg"
-            # 这里**不是**叫你在本地 bump：本 workflow 自己 bump（下一步）。
-            # 真走到这一步，先在本地把两处对齐（npm version <版本> --no-git-tag-version 会同时写两处）再重跑；
-            # 想换版本线，用 workflow 的 tier 输入。
-            echo "fix locally so both fields agree (npm version <version> --no-git-tag-version rewrites both), then re-run; use the tier input to pick the next version"
+            echo "fix locally so both fields agree (npm version <version> --no-git-tag-version rewrites both), then commit and re-run"
+          echo "本 workflow 不改写版本号：版本驱动的判据见文件头注释"
             exit 1
           fi
 
-      - name: Bump both version fields
-        id: bump
+      # 发布的版本号就是清单里那个；dist-tag 由**版本自己**的预发布段推导（2.0.0-alpha.1 → alpha），
+      # 不是第二个输入参数 —— 判据只此一处，publish 与 GitHub Release 读同一个输出。
+      - name: Read the version to publish
+        id: version
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          case "${{ inputs.tier }}" in
-            prerelease) version=$(npm version prerelease --preid="${{ inputs.preid }}" --no-git-tag-version) ;;
-            premajor) version=$(npm version premajor --preid="${{ inputs.preid }}" --no-git-tag-version) ;;
-            *) version=$(npm version "${{ inputs.tier }}" --no-git-tag-version) ;;
-          esac
-          # dist-tag 从**结果版本**推出来，不留第二处判据：带 `-` 的版本发到 preid 同名 tag，否则走默认 latest。
-          case "$version" in
-            *-*) tag="${{ inputs.preid }}" ;;
-            *) tag="" ;;
-          esac
+          version=$(node -p "require('./package.json').version")
+          tag=$(node -p "const v=require('./package.json').version; const m=/^[0-9]+\.[0-9]+\.[0-9]+-([A-Za-z][0-9A-Za-z-]*)(?:\.[0-9A-Za-z-]+)*$/.exec(v); m ? m[1] : ''")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "dist_tag=$tag" >> "$GITHUB_OUTPUT"
           echo "准备发布 $version（dist-tag: ${tag:-默认 latest}）"
 
+      # 幂等：这个版本已在 npm 上就跳过 publish，只补齐 git 侧（重跑一次即可修复「已发布但推送失败」）。
+      # 版本驱动之后它还多担一个职责：**忘了 bump** 的症状就是这里变红 —— 报的是「这个号已经在 npm 上」，
+      # 而不是发一个内容相同的新版本出去。
       - name: Check whether that version is already on npm
         id: check
         run: |
-          if npm view "dsh-zhihu-search@${{ steps.bump.outputs.version }}" version > /dev/null 2>&1; then
+          if npm view "dsh-zhihu-search@${{ steps.version.outputs.version }}" version > /dev/null 2>&1; then
             echo "published=true" >> "$GITHUB_OUTPUT"
-            echo "${{ steps.bump.outputs.version }} 已在 npm 上：跳过 publish，只补齐 git 侧"
+            echo "${{ steps.version.outputs.version }} 已在 npm 上：跳过 publish，只补齐 git 侧（如果这是忘了 bump，先本地 bump 再重跑）"
           else
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit the version bump
+      # bump 已经发生在这个 workflow 之外的本地提交里；这里只是在有残留改动时兜一次底
+      # （没有改动就跳过 —— 版本驱动下这是常态，不该因此变红）。
+      - name: Commit any remaining manifest changes
         run: |
-          git add package.json package-lock.json
-          git commit -m "chore: release ${{ steps.bump.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "清单没有改动（版本驱动：bump 已在本地提交里），跳过提交"
+          else
+            git add package.json package-lock.json
+            git commit -m "chore: commit manifest state for release ${{ steps.version.outputs.version }}"
+          fi
 
       - name: Publish to npm
         if: steps.check.outputs.published == 'false'
@@ -160,11 +156,11 @@ jobs:
         # 都不会出现）。光有槽不够：该槽不传 form，表单只能经 configForms.get(<entry id>) 取。
         # 下限见 engines.dsh / peerDependencies，在旧宿主上配置界面静默不出现，
         # 直接推 latest 会让还在旧宿主线上的使用者静默失去配置入口。
-        # dist-tag 由 bump 步按**结果版本**给出（预发布 → <preid>，稳定版 → 默认 latest）：
+        # dist-tag 由版本自己的预发布段给出（2.0.0-alpha.1 → alpha，稳定版 → 默认 latest）：
         # 判据只此一处，publish 与 GitHub Release 两步读同一个输出，避免「推 latest 的那一档其实是预发布」。
         run: |
-          if [ -n "${{ steps.bump.outputs.dist_tag }}" ]; then
-            npm publish --provenance --access public --tag "${{ steps.bump.outputs.dist_tag }}"
+          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
+            npm publish --provenance --access public --tag "${{ steps.version.outputs.dist_tag }}"
           else
             npm publish --provenance --access public
           fi
@@ -196,10 +192,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 与 publish 同一判据（结果版本带 `-` 即预发布），不按 tier 判。
+          # 与 publish 同一判据（版本带预发布段即预发布），不按任何输入参数判。
           extra=""
-          if [ -n "${{ steps.bump.outputs.dist_tag }}" ]; then extra="--prerelease"; fi
-          gh release create "${{ steps.bump.outputs.version }}" \
+          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then extra="--prerelease"; fi
+          gh release create "${{ steps.version.outputs.version }}" \
             --target "$(git rev-parse HEAD)" \
-            --title "${{ steps.bump.outputs.version }}" \
+            --title "${{ steps.version.outputs.version }}" \
             --generate-notes $extra

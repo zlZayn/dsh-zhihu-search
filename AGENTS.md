@@ -3,7 +3,7 @@
 ## 状态
 
 - 已发布版本以 [package.json](package.json) 的 `version` 为准 → <https://github.com/zlZayn/dsh-zhihu-search>
-- npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 手动触发，一次跑完 bump → 发布 → tag → GitHub Release）
+- npm → <https://www.npmjs.com/package/dsh-zhihu-search>（由 [release.yml](.github/workflows/release.yml) 手动触发：**只发 `package.json` 里那个号**，不 bump；版本号是发布前的本地一步，见「常用命令」的发版两步）
 - 功能、插件页配置卡片与本地真机验证全部完成；工具清单见 [README.md](README.md)。
 - 市场收录：仓库已带 `dsh-plugin` topic；`awesome-dsh-plugin` 的 [PR #5037](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5037) 已提，等评审 → [笔记](.agents/notes/2026-09-12-marketplace-submission.md)
 
@@ -35,7 +35,7 @@
 
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
-- 发版：`gh workflow run release.yml -f tier=patch|minor|major|prerelease|premajor`（预发布档配 `-f preid=alpha`）—— 唯一入口，档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由结果版本推导**（带预发布段 → preid 同名 tag，稳定档 → `latest`），**同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`**（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
+- **发版两步，顺序是死的**：① 本地 `npm version <档位> [--preid=alpha] --no-git-tag-version` → `git commit`；② `gh workflow run release.yml`（**没有 tier 参数** —— workflow 只发 `package.json` 里那个号，它不 bump）。档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由版本自己那段推**（`2.0.0-alpha.1` → `alpha`，稳定档 → `latest`）；同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
 - 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap alpha` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify alpha`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check alpha`（承诺线就是 alpha；`next` 已低于我们的下限，只作记录）
 
 ## 验证快照（2026-09-16 实跑）
@@ -77,7 +77,7 @@
 - **redact 是 schema 驱动的**：`redactSecrets` 只剥 schema 里带 `role('secret')` 的字段。把一个「代码已经不读」的密钥字段从 schema 里删掉，redact 会同时停止保护它，而功能测试全绿。接缝换代后下行的配置描述**只投影 volatile 字段**，所以非 volatile 的密钥字段已经不在这条线路上（本仓的 `accessSecret` 就是如此）—— 但这层保护对**任何新加的密钥字段**仍然靠角色声明，删字段前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「密钥解析契约」。
 - **挂载方式**：只用官方 CLI `dsh plugin --profile web add <path>`（它会顺带 reconcile `dsh.profile.bundles`），不要手改 `cordis.patch.yml`。
 - **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：**`alpha` = 当前承诺线**（2026-09-22 起；声明面落在它上面），`next` = 已低于我们声明下限的旧线（只作记录），`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本，具体值一律现查（`npm view @deepseek-ai/dsh dist-tags`）。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
-- **发版的两档预发布不是同义词，选错要赔一个版本号**：`prerelease` 在**同一条 `X.Y.Z` 线**上把预发布计数 +1，`premajor` **开新线**。从 `2.0.0-alpha.0` 跑 `premajor` 得到的是 **`3.0.0-alpha.0`**（semver 见 prerelease 不是 `[0]` 就给 major 加一），而 npm 上的版本号**不可覆盖**。本仓踩过一次：初版提案正是「先人工 bump 到 alpha.1 再跑 premajor」，被 Lead 用同一张实测表推翻 —— **别拿文档推断 semver，量一次**（`npm version <tier> --preid=alpha --no-git-tag-version` 在临时目录里跑）。另：workflow **自己 bump**，漂移提示不是叫你人工 bump。全套判据与实测输出见[决策记录](.agents/notes/2026-09-22-release-tiers-and-dist-tags.md)。
+- **发版的两档预发布不是同义词，选错要赔一个版本号**：`prerelease` 在**同一条 `X.Y.Z` 线**上把预发布计数 +1，`premajor` **开新线**。从 `2.0.0-alpha.0` 跑 `premajor` 得到的是 **`3.0.0-alpha.0`**（semver 见 prerelease 不是 `[0]` 就给 major 加一），而 npm 上的版本号**不可覆盖**。本仓踩过一次：初版提案正是「先人工 bump 到 alpha.1 再跑 premajor」，被 Lead 用同一张实测表推翻 —— **别拿文档推断 semver，量一次**（`npm version <tier> --preid=alpha --no-git-tag-version` 在临时目录里跑）。另：**2026-09-22 起本仓改成版本驱动** —— workflow **不 bump**，bump 是发布前的本地一步（先 bump → 提交 → 再截图 → 最后发布），所以现在这句话反过来成立：**本地 bump 才是正路**。全套判据与实测输出见[决策记录](.agents/notes/2026-09-22-release-tiers-and-dist-tags.md)与[版本驱动那条](.agents/notes/2026-09-22-version-driven-release.md)。
 - **接缝缺席是静默的，缺法有三种、各踩过一次**：
   - 宿主早于接缝换代时，客户端 `inject` 里的 `settingsScope` 让整个 `apply` 不执行（**声明一个已删服务 = 激活门禁不过**，用户只看到 pending）；
   - 客户端服务 `configForms` 缺席（更早的宿主）时**卡片整个不注册** —— 界面里没有任何配置入口；

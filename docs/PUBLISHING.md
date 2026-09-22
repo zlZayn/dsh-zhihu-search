@@ -6,30 +6,38 @@
 
 只列需要人判断的项；构建、测试、两处版本号一致、工作区状态由工作流自己保证。
 
+0. **先 bump、再截图、最后发布** —— 顺序不能反（2026-09-22 定，跨仓规则 5b）：
+   界面上的版本 tag 显示的就是 `package.json` 里那个号，而 release.yml **不 bump**。
+   所以「bump 并提交」是**发布之前的独立一步**，排在截图之前 —— 反过来的话，
+   截图拍到的永远是**上一个已发布版本**的号（本仓 2026-09-22 就是这么翻的车）。
 1. 档位按下方[版本号](#版本号)的问题链定：**patch / minor 由维护 agent 定档后直接发，major 必须先经人类确认**。
 2. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
 3. `cordis.patch.yml` 里**不含**任何凭据。
 
 ## 发版
 
-发版只有一个入口：手动触发 [release.yml](../.github/workflows/release.yml)。
+**两步，顺序是死的**：
 
 ```bash
-gh workflow run release.yml -f tier=patch                        # 稳定档
-gh workflow run release.yml -f tier=prerelease -f preid=alpha    # 预发布：同一条 X.Y.Z 线上的下一个 alpha
-# 或 Actions → Release → Run workflow
+# ① 本地：定档 → bump → 提交（这一步不改远端任何东西）
+npm version prerelease --preid=alpha --no-git-tag-version   # 同一条 X.Y.Z 线上的下一个 alpha
+git commit -am "chore: release v2.0.0-alpha.1"
+
+# ② 发布：把 package.json 里那个号发出去，workflow 不碰版本号
+gh workflow run release.yml                                 # 或 Actions → Release → Run workflow
 ```
 
-一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移 → `npm version <tier> --preid=… --no-git-tag-version`（同时写两处；`preid` 只对 `prerelease` / `premajor` 有意义）→ 提交 `chore: release vX.Y.Z` → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
+一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移（`package.json` ↔ `package-lock.json`）→ **读出** `package.json` 的版本 → 按版本自己的预发布段推 dist-tag → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
 
-五条设计约束：
+六条设计约束：
 
 - **先发布、后动远端**：publish 失败时远端不发生任何变化，tag 与 Release 也只可能在发布成功后创建。
 - **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
-- **dist-tag 按结果版本推导，不按 `tier` 判**：bump 之后若版本号带预发布段就发到 `preid` 同名 tag，否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出。理由：不这样的话「非 premajor 一律推 latest」，一旦有人用 `patch` 去推进 alpha 线，就会把预发布构建**推上 `latest`** —— 而 `latest` 停在 1.6.3，那是 workflow 自己做出上面那段注释警告的事。
+- **发布不得改写版本号（版本驱动）**：`release.yml` 只发 `package.json` 里那个号，**没有 bump 步**。判据是**会执行的命令行**（[scripts/check-release.mjs](../scripts/check-release.mjs) 的 `findVersionWrites`，`npm run check:release` 与 [test/release-workflow.test.ts](../test/release-workflow.test.ts) 读同一份，带反向控制）。为什么写成硬规则：界面上的版本 tag 就是那个号，workflow 自己 bump 会让工作树永远停在「上一个已发布版本」，**截图必然拍出旧号**。
+- **dist-tag 由版本自己推导，不按输入参数判**：版本号带预发布段（`2.0.0-alpha.1`）就发到**那段本身**（`alpha`），否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出（`steps.version.outputs.dist_tag`）。判据只此一处，避免「推 latest 的那一档其实是预发布」—— 而 `latest` 停在 1.6.3。
 - **手工推 tag 不会发布**：tag 由工作流创建，绕过上面的顺序没有意义。
-- **档位由判定链定**：`tier` 是入参，不从 commit 类型推断；patch / minor 由维护 agent 直接发，major 需人类确认。
-- **两个预发布档别选错**：`tier=prerelease` 在**同一条 `X.Y.Z` 线**上把预发布计数 +1（`2.0.0-alpha.0` → `2.0.0-alpha.1`），`tier=premajor` 开**新的 `X.Y.Z` 预发布线**（`1.6.3` → `2.0.0-alpha.0`）。在同一线上推下一个 alpha 时用 `premajor` 会得到 `3.0.0-alpha.0` —— semver 见 prerelease 不是 `[0]` 就给 major 加一；而 npm 上的版本号**不可覆盖**。判据与实测输出见[决策记录](../.agents/notes/2026-09-22-release-tiers-and-dist-tags.md)。
+- **档位由判定链定，且在本地定完再发**：`npm version` 的档位（`patch` / `minor` / `major` / `prerelease` / `premajor`）写在**本地的 bump 命令**里，不从 commit 类型推断；patch / minor 由维护 agent 直接发，major 需人类确认。
+- **两个预发布档别选错**：`prerelease` 在**同一条 `X.Y.Z` 线**上把预发布计数 +1（`2.0.0-alpha.0` → `2.0.0-alpha.1`），`premajor` 开**新的 `X.Y.Z` 预发布线**（`1.6.3` → `2.0.0-alpha.0`）。在同一线上推下一个 alpha 时用 `premajor` 会得到 `3.0.0-alpha.0` —— semver 见 prerelease 不是 `[0]` 就给 major 加一；而 npm 上的版本号**不可覆盖**。判据与实测输出见[决策记录](../.agents/notes/2026-09-22-release-tiers-and-dist-tags.md)。
 - **不发无行为变更的版本**：bump 之前先比「上个 tag..HEAD」的改动清单，只剩非产物改动就红；`force` 是唯一的越过方式，且要说明理由。
 
 ## 发布后才发现严重缺陷
@@ -99,6 +107,7 @@ gh workflow run release.yml -f tier=prerelease -f preid=alpha    # 预发布：�
 - 补上端点本来就有、只是没透出的信号 → Q3 否（不是新能力）→ patch。
 - 调整打包清单（排除 source map、补进英文 README）→ Q1 否 Q3 否 → patch。
 - 包元数据纠错（`keywords`、npm 页面描述）→ Q1 否 Q3 否 → patch。
+- **把发布流程从「档位驱动」改成「版本驱动」**（`release.yml` 去掉 bump、dist-tag 改按版本自己那段推；bump 变成发布前的本地一步）→ Q0 **是**（`.github/workflows/release.yml` 在产物判定里算改动，且下一次发布发的号由它决定）；Q1 否 Q2 否（使用者用法一个字都不用改）；Q3 否（**不是新能力**，是流程顺序的修正 —— 它修的是「截图必然拍出旧号」这个内部缺陷）→ **patch**。2026-09-22 判，与跨仓规则 5b 同批。
 - **加插件展示元数据**（包根 `locale/<lang>.json` 的 `meta.title` / `meta.description` 进 `files` 与 `exports`，即宿主界面上的名字与那句描述；**同一批还给包根加了 `icon.svg`**，理由与几何判据见[图标记录](../.agents/notes/2026-09-22-plugin-icon.md)）→ Q0 **是**（渲染文本变了：插件页与设置里显示的不再是技术名，详情页描述那行从空变成一句话；`files` 也只增不减）；Q1 否（旧版上正确的用法不因此变错）；Q2 否（不需要改用法、不需要改配置）；Q3 否（**不是新能力** —— 只是同一件东西显示得更清楚，与上面两条包元数据判例同类；`README` 里「点哪个名字进详情页」这句话跟着改，属描述同步而不是新用法）→ **patch**。2026-09-22 判，本次带这份元数据的版本是 `2.0.0-alpha.1`（预发布线上按 SemVer 语义取整到 `2.0.0`）；图标（可选字段）本次未加，判据见[决策记录](../.agents/notes/2026-09-22-plugin-display-metadata.md)。
 - 更新截图与 README 展示 → Q1 否 Q3 否 → patch —— 这是**搭车时的档位**，不是「为图发版」：`assets/` 与 `.md` 都不进产物，只含它们的区间会被[守卫](../scripts/release-guard.mjs)拦下，重截图随引起它的那次改动一起走（判例 `d0a3adb` 搭了 v1.4.0）。
 - 新增可选开关（如「隐藏原生网页搜索」）→ 旧用法全部仍然正确，且能观察到新能力 → Q3 是 → minor。
