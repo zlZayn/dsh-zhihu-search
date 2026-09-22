@@ -11,8 +11,14 @@
 #
 # 幂等：重跑不会重复发布 —— 目标版本已在 npm 上时跳过 publish，只补齐 git 侧（提交 / tag / Release）。
 #
-# 预发布：tier=premajor + preid（默认 alpha）产出如 2.0.0-alpha.0，并**发布到 preid 同名 dist-tag**，
-# latest 保持不动；GitHub Release 也标为 prerelease。走它还是走稳定档，按 docs/PUBLISHING.md 定。
+# 预发布：两个档都用 preid（默认 alpha），产出预发布版本并**发布到 preid 同名 dist-tag**，
+# latest 保持不动；GitHub Release 也标为 prerelease。
+# - tier=prerelease：在**同一个 X.Y.Z 线**上把预发布计数 +1（2.0.0-alpha.0 → 2.0.0-alpha.1）；
+# - tier=premajor：开一条新的 X.Y.Z 预发布线（1.6.3 → 2.0.0-alpha.0）。
+# **别拿 premajor 去推同一线上的下一个 alpha**：semver 见 prerelease 不是 [0] 就把 major 加一，
+# 从 2.0.0-alpha.0 跑 premajor 得到的是 3.0.0-alpha.0（不可覆盖）。
+# **dist-tag 按「结果版本」判、不按 tier 判**：版本号里带 `-` 就发到 <preid>，否则默认 latest。
+# 走哪一档按 docs/PUBLISHING.md 定。
 #
 # 防噪音：bump 之前先跑 scripts/release-guard.mjs —— 上个 tag 以来若只剩非产物改动
 # （文档 / 测试 / CI / 工具脚本），说明没有可发布的行为变化，直接红。确需发版用 force 输入越过。
@@ -28,9 +34,9 @@ on:
         description: 'SemVer 档位，按 docs/PUBLISHING.md 的问题链定档'
         type: choice
         required: true
-        options: [patch, minor, major, premajor]
+        options: [patch, minor, major, prerelease, premajor]
       preid:
-        description: '预发布标识；仅当 tier=premajor 时使用。版本发到同名 dist-tag，latest 不动'
+        description: '预发布标识；仅当 tier=prerelease 或 premajor 时使用。版本发到同名 dist-tag，latest 不动'
         type: string
         default: alpha
       force:
@@ -102,7 +108,10 @@ jobs:
           lock=$(node -p "require('./package-lock.json').version")
           if [ "$pkg" != "$lock" ]; then
             echo "::error::package-lock.json version $lock does not match package.json version $pkg"
-            echo "bump with: npm version <patch|minor|major> --no-git-tag-version"
+            # 这里**不是**叫你在本地 bump：本 workflow 自己 bump（下一步）。
+            # 真走到这一步，先在本地把两处对齐（npm version <版本> --no-git-tag-version 会同时写两处）再重跑；
+            # 想换版本线，用 workflow 的 tier 输入。
+            echo "fix locally so both fields agree (npm version <version> --no-git-tag-version rewrites both), then re-run; use the tier input to pick the next version"
             exit 1
           fi
 
@@ -111,13 +120,19 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ "${{ inputs.tier }}" = "premajor" ]; then
-            version=$(npm version premajor --preid="${{ inputs.preid }}" --no-git-tag-version)
-          else
-            version=$(npm version "${{ inputs.tier }}" --no-git-tag-version)
-          fi
+          case "${{ inputs.tier }}" in
+            prerelease) version=$(npm version prerelease --preid="${{ inputs.preid }}" --no-git-tag-version) ;;
+            premajor) version=$(npm version premajor --preid="${{ inputs.preid }}" --no-git-tag-version) ;;
+            *) version=$(npm version "${{ inputs.tier }}" --no-git-tag-version) ;;
+          esac
+          # dist-tag 从**结果版本**推出来，不留第二处判据：带 `-` 的版本发到 preid 同名 tag，否则走默认 latest。
+          case "$version" in
+            *-*) tag="${{ inputs.preid }}" ;;
+            *) tag="" ;;
+          esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "准备发布 $version"
+          echo "dist_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "准备发布 $version（dist-tag: ${tag:-默认 latest}）"
 
       - name: Check whether that version is already on npm
         id: check
@@ -145,9 +160,11 @@ jobs:
         # 都不会出现）。光有槽不够：该槽不传 form，表单只能经 configForms.get(<entry id>) 取。
         # 下限见 engines.dsh / peerDependencies，在旧宿主上配置界面静默不出现，
         # 直接推 latest 会让还在旧宿主线上的使用者静默失去配置入口。
+        # dist-tag 由 bump 步按**结果版本**给出（预发布 → <preid>，稳定版 → 默认 latest）：
+        # 判据只此一处，publish 与 GitHub Release 两步读同一个输出，避免「推 latest 的那一档其实是预发布」。
         run: |
-          if [ "${{ inputs.tier }}" = "premajor" ]; then
-            npm publish --provenance --access public --tag "${{ inputs.preid }}"
+          if [ -n "${{ steps.bump.outputs.dist_tag }}" ]; then
+            npm publish --provenance --access public --tag "${{ steps.bump.outputs.dist_tag }}"
           else
             npm publish --provenance --access public
           fi
@@ -179,8 +196,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # 与 publish 同一判据（结果版本带 `-` 即预发布），不按 tier 判。
           extra=""
-          if [ "${{ inputs.tier }}" = "premajor" ]; then extra="--prerelease"; fi
+          if [ -n "${{ steps.bump.outputs.dist_tag }}" ]; then extra="--prerelease"; fi
           gh release create "${{ steps.bump.outputs.version }}" \
             --target "$(git rev-parse HEAD)" \
             --title "${{ steps.bump.outputs.version }}" \

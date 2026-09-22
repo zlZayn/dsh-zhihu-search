@@ -15,17 +15,21 @@
 发版只有一个入口：手动触发 [release.yml](../.github/workflows/release.yml)。
 
 ```bash
-gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run workflow
+gh workflow run release.yml -f tier=patch                        # 稳定档
+gh workflow run release.yml -f tier=prerelease -f preid=alpha    # 预发布：同一条 X.Y.Z 线上的下一个 alpha
+# 或 Actions → Release → Run workflow
 ```
 
-一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移 → `npm version <tier> --no-git-tag-version`（同时写两处）→ 提交 `chore: release vX.Y.Z` → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
+一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移 → `npm version <tier> --preid=… --no-git-tag-version`（同时写两处；`preid` 只对 `prerelease` / `premajor` 有意义）→ 提交 `chore: release vX.Y.Z` → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
 
 五条设计约束：
 
 - **先发布、后动远端**：publish 失败时远端不发生任何变化，tag 与 Release 也只可能在发布成功后创建。
 - **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
+- **dist-tag 按结果版本推导，不按 `tier` 判**：bump 之后若版本号带预发布段就发到 `preid` 同名 tag，否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出。理由：不这样的话「非 premajor 一律推 latest」，一旦有人用 `patch` 去推进 alpha 线，就会把预发布构建**推上 `latest`** —— 而 `latest` 停在 1.6.3，那是 workflow 自己做出上面那段注释警告的事。
 - **手工推 tag 不会发布**：tag 由工作流创建，绕过上面的顺序没有意义。
 - **档位由判定链定**：`tier` 是入参，不从 commit 类型推断；patch / minor 由维护 agent 直接发，major 需人类确认。
+- **两个预发布档别选错**：`tier=prerelease` 在**同一条 `X.Y.Z` 线**上把预发布计数 +1（`2.0.0-alpha.0` → `2.0.0-alpha.1`），`tier=premajor` 开**新的 `X.Y.Z` 预发布线**（`1.6.3` → `2.0.0-alpha.0`）。在同一线上推下一个 alpha 时用 `premajor` 会得到 `3.0.0-alpha.0` —— semver 见 prerelease 不是 `[0]` 就给 major 加一；而 npm 上的版本号**不可覆盖**。判据与实测输出见[决策记录](../.agents/notes/2026-09-22-release-tiers-and-dist-tags.md)。
 - **不发无行为变更的版本**：bump 之前先比「上个 tag..HEAD」的改动清单，只剩非产物改动就红；`force` 是唯一的越过方式，且要说明理由。
 
 ## 发布后才发现严重缺陷
