@@ -7,7 +7,8 @@
 - `banner.svg`：头图，双语共用，被 [README.md](../README.md) 与 [README_en.md](../README_en.md) 引用。
 - `zhihu-daily-quota.jpg`：知乎开放平台「各接口剩余配额」面板的截图，双语 README 共用（**额度**按自然日刷新，这张图是静态截图、不随日更换）。
 - `logo.svg`：523×346 的横版**字标**，本身未被引用，但它是包根 [icon.svg](../icon.svg) 的**来源** ——
-  图标取的是它三块里那只 261×261 的蓝色方标（`fill="#0084FF"`），按官方留白等比缩进 36×36 画布。
+  图标取的是它三块里的**两支**（`fill="#0084FF"` 那只鲸鱼 + `fill="black"` 那个「知」方标），
+  **丢掉底部那行 `dsh-zhihu-search` 小字**，两支同填知乎蓝，按官方留白等比缩进 36×36 画布。
   **两者不是同一份东西**：改 logo 不自动改图标，改图标也不必动 logo → [图标记录](../.agents/notes/2026-09-22-plugin-icon.md)。
 - `banner.jpg`、`logo.jpg`、`slogan.jpg`、`slogan.svg`：未引用。
 - `settings-card.png`：配置卡片所在页面的整屏实拍（中文），被 [README.md](../README.md) 引用。

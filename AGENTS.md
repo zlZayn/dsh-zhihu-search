@@ -55,7 +55,7 @@
 - **卡片图重拍时要连页面上的名字与图标一起核对**：2026-09-22 起插件页与设置里显示的是 `locale` 里的
   `meta.title` / `meta.description`（详情页标题从 `zhihu-search` 变成 `知乎检索` / `Zhihu Search`，
   标题下方仍留着技术名 `dsh-zhihu-search`，描述那一行从空变成一句话），左上角那格图标也换成
-  [icon.svg](icon.svg)（36 视口里的蓝色方标）。这几处都在两张卡片图的画面里，因此重拍时它们是新的**判废项** ——
+  [icon.svg](icon.svg)（36 视口里的「鲸鱼 + 知」同色双拼）。这几处都在两张卡片图的画面里，因此重拍时它们是新的**判废项** ——
   拍前按 [locale/](locale/) 与 [icon.svg](icon.svg) 各 diff 一次，判据与拍摄路径见 [assets/AGENTS.md](assets/AGENTS.md)
   与 [assets/README.md](assets/README.md)
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）。2026-09-22 起它服务的只剩**组合配置**一条来源
