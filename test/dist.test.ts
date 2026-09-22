@@ -43,9 +43,21 @@ describe('编译后的 host 图可在 Node 中求值', () => {
       Config: (input: unknown) => unknown;
     };
     const registered: string[] = [];
+    // 替身按 0.1.7 的接缝摆：设置面只剩 `configure`（注册「这一行自带页面」这条策略），
+    // 再加一个插件自己的 fiber —— `configure` 的第二个实参就是它。
+    const presentations: unknown[] = [];
+    const credentials = {
+      resolve: async () => undefined,
+      describe: async () => ({ configured: false, writable: true }),
+      set: async () => undefined,
+    };
     const ctx = {
+      fiber: { id: 'zhihu-search-fiber' },
       tools: { register: (d: { name: string }) => { registered.push(d.name); return () => undefined; } },
-      settings: { installSection: () => undefined },
+      settings: {
+        configure: (presentation: unknown) => { presentations.push(presentation); return () => undefined; },
+      },
+      credentials,
       inject: (_s: string[], cb: (c: unknown) => void) => { cb(ctx); },
       on: () => () => undefined,
       get: () => undefined,
@@ -54,6 +66,7 @@ describe('编译后的 host 图可在 Node 中求值', () => {
     };
     mod.apply(ctx, mod.Config({ accessSecret: 'x' }));
     expect(registered).toEqual(['zhihu_search', 'zhihu_global_search', 'zhihu_zhida']);
+    expect(presentations).toEqual([{ auto: false }]);
   });
 });
 

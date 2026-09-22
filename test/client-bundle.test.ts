@@ -3,8 +3,8 @@
  *
  * 为什么需要它：client 半体只有装进浏览器才能跑通，普通单测覆盖不到；
  * 但**产物格式**与**装配能否跑起来**是可以在这里钉死的 —— 信封 id、factory 形状、
- * 导出面、注册进 `plugins.bundle.config` 的 key（等于本包包名），以及本模块最后那组
- * 「按真实 Cordis 语义挂载」。这几处任何一处错了，
+ * 导出面、注册进 `plugins.row.config` 的 key（`<包名>#<行 id>`，两半都从仓内声明文件里读），
+ * 以及本模块最后那组「按真实 Cordis 语义挂载」。这几处任何一处错了，
  * 症状都是「插件页里什么都没有」，排查代价极高。
  *
  * 依赖 `lib/client.js` 已构建（`npm test` 会先跑 build）。
@@ -14,8 +14,14 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { Context } from '@deepseek-ai/cordis';
 import { describe, expect, it, vi } from 'vitest';
+import { readPackageName, readPatchRow } from './declaration.js';
 
 const require_ = createRequire(import.meta.url);
+
+/** 本包的包名与 bundle patch 的行；key 由它们拼出来（见 [declaration.ts](declaration.ts)）。 */
+const PACKAGE_NAME = readPackageName();
+const PATCH_ROW = readPatchRow();
+const ROW_KEY = `${PACKAGE_NAME}#${PATCH_ROW.id}`;
 
 /** 一条被模块表接收的注册行。 */
 interface LoaderRow {
@@ -77,21 +83,31 @@ describe('client bundle 信封', () => {
   });
 
   it('注册的 id 等于包名（模块表以它作 key）', () => {
-    expect(loadBundleRow().id).toBe('dsh-zhihu-search');
+    expect(loadBundleRow().id).toBe(PACKAGE_NAME);
   });
 
-  it('导出 apply 与 inject', () => {
+  it('导出 apply 与 inject，且 inject 里没有任何已删的服务名', () => {
     const mod = materialize(loadBundleRow());
     expect(typeof mod['apply']).toBe('function');
     // `remote` 与 `remote.credentials` 都必须有：前者让 `ctx.remote` 属性访问合法，
     // 后者等命名空间就绪。漏掉 `remote` 会让整张卡片装不上（见本文件最后一组测试）。
-    expect(mod['inject']).toEqual(['slots', 'settingsScope', 'remote', 'remote.credentials', 'locale']);
+    //
+    // 0.1.7 起 `settingsScope` 这个服务被删了：它曾经是卡片的读写面，现在换成宿主经槽位
+    // props 递过来的 `form`。声明一个不存在的服务不会降级 —— inject 是**激活门禁**，
+    // 少一个服务整个 apply 不执行（用户看到的是「pending (waiting for service)」）。
+    expect(mod['inject']).toEqual(['slots', 'remote', 'remote.credentials', 'locale']);
+    expect(mod['inject']).not.toContain('settingsScope');
   });
 });
 
 describe('client bundle 注册行为', () => {
   /** 槽位注册交出的组件；本组只关心它的 view 分支返回值。 */
-  type CardComponent = (seat: { t: (key: string) => string; view: 'summary' | 'page' }) => unknown;
+  type CardComponent = (seat: { t: (key: string) => string; view: 'summary' | 'page'; form?: unknown }) => unknown;
+
+  /** 取出一个注册元素的 props（槽位交出来的是 React 元素，不渲染就看不到它的座位）。 */
+  function propsOf(element: unknown): Record<string, unknown> {
+    return (element as { props?: Record<string, unknown> }).props ?? {};
+  }
 
   /** 记录槽位注册与字典注册的替身上下文。 */
   function makeContext() {
@@ -101,12 +117,6 @@ describe('client bundle 注册行为', () => {
     const dictionaries: Array<{ ns: string; locales: string[] }> = [];
     /** 读凭据域的记账。写路径由 [credential-store 单测](credential-store.test.ts) 覆盖。 */
     const credentialReads: string[][] = [];
-    const scope = {
-      subscribe: () => () => undefined,
-      getSnapshot: () => ({ status: 'ready', writable: true, value: undefined, user: undefined, base: undefined }),
-      set: async () => undefined,
-      unset: async () => undefined,
-    };
     const remote = {
       credentials: {
         describe: async (refs: readonly string[]) => {
@@ -117,9 +127,8 @@ describe('client bundle 注册行为', () => {
       },
       $on: () => () => undefined,
     };
-    /** 卡片在 apply 期就需要 effect、locale 与 remote，缺任一项都会让它抛错。 */
+    /** 卡片的 apply 期需要 effect、locale 与 remote，缺任一项都会让它抛错。 */
     const base = {
-      settingsScope: { bind: () => scope },
       locale: {
         register(ns: string, dicts: Record<string, unknown>) {
           dictionaries.push({ ns, locales: Object.keys(dicts) });
@@ -149,25 +158,49 @@ describe('client bundle 注册行为', () => {
     return { ctx, base, registrations, components, injected, dictionaries, credentialReads };
   }
 
-  it('注册进 plugins.bundle.config，且 key 等于本包包名', () => {
+  it('注册进 plugins.row.config，key 逐字等于「包名#行 id」', () => {
     const { ctx, registrations, injected } = makeContext();
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(ctx);
 
-    expect(injected).toEqual(['plugins.bundle.config']);
+    expect(injected).toEqual(['plugins.row.config']);
     expect(registrations).toHaveLength(1);
-    expect(registrations[0]).toMatchObject({ name: 'plugins.bundle.config', key: 'dsh-zhihu-search' });
+    expect(registrations[0]).toMatchObject({ name: 'plugins.row.config', key: ROW_KEY });
+    // 反向控制：那两个文件真的能拼出这个 key —— 而不是这边写死一个、那边也写死一个。
+    // 行 id 与包名今天恰好同名，所以这条同时钉住「patch 的 name 必须等于本包包名」。
+    expect(PATCH_ROW.name).toBe(PACKAGE_NAME);
+    expect(ROW_KEY).toBe('dsh-zhihu-search#dsh-zhihu-search');
   });
 
-  it('该槽只被要求 page：summary 视图返回空而不是抛错', () => {
+  it('page 视图把宿主的 form 座位原样交给卡片，summary 视图交出行描述', () => {
     const { ctx, components } = makeContext();
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(ctx);
 
     expect(components).toHaveLength(1);
-    // summary 分支不渲染表单，因此不碰 React —— 表单组件带 hook，直接调用会抛「Invalid hook call」，
-    // 断言它**没有**走到那一步正是这条用例的区分力所在。
-    expect(components[0]?.({ t: (key) => key, view: 'summary' })).toBeNull();
+    const form = { state: { status: 'ready', writable: true }, mutate: async () => true };
+
+    // page 分支交出的是卡片元素（JSX 不求值组件体，所以这里不碰 React）；
+    // 断言的是**座位透传**：宿主给的 form 必须原样进去，不能在调用点上被解引用 ——
+    // `seat.form.state` 这种写法在 form 缺席时就是一次 TypeError，整块页面白屏。
+    expect(propsOf(components[0]?.({ t: (key) => key, view: 'page', form })).form).toBe(form);
+
+    // summary 分支不渲染表单，只回一行文案：插件管理页拿它当**行缺描述时的回退**
+    // （DSH `PluginManagerPage.tsx:496`），本插件 patch 的行没有 description，所以一定可见。
+    expect(components[0]?.({ t: (key) => key, view: 'summary' })).toBe('rowSummary');
+  });
+
+  it('form 缺席时不抛错：原样透传 undefined（宿主还没描述好，或这一行不可配置）', () => {
+    const { ctx, components } = makeContext();
+    const mod = materialize(loadBundleRow());
+    (mod['apply'] as (ctx: unknown) => void)(ctx);
+
+    // 两种成因表现相同：这一行不在 describe 镜像里（没有 volatile 字段、或连接是 memory 模式），
+    // 或者描述还没回来。卡片按「不可写」渲染，注册这条路径不该有任何区别。
+    const element = components[0]?.({ t: (key) => key, view: 'page' });
+    expect(propsOf(element).form).toBeUndefined();
+    expect(propsOf(element).store).toBeDefined();
+    expect(typeof propsOf(element).trackSavedRef).toBe('function');
   });
 
   it('注册是惰性的：只在声明到账后才发生', () => {
@@ -198,11 +231,14 @@ describe('client bundle 注册行为', () => {
     expect(dictionaries[0]?.locales.slice().sort()).toEqual(['en', 'zh']);
   });
 
-  it('装配时就查一次凭据域，且用的是默认引用名', () => {
+  it('装配期不读凭据域：那次读随卡片挂载发生', () => {
+    // 0.1.7 起引用名的**生效值**只有卡片看得到（form 由页面在渲染期才算），
+    // 所以读凭据域的动作搬进了卡片的 useEffect：先回传引用名，再重读。
+    // 装配期读的话，读到的只会是默认名 —— 一个可能已经不对的答案。
     const { ctx, credentialReads } = makeContext();
     const mod = materialize(loadBundleRow());
     (mod['apply'] as (ctx: unknown) => void)(ctx);
-    expect(credentialReads).toEqual([['ZHIHU_ACCESS_SECRET']]);
+    expect(credentialReads).toEqual([]);
   });
 });
 
@@ -210,7 +246,8 @@ describe('client bundle 注册行为', () => {
  * 配置槽的能力探测（不查版本号）。
  *
  * 槽缺席时 `ctx.slots.inject` 的回调永远不来，且宿主不报错 —— 症状是「插件页里什么都没有」。
- * 这三条钉住提示路径：只对缺席的宿主发声、格式是英文 `[WARN]`（无 emoji）、
+ * 它盯的是一个**真实故障**：宿主把本插件当普通 entry 挂载（不是 bundle 行）时没有行、
+ * 没有 Configure 控件。这三条钉住提示路径：只对缺席的宿主发声、格式是英文 `[WARN]`（无 emoji）、
  * 且**可撤销**（槽迟到就补一条 `[INFO]`），注册语义一字不动。
  */
 describe('client bundle 配置槽能力探测', () => {
@@ -219,18 +256,11 @@ describe('client bundle 配置槽能力探测', () => {
 
   /** 探测用例的最小服务面：卡片外壳要的替身，槽由各用例自己给。 */
   function probeContext(slots: { inject: unknown; register: unknown }): Record<string, unknown> {
-    const scope = {
-      subscribe: () => () => undefined,
-      getSnapshot: () => ({ status: 'ready', writable: true, value: undefined, user: undefined, base: undefined }),
-      set: async () => undefined,
-      unset: async () => undefined,
-    };
     const credentials = {
       describe: async () => ({ ok: true as const, value: {} }),
       set: async () => ({ ok: true as const, value: undefined }),
     };
     return {
-      settingsScope: { bind: () => scope },
       locale: { register: () => () => undefined },
       remote: { credentials, $on: () => () => undefined },
       effect(callback: () => unknown) {
@@ -304,6 +334,8 @@ describe('client bundle 配置槽能力探测', () => {
       expect(line).toMatch(/^\[WARN\] /);
       // 英文、无 emoji：整条提示必须是纯 ASCII。
       expect(line).toMatch(/^[\x20-\x7E]+$/);
+      // 文案里点名的槽必须是实际注册的那个 —— 探测说要装 A、卡片装进 B，是最坏的一种「说谎」。
+      expect(line).toContain('plugins.row.config');
       expect(silentRegistrations).toBe(0);
     } finally {
       captured.restore();
@@ -336,7 +368,7 @@ describe('client bundle 配置槽能力探测', () => {
       expect(captured.infos).toHaveLength(1);
       expect(captured.infos[0]).toMatch(/^\[INFO\] /);
       expect(registrations).toHaveLength(1);
-      expect(registrations[0]).toMatchObject({ name: 'plugins.bundle.config', key: 'dsh-zhihu-search' });
+      expect(registrations[0]).toMatchObject({ name: 'plugins.row.config', key: ROW_KEY });
     } finally {
       captured.restore();
       vi.useRealTimers();
@@ -361,12 +393,6 @@ describe('client bundle 配置槽能力探测', () => {
 describe('client bundle 按真实 Cordis 语义装配', () => {
   /** 卡片需要的最小服务面。键就是 Cordis 服务名，点号键也照实提供。 */
   function services() {
-    const scope = {
-      subscribe: () => () => undefined,
-      getSnapshot: () => ({ status: 'ready', writable: true, value: undefined, user: undefined, base: undefined }),
-      set: async () => undefined,
-      unset: async () => undefined,
-    };
     const credentials = {
       describe: async () => ({ ok: true as const, value: {} }),
       set: async () => ({ ok: true as const, value: undefined }),
@@ -374,7 +400,6 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
     return {
       slots: { inject: () => undefined, register: () => () => undefined },
       locale: { register: () => () => undefined },
-      settingsScope: { bind: () => scope },
       remote: { credentials, $on: () => () => undefined },
       'remote.credentials': credentials,
     };
@@ -440,9 +465,9 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
     expect((await mount(partial)).applied).toBe(false);
   });
 
-  it('反向控制：少提供 settingsScope 时也不跑', async () => {
+  it('反向控制：少提供 locale 时也不跑', async () => {
     const partial = services();
-    delete (partial as Record<string, unknown>)['settingsScope'];
+    delete (partial as Record<string, unknown>)['locale'];
     expect((await mount(partial)).applied).toBe(false);
   });
 });

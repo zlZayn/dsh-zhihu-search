@@ -6,24 +6,30 @@
 # ## 为什么用 dist-tag 而不是版本矩阵
 #
 # DSH 至今没有正式版，版本号本身不构成承诺，tag 才是。三个 tag 的语义**各不相同**
-# （2026-09-16 实测，@deepseek-ai/dsh-* 全家族一致）：
+# （@deepseek-ai/dsh-* 全家族一致）：
 #
-#   next   —— 当前承诺支持的线。package.json 的 peer 范围就该罩住它。
-#   alpha  —— 前瞻线。按设计**就在声明范围之外**（预发布版本只被同 tuple 的区间放行，
-#             所以 next 线的 peer 范围取不到 alpha 上的版本）。这里只提前看破坏，不产生任何承诺。
+#   alpha  —— **当前承诺线**。2026-09-22 起本仓的声明面（engines.dsh 与全部 27 条
+#             @deepseek-ai/dsh-* 声明）落在这一条上，形状见 package.json。
+#             使用者按我们给的区间装得到、我们也只测这条线。
+#   next   —— **已低于本仓声明的下限**（具体值现查 npm view @deepseek-ai/dsh dist-tags）。
+#             换到它上面等于把依赖降到自己的声明范围之外，所以它不再是 pass/fail 信号，
+#             只留一个「旧线还能不能跑」的记录（见下面 next job）。
 #   latest —— **不可用**：多数 @deepseek-ai/dsh-* 包上它指向很早的版本，@deepseek-ai/dsh 自己
 #             那条也未必落在本插件的声明里（具体值现查 npm view @deepseek-ai/dsh dist-tags）。
 #             按默认方式装宿主会装到过期版本。
 #
-# ## 两条线的处理方式不同
+# ## 两条线的处理方式不同（2026-09-22 角色对调）
 #
-#   next  红了 = 使用者会装到 = **必须修** → 整个 run 红，会发通知（declaration / next 两个 job）。
-#   alpha 红了 = **记录，等它切到 next 再处理** → job 红、run 绿，不进跟踪 issue。
+#   alpha 红了 = 使用者会装到 = **必须修** → 整个 run 红，会发通知（declaration / alpha 两个 job）。
+#   next  红了 = **记录，不阻断** → job 红、run 绿，不进跟踪 issue。
+#
+# 从前是反过来的（next 承诺、alpha 前瞻）。对调的理由不是口味：本仓的配置接缝只存在于 alpha
+# 线上，声明面因此跟着它走，而一条**长期必红**的周更任务会让「红 = 出事」这个信号失效 ——
+# 噪音掩盖真问题，比少一条巡逻更糟。
 #
 # 声明面（declaration）是这两条之外的一件事：它不跑任何代码，只问「我们声明的区间还罩不罩得住
-# **README 告诉用户去装的那条线**」。那条线现在落在 alpha 上（配置界面的下限就在那里），
-# 所以它两条线都查、任一条不达标即红 —— 与「alpha 红了只记录」不冲突：
-# alpha job 判的是「代码还能不能跑」，declaration 判的是「承诺还成不成立」。
+# **README 告诉用户去装的那条线**」。那条线现在就是 alpha（配置接缝的下限也在那里），
+# 所以它**只查 alpha** —— 查一条我们自己都不再声明的线，红只会变成每周的噪音。
 #
 # 不挂 push：这条线看的是**上游**动没动，本地提交改不了结论。
 name: Compat
@@ -39,10 +45,10 @@ permissions:
   contents: read
 
 jobs:
-  # 声明面：peer 范围还罩不罩得住**我们告诉用户去装的那两条线**（next / alpha）。
+  # 声明面：peer 范围还罩不罩得住**我们告诉用户去装的那条线**（alpha）。
   #
   # 单独成 job 的理由：它只读 package.json 再问 npm，几十秒出结果；而且它的结论
-  # 与「代码还能不能跑」是两件事 —— 混在 next job 里会被后者的红遮住，反过来也一样。
+  # 与「代码还能不能跑」是两件事 —— 混在代码 job 里会被后者的红遮住，反过来也一样。
   declaration:
     runs-on: ubuntu-latest
     steps:
@@ -54,20 +60,16 @@ jobs:
 
       # 不装任何东西：判据是「我们声明的区间能取到的最新版本」与「tag 指向的版本」是否同一个。
       #
-      # 两条线都查。理由是**文档**而不是对称：根 README 的「版本兼容」告诉使用者，需要配置界面
-      # 就把宿主升到 package.json 的 engines.dsh 声明的版本 —— 那个版本只在 alpha 线上。
-      # 判据是「声明区间必须罩得住我们告诉用户去装的那条线」，少查一条就是漏检。
-      - name: Declaration surface — the committed line (next)
-        id: next
-        continue-on-error: true
-        run: node scripts/compat-swap.mjs check next
-
+      # **只查 alpha**：根 README 的「版本兼容」告诉使用者，需要配置界面就把宿主升到
+      # package.json 的 engines.dsh 声明的版本 —— 那个版本只在 alpha 线上，而声明面本身
+      # 也落在那里。判据是「声明区间必须罩得住我们告诉用户去装的那条线」。
+      #
+      # 曾经两条线都查（那时承诺线是 next）。2026-09-22 撤掉 next 那一步：它已低于我们的下限，
+      # 于是**长期必红**，而长期必红会让信号失效。
       - name: Declaration surface — the line the README points users at (alpha)
         id: alpha
-        continue-on-error: true
         run: node scripts/compat-swap.mjs check alpha
 
-      # 两步都是 continue-on-error（为了两条线都拿到信号），所以成败在这里显式汇总。
       - name: Summarize
         if: always()
         run: |
@@ -76,25 +78,31 @@ jobs:
             echo ""
             echo "| 线 | check 结果 |"
             echo "| --- | --- |"
-            echo "| next（承诺支持的线） | ${{ steps.next.outcome }} |"
-            echo "| alpha（README 让用户去装配置界面的那条线） | ${{ steps.alpha.outcome }} |"
+            echo "| alpha（承诺线 = README 让用户去装配置界面的那条线） | ${{ steps.alpha.outcome }} |"
             echo ""
             echo "判据：声明区间必须能覆盖**我们告诉用户去装的那条线**（见根 README 的「版本兼容」）。"
             echo ""
-            echo "红了怎么办：核对上游变更 → 放宽 peer 范围 → 同步两份 README 的「前置」→ 按 docs/PUBLISHING.md 的 Q1/Q2 定档。"
-            echo "范围放宽不改行为，Q1/Q2 全否即 **patch**，但必须发版（声明在产物里）。"
+            echo "红了怎么办：核对上游变更 → 放宽 peer 范围（形状见 package.json）→ 同步两份 README 的「前置」"
+            echo "→ 按 docs/PUBLISHING.md 的 Q1/Q2 定档。范围放宽不改行为，Q1/Q2 全否即 **patch**，"
+            echo "但必须发版（声明在产物里）。"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verdict
         if: always()
         run: |
-          if [ "${{ steps.next.outcome }}" != "success" ] || [ "${{ steps.alpha.outcome }}" != "success" ]; then
-            echo "::error::声明面罩不住：next=${{ steps.next.outcome }}，alpha=${{ steps.alpha.outcome }}。处理链见本次运行的 Summary。"
+          if [ "${{ steps.alpha.outcome }}" != "success" ]; then
+            echo "::error::声明面罩不住 alpha 线：check=${{ steps.alpha.outcome }}。处理链见本次运行的 Summary。"
             exit 1
           fi
 
+  # 旧线（next）：**只记录，不阻断 run**。
+  #
+  # 它已低于本仓声明的下限，换到它上面等于把依赖降到声明范围之外 —— 红是这个 job 的常态，
+  # 而不是仓库出事的信号。留着它是为了「旧线到底哪一步先坏」这份记录，
+  # 不让它把每周的失败通知打出去。真正看住的东西在 alpha 与 declaration 上。
   next:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
 
@@ -106,6 +114,7 @@ jobs:
       # 刻意**不跑 npm ci**：要的是一棵按新声明重新解析出来的树。先 ci 再改，npm 会拿旧树去
       # reconcile，实测直接 ERESOLVE（exit 1）并且 node_modules 原封不动停在旧版本上 ——
       # 后面的测试于是全绿，报出一个假兼容。
+      # 换包只替换区间里的**下限版本**，比较符与上界原样保留 —— 声明面不会在 CI 里悄悄变形。
       - name: Swap the declared ranges onto the next line
         run: node scripts/compat-swap.mjs swap next
 
@@ -148,7 +157,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## DSH 兼容性 · next 线（承诺支持的线）"
+            echo "## DSH 兼容性 · next 线（已低于声明下限，只记录）"
             echo ""
             echo "| 步骤 | 结果 |"
             echo "| --- | --- |"
@@ -159,7 +168,12 @@ jobs:
               echo "| 分流诊断（跳过 tsc 的类型面） | ${{ steps.diagnose.outcome }} |"
             fi
             echo ""
-            echo "**红了怎么办**（顺序不可颠倒）："
+            echo "**红了怎么办**：先确认这不是「本来就该红」—— 本 job 跑的那条线**低于我们对宿主的下限**，"
+            echo "红了通常只说明旧线装不出新接缝，不构成缺陷。真要看的是 alpha job 与 declaration job。"
+            echo ""
+            echo "（历史：2026-09-22 之前这条线是承诺线，红了必须修；角色对调后它降级为记录。）"
+            echo ""
+            echo "**若确实要查**（顺序不可颠倒）："
             echo ""
             echo "1. 先判类别 —— 三类红的处理完全不同："
             echo "   - **换包那一步或核对失败** → 树根本没换成，先解决安装问题再看别的（多半是上游包之间的 peer 冲突）。"
@@ -179,16 +193,16 @@ jobs:
         if: always()
         run: |
           if [ "${{ steps.verify.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ] || [ "${{ steps.suite.outcome }}" != "success" ]; then
-            echo "::error::next 线漂移：换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}。处理链见本次运行的 Summary。"
+            echo "::error::next 线漂移（换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}）。这是**记录**不是告警：这条线已低于声明下限。处理链见本次运行的 Summary。"
             exit 1
           fi
 
+  # 承诺线（alpha）：红了**必须修**，会发通知。
+  #
+  # 2026-09-22 之前它是前瞻线（continue-on-error）；声明面落到 alpha 之后角色对调 ——
+  # 使用者按我们的区间装到的就是这条线，它红了就是真出事。
   alpha:
     runs-on: ubuntu-latest
-    # 前瞻线：红了**不阻断** run。
-    # 它按设计就落在声明范围之外，红是这个 job 的常态而不是仓库出事的信号 ——
-    # 因此不让它把每周的失败通知打出去。真正看住的东西在 next 与 declaration 上。
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
 
@@ -243,7 +257,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## DSH 兼容性 · alpha 线（前瞻，不构成承诺）"
+            echo "## DSH 兼容性 · alpha 线（承诺线 = 我们声明的与使用者装到的那条线）"
             echo ""
             echo "| 步骤 | 结果 |"
             echo "| --- | --- |"
@@ -254,29 +268,35 @@ jobs:
               echo "| 分流诊断 | ${{ steps.diagnose.outcome }} |"
             fi
             echo ""
-            echo "**红了怎么办**：只记录，**不动 peer 范围** —— alpha 不产生承诺，按它放宽声明会把使用者引到未发布的线上。"
+            echo "**红了怎么办**（顺序不可颠倒）："
             echo ""
-            echo "- **类型面红**（截至 2026-09-16 的实况）→ 在 .agents/notes/ 记一条"
-            echo "  「alpha 收紧了某个 API，正式版前需处理」；顺手判断能否提前写成新旧都能编译的形式。"
-            echo "- **行为面红** → 提前开修，别等正式版：它早晚会走到 next 线上，那时就是 must-fix。"
-            echo "- 等 alpha 切到 next（或发正式版）时，这条记录升级为必须处理项。"
+            echo "1. 先判类别 —— 三类红的处理完全不同："
+            echo "   - **换包那一步或核对失败** → 树根本没换成，先解决安装问题再看别的（多半是上游包之间的 peer 冲突）。"
+            echo "   - **类型面红** → 上游 API 签名变了。定位到具体包与符号，先看能不能改调用点使其新旧都能编译"
+            echo "     （compat.yml 的历史里记过一个例子：显式 return undefined 同时满足两条线）。"
+            echo "     两版不可兼得时说明下限必须抬高，那是 Q2 是 → **major，先问人类**。"
+            echo "   - **全量测试红** → **行为差异**，最重。按 test/README.md 的分层定位："
+            echo "     L3b/L6a（native-web-tools / client-bundle / dist）说明平台语义变了；L1/L2 红则先怀疑"
+            echo "     换包装错了 —— 那几层对宿主版本不敏感。"
+            echo "2. 本地复现：clone 之后照本 job 的步骤跑一遍（swap → npm install --ignore-scripts → verify）。"
+            echo "3. 修 → 按 docs/PUBLISHING.md 定档 → 发版 → 等下一轮。"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verdict
         if: always()
         run: |
           if [ "${{ steps.verify.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ] || [ "${{ steps.suite.outcome }}" != "success" ]; then
-            echo "::error::alpha 线漂移（换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}）。这是**记录**不是告警：处理链见本次运行的 Summary。"
+            echo "::error::alpha 线漂移（承诺线）：换包=${{ steps.verify.outcome }}，类型面=${{ steps.typecheck.outcome }}，全量测试=${{ steps.suite.outcome }}。处理链见本次运行的 Summary。"
             exit 1
           fi
 
   # 失败可见：定时任务的失败邮件 GitHub 自带，但它只发给最后改过 cron 的人，**不能当作主通知**。
   # 这里把「哪条线、哪一步红」写进一个**固定标题**的跟踪 issue：已存在就追加评论，不刷屏。
   #
-  # 只收会红到使用者身上的两个 job：declaration（承诺还成不成立）与 next（代码还能不能跑）。
-  # alpha 刻意不进：它按设计落在声明范围之外，红是**记录**不是告警（见文件头与 alpha job）。
+  # 只收会红到使用者身上的两个 job：declaration（承诺还成不成立）与 alpha（代码还能不能跑）。
+  # next 刻意不进：它已低于声明下限，红是**记录**不是告警（见文件头与 next job）。
   report:
-    needs: [declaration, next]
+    needs: [declaration, alpha]
     if: failure()
     runs-on: ubuntu-latest
     permissions:
@@ -292,7 +312,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DECLARATION: ${{ needs.declaration.result }}
-          NEXT: ${{ needs.next.result }}
+          ALPHA: ${{ needs.alpha.result }}
         run: |
           set -euo pipefail
           title='DSH compatibility patrol failed'
@@ -304,15 +324,16 @@ jobs:
 
           | Job | What it watches | Result |
           | --- | --- | --- |
-          | declaration | the declared ranges vs the lines the README points users at | ${DECLARATION} |
-          | next | the committed line: swap, typecheck, full suite | ${NEXT} |
+          | declaration | the declared ranges vs the line the README points users at | ${DECLARATION} |
+          | alpha | the committed line: swap, typecheck, full suite | ${ALPHA} |
 
           Run: ${RUN_URL}
 
-          Criterion: the declared range must cover the line we tell users to install - the committed line (next)
-          and the line the README sends users to for the configuration UI (alpha). A red declaration means the
-          declared range no longer reaches that line; a red next means the code no longer compiles or behaves
-          on the committed line.
+          Criterion: the declared range must cover the line we tell users to install - the committed line
+          (alpha), which is also the line the README sends users to for the configuration UI. A red declaration
+          means the declared range no longer reaches that line; a red alpha means the code no longer compiles
+          or behaves on the committed line. The next line runs as a record only: it sits below our declared
+          floor, so a red there is expected and is not reported here.
 
           Recovery: open the run summary, classify the failure, then widen the peer ranges, sync both READMEs,
           and ship a release - see docs/PUBLISHING.md, section "Compatibility" (兼容性). Close this issue once

@@ -27,8 +27,13 @@
  *
  * 某个包在该 tag 上没有版本时：
  *   - 它出现在 `peerDependencies` → **失败**（声明面点名了一条线上不存在的版本）；
- *   - 它只是 `devDependencies` → 告警并跳过。当前的例子是 `dsh-code-runtime`：
- *     它的 alpha 停在 0.1.5-alpha.2（比 next 的 0.1.5-rc.2 还旧），且仓库里没有任何文件引用它。
+ *   - 它只是 `devDependencies` → 告警并跳过。
+ *
+ * ## 写回是**保形**的
+ *
+ * 换包只替换声明区间里的**下限版本**，比较符与上界原样留下（`>=0.1.7-alpha.1 <0.2.0` →
+ * `>=0.1.8-alpha.1 <0.2.0`）。硬编码一个 `'^' + version` 会把 `>=` 静默改回 `^`、
+ * 把上界抹掉 —— 声明面在 CI 里当场变形，而人只看到 job 绿。
  *
  * ## 为什么必须有 verify
  *
@@ -61,6 +66,24 @@ const [command, tag] = process.argv.slice(2);
 if (!COMMANDS.includes(command) || tag === undefined) {
   console.error('用法：node scripts/compat-swap.mjs <check|swap|verify> <next|alpha>');
   process.exit(2);
+}
+
+/**
+ * 把声明区间换到某个版本上，**保留它自己的形状**。
+ *
+ * 只替换第一个版本号（区间里的下限），比较符与任何上界都原样留着：
+ * `>=0.1.7-alpha.1 <0.2.0` → `>=<ver> <0.2.0`；`^1.2.3` → `^<ver>`。
+ *
+ * @param {string} declared - 当前声明。
+ * @param {string} version - 该 tag 上的版本。
+ * @returns {string} 保形的新声明。
+ */
+function withVersion(declared, version) {
+  const pattern = /\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/;
+  // 「读不出版本号」必须用 test 判，不能拿替换结果与原串比：目标版本与下限**恰好相同**时
+  // 替换是个空操作，比字符串会把它误判成「没有版本号」从而退回裸版本 —— 形状照样丢。
+  if (!pattern.test(declared)) return version;
+  return declared.replace(pattern, version);
 }
 
 /**
@@ -174,9 +197,11 @@ for (const name of targets) {
     skipped.push(name);
     continue;
   }
-  console.log('  ' + name + '：' + (peers[name] ?? devs[name]) + ' → ' + version);
-  if (peers[name] !== undefined) peers[name] = version;
-  if (devs[name] !== undefined) devs[name] = version;
+  const declared = peers[name] ?? devs[name];
+  const next = withVersion(declared, version);
+  console.log('  ' + name + '：' + declared + ' → ' + next);
+  if (peers[name] !== undefined) peers[name] = next;
+  if (devs[name] !== undefined) devs[name] = next;
 }
 if (skipped.length > 0) console.log('跳过 ' + String(skipped.length) + ' 个：' + skipped.join(', '));
 

@@ -24,7 +24,7 @@
 - `index.ts` 是**唯一**接触 Cordis 的模块，也是唯一创建状态的模块。其余模块都不认识框架，因此可脱离框架单测。
 - `present/` 与 `utils/` 是**叶子**：不反向依赖任何模块，也不做运行时 `@deepseek-ai/*` 导入。前者的理由是纯度必须可测，后者同理。
 - `transport.ts` 位于编译器的**下游**而非上游——它不认识语义化参数（见「不可破坏的约束」）。
-- 浏览器半体 `client/` 与 Node 侧**不共享任何模块**：它通过 `ctx.settingsScope` 与 Host 通信，不 import `src/` 下的实现。
+- 浏览器半体 `client/` 与 Node 侧**不共享任何模块**：它通过 `ctx.slots` 的 `plugins.row.config` 槽与 Host 通信 —— Host 把「这一行的配置表单」当作座位 props 递进来，它不 import `src/` 下的实现。
 
 逐文件的箭头清单与职责见 [src/README.md](../src/README.md)。
 
@@ -98,25 +98,28 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 
 ### `accessSecret` 为什么仍留在 schema 里
 
-它**不是**取值来源 —— 插件不读它的值。留着只为两件事：
+它**不是**取值来源 —— 插件不读它的值。留着只为**一件事**（2026-09-22 起）：
 
-- **redact 锚点。** `redactSecrets` 是 **schema 驱动**的：只剥 schema 里带 `role('secret')` 的字段。字段一旦移出 schema，redact 就不再认识它，明文会**原样出现在发往浏览器的 describe 线路里**（2026-09-15 用真实 `dsh-settings-file` 实测）。由 [test/redact-anchor.test.ts](../test/redact-anchor.test.ts) 固化 —— 删字段即变红。
-- **迁徙入口。** 启动时由 [src/migrate.ts](../src/migrate.ts) 把旧明文搬进凭据域，再从设置文档删掉。
+- **组合配置单向迁徙的入口。** 有人把明文写进活动 profile 的 `cordis.patch.yml`（`config.accessSecret`）时，启动期由 [src/migrate.ts](../src/migrate.ts) 把它搬进凭据域，然后告警请人手动删掉那一行。组合配置不属插件，插件没有也不该有改写它的口子。
 
-推论：**迁徙必须早于任何界面读取 describe**；将来清理时，这个字段与 `migrate.ts` 必须一起删。
+**它曾经的作用是 redact 锚点，那一层已经随这次接缝换代（2026-09-22）消失**：客户端配置页只投影 **volatile** 字段（settings 包的 `volatileForm` + `projectForm`），而非 volatile 的 `accessSecret` 结构上不可能出现在发往浏览器的 value / base / user 里 —— 那条线路上已经没有保护对象。字段仍带 `role('secret')`（[test/redact-anchor.test.ts](../test/redact-anchor.test.ts) 钉住 redact 仍然认得这个槽位），但保留它的理由换成了上面那一条。
 
-迁徙本身的三条纪律与新明文各层归属，见[决策记录](../.agents/notes/2026-09-15-credential-store-migration.md)。
+旧 `settings.yaml` 那半边是**结构性**不可达的，不是「暂时读不到」：宿主的 `importLegacyDocument()` 按 section 名当 entry id 导入，而它只映射三个官方 section；就算导进去了，`describe()` 也只投影 volatile 字段，`mutate()` 对非 volatile 路径直接抛。所以「先写后删」的次序纪律连同 `purge` 通道一起退场 —— 现在没有任何东西可删，「搬不动就原样保留」是结构性成立的。
+
+将来清理时，这个字段与 `migrate.ts` 仍然必须一起删。迁徙的纪律与明文各层归属，见[决策记录](../.agents/notes/2026-09-15-credential-store-migration.md)。
 
 ## 两半体约束
 
 插件在面板中出现，需要**两个半体同时存在**：
 
-- Host 半体用 `ctx.settings.installSection` 注册设置命名空间，使 Host 透过 describe 线路把它暴露出来。
-- 浏览器半体声明 `dsh.client`，并向插件页的 `plugins.bundle.config` 注册一张 `key` 等于**本包包名**的卡片（该槽只向条目要 `view: 'page'`）。
+- Host 半体把配置标成**活引用**（volatile）：`accessSecretRef` 与 `disableNativeWebSearch` 两个字段带 `.volatile()`，插件因此不重新挂载就能读到新值（`.get()`），并用一条 `ctx.on('loader/volatile-update', …)` 做写入后的就地生效。它再用 `settings.configure({ auto: false }, ctx.fiber)` 声明「这一行自带页面」。
+- 浏览器半体声明 `dsh.client`，并向插件页的 `plugins.row.config` 注册一张卡片，`key` 是 `<包名>#<行 id>`（两半分别取自 `package.json` 与 `cordis.patch.yml`）。
 
-更早的宿主没有这个槽：`ctx.slots.inject` 的回调不会来，宿主也不报错 —— 界面**静默缺席**。浏览器半体因此带一个超时的能力探测（不查版本号，只问槽在不在）：超时后在客户端控制台留一条英文 WARN，槽迟到再补一条 INFO 撤销；探测不改变注册语义，也不影响任何既有功能。分水岭与升级指引见根 [README.md](../README.md) 的「版本兼容」。
+拿不到这个槽（更早的宿主，或本插件被当成普通 entry 而不是 bundle 行挂载）时：`ctx.slots.inject` 的回调不会来，宿主也不报错 —— 界面**静默缺席**。浏览器半体因此带一个超时的能力探测（不查版本号，只问槽在不在）：超时后在客户端控制台留一条英文 WARN，槽迟到再补一条 INFO 撤销；探测不改变注册语义，也不影响任何既有功能。分水岭与升级指引见根 [README.md](../README.md) 的「版本兼容」。
 
-页面渲染的是两者同时在场：已服务的命名空间提供值，已注册的条目提供界面。**没有通用 schema 表单回退**，因此「注册了命名空间」与「页面里看得见」是两件事。命名空间是 Host 与卡片之间的连接键，包名是插件页取条目的连接键 —— 任一侧拼错都是静默不显示。
+页面渲染的是三者同时在场：**这一行的配置表单**（`form`，宿主在渲染期算好、经座位 props 递进来）、已注册的条目、以及条目要的那个视图。**没有通用 schema 表单回退**，因此「注册了条目」与「页面里看得见」是两件事。`<包名>#<行 id>` 是插件页取这一行配置的连接键，任一半拼错都是静默不显示。
+
+**卡片刻意不订阅表单值**：`form.state` 是页面渲染期取的一份快照（DSH 原文「refreshed by the page owner」），不是订阅源。保存成功后由页面重渲染把新值推进来（`mutate` 会把宿主应答折回镜像）。所以卡片是「受控 + 本地草稿」，订阅只用于凭据状态那一小块。
 
 卡片文案走 DSH 的 locale 服务，不硬编码：字典在 [src/client/locales.ts](../src/client/locales.ts)，槽位注册声明 `locale:` 之后框架才把类型化的 `t` 座位注入组件 props。代价是一个**硬依赖**——声明了 `locale:` 的条目在渲染时要求已安装的 locale 面，缺席即报错而不是降级。标准 `dsh web` 装配必然带它（DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`，多个核心客户端包也依赖它）。
 
@@ -190,13 +193,13 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 - 标题可能含 `]` 与换行，进入 Markdown 链接前需转义。
 - 无时区信息的日期按 UTC 解释；否则同一输入在不同机器产生不同缓存键。
 - 缓存只写成功结果；失败结果入缓存会把一次偶发限流锁定整个 TTL。
-- **设置里的密钥靠 schema 活着，不靠代码读它**：`redactSecrets` 只认识 schema 声明的 `role('secret')` 字段。把一个「已经没人读」的密钥字段从 schema 里删掉，redact 会同时停止保护它，明文改从 describe 线路走出 —— 功能测试全绿，泄漏静默发生。见「密钥解析契约」与 [test/redact-anchor.test.ts](../test/redact-anchor.test.ts)。
+- **密钥字段的角色是 schema 声明的**：`redactSecrets` 只认识带 `role('secret')` 的字段，摘掉角色等于停止脱敏。接缝换代后客户端配置页只投影 volatile 字段，所以非 volatile 的 `accessSecret` 已经不在这条线路上 —— 但它仍带角色，且**任何新加的密钥字段都要照同一规矩办**。见「密钥解析契约」与 [test/redact-anchor.test.ts](../test/redact-anchor.test.ts)。
 
 ### 宿主版本（DSH 侧，不随我们改）
 
 - **声明面只有一个**：`package.json` 的 `peerDependencies`。它同时是安装器的判据与 npm 页面上的对外承诺 —— 改它等于改对外契约，因此必须与实测对齐，不能凭文档推断。
-- **依赖的是运行时行为，不是 API 形状**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派规则、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、密钥读不到，或明文开始出现在 describe 线路上）。
-- **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`），`next` 才是当前承诺支持的线。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
+- **依赖的是运行时行为，不是 API 形状**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)` 的页面策略、`ctx.on('loader/volatile-update', …)` 的就地对账、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.row.config` 的 keyed 分派与 `form` 座位、客户端模块格式。任一处改动都可能在升级后**静默失效**（卡片不显示、开关不生效、密钥读不到）。
+- **驱动版本用 dist-tag，不用版本号**：DSH 至今全是 prerelease。`latest` 在多数子包上指向过期版本（具体值现查 `npm view @deepseek-ai/dsh dist-tags`），**`alpha` 才是当前承诺线**（2026-09-22 起；在那之前是 `next`，而 `next` 现在已低于我们的下限）。三条线的语义与实测由 [compat.yml](../.github/workflows/compat.yml) 每周核对，处理链归 [docs/PUBLISHING.md](PUBLISHING.md) 的「兼容性」。
 - **类型面会先于行为面动**：宿主收紧 API 签名时 `npm run typecheck` 先红，而全部测试仍然全绿。判断「兼容不兼容」不能只看测试结果。
 
 ### 契约纪律（破坏即改契约）

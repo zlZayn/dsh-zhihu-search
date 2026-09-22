@@ -1,5 +1,9 @@
 # 声明面下限：试过抬到 alpha 线，抬不动 —— 维持停在 next 线
 
+> **已被取代（2026-09-22）**：本文件的**决策**（维持停在 next 线）作废 —— 声明面已整条抬到 alpha 线，
+> 见 [2026-09-22-declaration-floor-moves-to-alpha.md](2026-09-22-declaration-floor-moves-to-alpha.md)。
+> **正文一字不改**：它记录的是当时的事实（那天确实抬不动），那份事实仍然真实 —— 变的只是结论。
+
 ## 问题
 
 `engines.dsh` 的下限是 `>=0.1.6-alpha.2`（引入 `plugins.bundle.config` 槽的那一版），

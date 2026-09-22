@@ -15,6 +15,8 @@
   为什么它必须存在：单元测试读的是 `execute()` 的返回值，既不过宿主那道校验，也拿不到渲染文本 —— v1.4.0 的 P0 正是漏在这条缝里（[复盘](../docs/postmortem/2026-09-14-output-schema-drift.md)）。
 - `compat-swap.mjs`：**兼容性换包**。把 DSH 依赖的**声明区间**就地换成某条 dist-tag 线上的精确版本，交给 [compat.yml](../.github/workflows/compat.yml) 去跑现有测试。
   三个子命令：`check <tag>`（只读，判声明面还罩不罩得住那条线）、`swap <tag>`（改写 `package.json`）、`verify <tag>`（断言实装版本就是 tag 上的版本）。
+  写回是**保形**的：只换区间里的下限版本，比较符与上界原样留下（形如 `>=… <下一个大版本>` 的声明换到别的版本后仍是同一个上界）
+  —— 硬编码 `'^' + version` 会让声明面在 CI 里悄悄变形，而人只看到 job 绿。
   为什么是「改写 package.json + 裸 `npm install`」而不是 `npm install <包>@<tag>`、以及 `verify` 为什么必须有 —— 见脚本头部注释，那里写的是实测结论而不是推断。
 
 ## 变更影响路由

@@ -15,13 +15,15 @@ import type { LocaleNamespaceMap } from '@deepseek-ai/dsh-client-ui-slots';
 /**
  * 字典命名空间。
  *
- * 与卡片的分派 key 同名但是两件事：分派 key 是 Host 侧设置命名空间，
- * 这个命名空间只标识本卡片的文案归属。
+ * 与卡片的分派 key **同名但是两件事**：分派 key 是 `<包名>#<行 id>`（描述「哪一行的配置」），
+ * 这个命名空间只标识本卡片的文案归属，由注册时的 `locale:` 座位用。
+ * 两者今天恰好都含包名，改一处不该顺手改另一处 —— 谁都不是谁的真源。
  */
 export const LOCALE_NS = 'zhihu-search';
 
 /** 本卡片全部文案的 key。 */
 export type ZhihuLocaleKey =
+  | 'rowSummary'
   | 'readOnly'
   | 'secretLabel'
   | 'secretConfigured'
@@ -39,7 +41,8 @@ export type ZhihuLocaleKey =
   | 'hideNativeWebOff'
   | 'hideNativeWebHint'
   | 'save'
-  | 'saving';
+  | 'saving'
+  | 'saveRejected';
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -49,6 +52,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** 简体中文文案。 */
 const zh: Record<ZhihuLocaleKey, string> = {
+  // 行缺描述时的回退文案（插件管理页 那一行标题下面）。
+  rowSummary: '知乎站内搜索、全网搜索与直答。点 Configure 填写 Access Secret 与引用名。',
   readOnly: '当前连接不允许写入设置。',
   secretLabel: 'Access Secret',
   secretConfigured: '已配置',
@@ -67,10 +72,12 @@ const zh: Record<ZhihuLocaleKey, string> = {
   hideNativeWebHint: '只控可见性 —— tool-web 本身照常加载。下次请求生效，无需重启。',
   save: '保存',
   saving: '保存中…',
+  saveRejected: '宿主拒绝了这次写入：配置在别处改过了，请重开这一页再试。',
 };
 
 /** English copy. */
 const en: Record<ZhihuLocaleKey, string> = {
+  rowSummary: 'Zhihu in-site search, global web search, and Zhida. Open Configure to set the Access Secret and its reference.',
   readOnly: 'This connection does not allow writing settings.',
   secretLabel: 'Access Secret',
   secretConfigured: 'Configured',
@@ -89,6 +96,7 @@ const en: Record<ZhihuLocaleKey, string> = {
   hideNativeWebHint: 'Visibility only — tool-web still loads. Takes effect next request; no restart.',
   save: 'Save',
   saving: 'Saving…',
+  saveRejected: 'The Host refused this write: the configuration changed elsewhere. Reopen this page and try again.',
 };
 
 /** 交给 `ctx.locale.register` 的双语字典。 */

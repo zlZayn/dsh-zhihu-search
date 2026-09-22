@@ -1,7 +1,7 @@
 /**
  * dsh-zhihu-search 插件入口。
  *
- * 本文件是**唯一**接触 Cordis 的地方：生命周期、配置校验、设置命名空间、工具注册。
+ * 本文件是**唯一**接触 Cordis 的地方：生命周期、配置校验、设置页面策略、工具注册。
  * 工具实现本身不依赖 Cordis，因此可以用普通对象直接单测。
  *
  * 生命周期纪律（红线 4）：
@@ -10,10 +10,15 @@
  * 否则 HMR 重载后会留下两代插件共用缓存与限流桶的幽灵故障。
  */
 
-import type { Context } from '@deepseek-ai/cordis';
+import type { Context, Volatile } from '@deepseek-ai/cordis';
 import { credentialRef, isCredentialRefName, type CredentialRef } from '@deepseek-ai/dsh-credentials';
 import type {} from '@deepseek-ai/dsh-agent';
-import type { SettingsProvider } from '@deepseek-ai/dsh-settings';
+// 类型导入即声明：`ctx.settings`（Host 侧设置服务面）由 settings 包合并进 Context。
+import type {} from '@deepseek-ai/dsh-settings';
+// 类型导入即声明：`loader/volatile-update` 由 Loader 合并进 Events。少了这一行，
+// 下面那个监听会以 TS2345 报「键不在 keyof Events 里」—— 官方同类写法见 DSH
+// packages/experimental/speech-to-text/src/index.ts:6-7。
+import type {} from '@deepseek-ai/cordis-plugin-loader';
 import z from '@deepseek-ai/schemastery';
 import { DEFAULT_STREAM_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, ZHIHU_BASE_URL, ZhihuClient } from './transport.js';
 import { resolveAccessSecret as resolveAccessSecretFrom } from './credentials.js';
@@ -29,15 +34,6 @@ export const name = 'zhihu-search';
 
 /** 本插件依赖的工具注册表服务。 */
 export const inject = ['tools'];
-
-/**
- * 设置命名空间。
- *
- * 设置文档、describe 线路与凭据引用名都按它寻址，两端必须用同一个字符串。
- * 它**不再是** client 半体的槽位分派 key：卡片迁到插件页后按包的**包名**分派，
- * 见 [client/index.tsx](client/index.tsx) 的 `BUNDLE_NAME`。
- */
-export const ZHIHU_SETTINGS_NAMESPACE = 'zhihu-search';
 
 /** 凭据引用的默认名，按 DSH 约定取环境变量名。 */
 export const DEFAULT_ACCESS_SECRET_REF = 'ZHIHU_ACCESS_SECRET';
@@ -83,15 +79,26 @@ export interface Config {
   /**
    * 旧版的字面量 Access Secret。**已弃用：插件不再把它当作取值来源。**
    *
-   * 留在 schema 里有两个不可省的作用，两者都不是「还能填」：
-   * 1. `role('secret')` 是 redact 层的锚点。字段一旦移出 schema，redact 就不再认识
-   *    它是密钥，明文会**原样出现在发往浏览器的 describe 线路里**（实测，见
-   *    [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」）。
-   * 2. 它是迁徙的入口：启动时由 [migrate.ts](./migrate.ts) 搬进凭据域，再从设置文档里删掉。
+   * 留在 schema 里只为一件事：它是**组合配置单向迁徙**的读取入口 —— 有人把明文写进
+   * 活动 profile 的 `cordis.patch.yml`（`config.accessSecret`）时，启动期由
+   * [migrate.ts](./migrate.ts) 搬进凭据域，然后告警请人手动删掉那一行。组合配置不属插件，
+   * 插件没有、也不该有改写它的口子。
+   *
+   * **0.1.7 起「redact 锚点」这层作用已经没有保护对象**：客户端配置页只投影 volatile 字段
+   * （settings 包的 `volatileForm` + `projectForm`），非 volatile 的字段结构上不可能出现在
+   * 发往浏览器的 value / base / user 里。字段仍然带 `role('secret')`
+   * （[test/redact-anchor.test.ts](../test/redact-anchor.test.ts) 钉住），但那不再是它留下的理由。
    */
   accessSecret?: string;
-  /** 凭据引用名（环境变量名或凭据记录名）。 */
-  accessSecretRef?: string;
+  /**
+   * 凭据引用名（环境变量名或凭据记录名）。
+   *
+   * `Volatile` 是**活引用**：Loader 能在不重新挂载插件的情况下换掉它的值，持有者因此总是
+   * 读到当前值（`.get()`），不需要 Host 再把整份配置推过来。
+   *
+   * 它必须 volatile —— 配置卡片要读写它，而 0.1.7 的配置页只投影 volatile 字段。
+   */
+  accessSecretRef?: Volatile<string>;
   /** 覆盖接入域名，便于指向沙箱或代理。 */
   baseUrl?: string;
   /** 单次 HTTP 请求的超时预算（毫秒）。搜索走它。 */
@@ -122,8 +129,10 @@ export interface Config {
    *
    * 默认 `false`：插件不擅自削宿主能力。打开后按 agent 生效，
    * 且作用于该 agent 派生的子 agent（restriction 沿 scope 链继承）。
+   *
+   * 同样是 volatile：卡片要能拨它，而拨完不该要求重启。
    */
-  disableNativeWebSearch?: boolean;
+  disableNativeWebSearch?: Volatile<boolean>;
 }
 
 /** 配置的运行时校验 schema；默认值同时是文档。 */
@@ -131,7 +140,10 @@ export const Config = z.object({
   // `secret` 角色只服务 redact 层（见 Config.accessSecret 的说明）；
   // `credential-ref` 角色才是本插件真正的配置面：这一格填的是凭据名，不是凭据本身。
   accessSecret: z.string().role('secret'),
-  accessSecretRef: z.string().role('credential-ref').default(DEFAULT_ACCESS_SECRET_REF),
+  // `.default()` 必须在 `.volatile()` 之前：前者先定 mode，后者才产出 `Volatile<T>`
+  // （而不是 `Volatile<T | undefined>`）。反过来写，`config.accessSecretRef.get()` 就带上
+  // undefined，与下面 `.get() ?? 默认值` 的写法打架。
+  accessSecretRef: z.string().role('credential-ref').default(DEFAULT_ACCESS_SECRET_REF).volatile(),
   baseUrl: z.string().default(ZHIHU_BASE_URL),
   timeoutMs: z.natural().default(DEFAULT_TIMEOUT_MS),
   streamTimeoutMs: z.natural().default(DEFAULT_STREAM_TIMEOUT_MS),
@@ -142,7 +154,7 @@ export const Config = z.object({
   enableSearch: z.boolean().default(true),
   enableGlobalSearch: z.boolean().default(true),
   enableZhida: z.boolean().default(true),
-  disableNativeWebSearch: z.boolean().default(false),
+  disableNativeWebSearch: z.boolean().default(false).volatile(),
 });
 
 /** 凭据服务在本模块用到的最小面。 */
@@ -187,10 +199,6 @@ export function apply(ctx: Context, config: Config): void {
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const streamTimeoutMs = config.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS;
 
-  // 权威 section 的读取器。设置界面写入后，Host 通过 setSource 换掉它，
-  // 因此在途与后续调用都会看到新值，无需重启。
-  let current: () => Config = () => config;
-
   /**
    * 凭据服务面。由下面的 `ctx.inject(['credentials'])` 就绪后写入，缺席时保持 `undefined`。
    *
@@ -209,8 +217,11 @@ export function apply(ctx: Context, config: Config): void {
    *
    * 默认值的回落只在这一处表达 —— 解析、缓存隔离、迁徙三处都问它，
    * 各自抄一遍必然会漂移。
+   *
+   * 读的是**活引用**（`.get()`）而不是挂载时的快照：卡片改完引用名即生效，
+   * 不需要重启，也不需要谁把新配置推给我们。
    */
-  const referenceName = (): string => current().accessSecretRef ?? DEFAULT_ACCESS_SECRET_REF;
+  const referenceName = (): string => config.accessSecretRef?.get() ?? DEFAULT_ACCESS_SECRET_REF;
 
   /**
    * 把引用名收窄成 seam 认得的 `CredentialRef`；不在语法内时返回 `undefined`。
@@ -230,7 +241,7 @@ export function apply(ctx: Context, config: Config): void {
    * 解析本次调用要用的密钥。
    *
    * 凭据域是唯一的取值口；进程环境只是 provider 缺席时的兜底。
-   * 设置里**没有**字面量通道 —— 旧明文由 {@link prepareCredentials} 一次性搬走。
+   * 设置里**没有**字面量通道 —— 组合配置里的旧明文由 {@link prepareCredentials} 一次性搬走。
    */
   const resolveAccessSecret = async (): Promise<string | undefined> =>
     resolveAccessSecretFrom({
@@ -263,29 +274,14 @@ export function apply(ctx: Context, config: Config): void {
    * 与 `agent/created` 同样的纪律 —— 一个可选的诊断不该有否决启动的权力，
    * 所以整条路径的异常都在这里收口。
    *
-   * @param settings - 已就绪的设置服务，用于读 user 层与抹掉旧明文。
+   * 0.1.7 起只剩**一条**来源：组合配置（活动 profile 的 `cordis.patch.yml` 里
+   * `config.accessSecret`）。旧 `settings.yaml` 那半边随宿主一起没了 —— 宿主的
+   * `importLegacyDocument()` 按 section 名当 entry id 导入，而它只映射三个官方 section，
+   * 我们那一段结构上不可能被导入，读它也就永远读不到。
    */
-  const prepareCredentials = async (settings: SettingsProvider): Promise<void> => {
-    /**
-     * 读设置文档 user 层里的旧明文。
-     *
-     * 用 `describe()` 而不是 `current()`：后者是 base 与 user 合并后的值，
-     * 分不出明文来自哪一层 —— 而「删不删得掉」正好取决于这个区分。
-     *
-     * @returns user 层里的明文，或 `undefined`。
-     */
-    const readUserLayer = (): string | undefined => {
-      const user: unknown = settings.describe().find((entry) => entry.ns === ZHIHU_SETTINGS_NAMESPACE)?.user;
-      if (typeof user !== 'object' || user === null) return undefined;
-      const value = (user as Record<string, unknown>)['accessSecret'];
-      return typeof value === 'string' ? value : undefined;
-    };
-
+  const prepareCredentials = async (): Promise<void> => {
     await migrateLegacySecret({
-      readLegacy: () => ({
-        fromSettings: readUserLayer(),
-        fromComposition: config.accessSecret,
-      }),
+      readLegacy: () => ({ fromComposition: config.accessSecret }),
       hasCredential: async () => {
         const ref = brand(referenceName());
         if (ref === undefined || credentialFace === undefined) return false;
@@ -301,9 +297,6 @@ export function apply(ctx: Context, config: Config): void {
         }
         await credentialFace.set(ref, value);
       },
-      purge: async () => {
-        await settings.mutate(ZHIHU_SETTINGS_NAMESPACE, [{ op: 'unset', path: ['accessSecret'] }]);
-      },
       referenceName,
       warn,
     });
@@ -311,7 +304,7 @@ export function apply(ctx: Context, config: Config): void {
     // 搬完之后仍然取不到，才说明用户是真的还没配。
     if ((await resolveAccessSecret()) === undefined) {
       warn(
-        '[zhihu-search] 未找到 Access Secret，工具会注册但调用时返回鉴权错误。可在 DSH 侧边栏 插件（Plugins） → dsh-zhihu-search 详情页中填写，或设置环境变量 ZHIHU_ACCESS_SECRET。',
+        '[zhihu-search] 未找到 Access Secret，工具会注册但调用时返回鉴权错误。可在 DSH 侧边栏 插件（Plugins） → dsh-zhihu-search 那一行的 Configure 中填写，或设置环境变量 ZHIHU_ACCESS_SECRET。',
       );
     }
   };
@@ -353,7 +346,7 @@ export function apply(ctx: Context, config: Config): void {
    * （DSH `core/agent` 的注册表语义），一个可选的界面开关不该有这种权力。
    */
   const installOn = (agent: ScopedAgent): void => {
-    if (current().disableNativeWebSearch !== true || restrictions.has(agent.id)) return;
+    if (config.disableNativeWebSearch?.get() !== true || restrictions.has(agent.id)) return;
     const tools = toolsFor(agent);
     if (tools === undefined) return;
 
@@ -387,13 +380,13 @@ export function apply(ctx: Context, config: Config): void {
   /**
    * 幂等对账：让每个 live agent 的 restriction 与当前配置一致。
    *
-   * 三个时机共用它 —— agent 服务就绪、设置写入、以及新 agent 出现。
-   * 幂等是硬要求：保存 Access Secret 同样会触发 `onChange`。
+   * 三个时机共用它 —— agent 服务就绪、volatile 写入、以及新 agent 出现。
+   * 幂等是硬要求：保存 Access Secret 也是 volatile 写入，一样会触发对账。
    */
   const syncNativeWebTools = (): void => {
     const registry = ctx.get('agents') as AgentRegistryFace | undefined;
     if (registry === undefined) return;
-    const wanted = current().disableNativeWebSearch === true;
+    const wanted = config.disableNativeWebSearch?.get() === true;
     for (const agent of registry.list()) {
       if (wanted) installOn(agent);
       else liftFrom(agent.id);
@@ -401,8 +394,13 @@ export function apply(ctx: Context, config: Config): void {
   };
 
   // 新 agent 补装；销毁时销账（它的 scope 已随之撤销）。
+  //
+  // `return undefined` 不是装饰：0.1.7 起这个事件的签名是 `Promise<undefined> | undefined`，
+  // 块体箭头返回 `void` 不再可赋值（**就是这一行**解掉了 2026-09-20 记下的「抬不动」）。
+  // 它同时满足两条线，[compat.yml](../.github/workflows/compat.yml:166-168) 早记过这招。
   ctx.on('agent/created', ({ agent }) => {
     installOn(agent);
+    return undefined;
   });
   ctx.on('agent/disposed', ({ agent }) => {
     restrictions.delete(agent.id);
@@ -414,38 +412,46 @@ export function apply(ctx: Context, config: Config): void {
     syncNativeWebTools();
   });
 
-  // 设置命名空间：让 Host 把这个 section 暴露给浏览器端的描述镜像，
-  // 否则插件页的配置卡片取不到值（分派 key 是包名，不是这个命名空间）。
+  // 设置是**可选**依赖，它如今只承载一条策略：本插件自带配置页面，别让客户端按 schema 再生成一个。
+  //
+  // 0.1.7 起注册页面不再需要 installSection —— 配置面按 **profile entry id** 寻址、只投影
+  // volatile 字段，插件要做的事只剩「声明自己有页面」。`auto:false` 今天是礼貌而非必需
+  // （官方 settings README：目前没有已发布的客户端按 schema 自动生成页面），做它是为了对齐契约。
+  //
+  // 包在 `effect` 里是**必需**的：`configure` 对同一个 fiber 第二次调用会抛
+  // `Settings presentation is already configured for this plugin instance`，而 settings 服务
+  // 被替换（HMR）时这个 inject 子作用域会重入 —— disposer 摘掉策略，重入才安全。
   ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, ZHIHU_SETTINGS_NAMESPACE, Config, config, {
-      setSource: (source) => {
-        current = source;
-      },
-      // 写入后就地生效：可见集在**每次模型请求**时重算，因此下一次请求即采用新集合，
-      // 不需要新窗口。DSH 在 section attach/detach 时也会调它，所以这里必须幂等。
-      onChange: () => {
-        syncNativeWebTools();
-      },
+    settingsCtx.effect(
+      () => settingsCtx.settings.configure({ auto: false }, ctx.fiber),
+      'zhihu-search: own configuration page',
+    );
+  });
+
+  // volatile 写入后的就地对账（旧的 installSection onChange 的替代品）。
+  // 可见集在**每次模型请求**时重算，所以下一次请求即采用新集合，不需要新窗口。
+  // 事件是实例局部的、只在 volatile 值提交后发一次；非法候选不会走到这里。
+  ctx.on('loader/volatile-update', () => {
+    syncNativeWebTools();
+  });
+
+  // 凭据是**可选**依赖：拿不到它时卡片仍要能显示、工具仍要能注册（调用时报鉴权错）。
+  // 所以单独一层 inject，而不是把 'credentials' 写进上面那个数组。
+  //
+  // 0.1.7 起它不再需要排在设置之后：迁徙只剩组合配置一个来源，读的是自己的 config，
+  // 与设置文档无关。
+  ctx.inject(['credentials'], (ready) => {
+    credentialFace = ready.credentials as CredentialsFace;
+
+    // 迁徙应尽早完成 —— 明文留在活动 profile 的 patch 里就是风险。
+    // 整条路径幂等，服务重新就绪时重复进入无害。
+    void prepareCredentials().catch((error: unknown) => {
+      warn(`[zhihu-search] 启动期凭据体检失败：${error instanceof Error ? error.message : String(error)}`);
     });
 
-    // 凭据是**可选**依赖：拿不到它时卡片仍要能显示、工具仍要能注册（调用时报鉴权错）。
-    // 所以嵌套一层 inject 而不是把 'credentials' 写进上面的数组 —— 那会让卡片陪着一起等，
-    // 一个没有凭据服务的装配连设置界面都进不去。
-    //
-    // 嵌套还顺带定死了顺序：迁徙必然发生在 installSection 之后（它要读 user 层、也要改它）。
-    settingsCtx.inject(['credentials'], (ready) => {
-      credentialFace = ready.credentials as CredentialsFace;
-
-      // 迁徙应尽早完成 —— 老配置里的明文在 redact 眼里仍是 secret 槽位，
-      // 但留在盘上就是风险。整条路径幂等，服务重新就绪时重复进入无害。
-      void prepareCredentials(settingsCtx.settings).catch((error: unknown) => {
-        warn(`[zhihu-search] 启动期凭据体检失败：${error instanceof Error ? error.message : String(error)}`);
-      });
-
-      return () => {
-        credentialFace = undefined;
-      };
-    });
+    return () => {
+      credentialFace = undefined;
+    };
   });
 
   // 插件卸载（含 HMR 换装）：撤掉我们装过的 restriction ——

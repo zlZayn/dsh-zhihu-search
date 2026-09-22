@@ -1,9 +1,10 @@
 # client/ — 浏览器半体
 
-- 职责：在侧边栏「插件（Plugins）」→「已安装（Installed）」组 → 本插件详情页里渲染「知乎搜索」配置卡片（槽 `plugins.bundle.config`，`key` 取本包包名）。设置段只承载凭据引用名与开关；**密钥经 `ctx.remote.credentials` 写进凭据存储**（`$DSH_HOME/.credentials.yaml`），不经过设置文档。
+- 职责：在侧边栏「插件（Plugins）」→「已安装（Installed）」组 → **本插件那一行的 Configure 页**里渲染「知乎搜索」配置卡片（槽 `plugins.row.config`，`key` 是 `<包名>#<行 id>`）。配置面只承载凭据引用名与开关；**密钥经 `ctx.remote.credentials` 写进凭据存储**（`$DSH_HOME/.credentials.yaml`），不经过配置文件。
 - 文件索引：`index.tsx` 卡片本体与注册；[credential-store.ts](credential-store.ts) 凭据状态源（纯逻辑，无 React）；[locales.ts](locales.ts) 中英字典，并导出 `LOCALE_NS`、`ZhihuLocaleKey` 与 `LocaleNamespaceMap` 增强声明（key 拼错或漏一种语言即编译错误）。
-- 关键导出：`apply`（注册字典与卡片）、`inject`（`['slots', 'settingsScope', 'remote', 'remote.credentials', 'locale']` —— **`remote` 与 `remote.credentials` 缺一不可**，理由见 [AGENTS.md](AGENTS.md)）、`createCredentialStore`（纯函数，跟踪引用名当下的配置状态）。
-- 能力探测：`plugins.bundle.config` 槽缺席（更早的宿主）时 `ctx.slots.inject` 的回调不会来，界面静默缺席 —— 注册处因此带一个超时窗口，超时后往**客户端控制台**写一条英文 WARN 提示；槽迟到则补一条 INFO 撤销它。只加提示路径，注册的槽名 / key / 时机一字不改，探测失败不影响任何既有功能。
+- 关键导出：`apply`（注册字典与卡片）、`inject`（`['slots', 'remote', 'remote.credentials', 'locale']` —— **`remote` 与 `remote.credentials` 缺一不可**，理由见 [AGENTS.md](AGENTS.md)）、`createCredentialStore`（纯函数，跟踪引用名当下的配置状态）。
+- 卡片怎么拿到配置面：宿主在渲染期把**这一行的** `form`（`{ state, mutate }`）作为**座位 props** 递进来（`plugins.row.config` 的 owner props）。`form` **可能缺席** —— 那一行不在 describe 镜像里（没有 volatile 字段、或连接是 memory 模式），或描述还没回来；缺席时按「不可写」渲染，沿用既有的只读文案，不新增可见状态。
+- 能力探测：`plugins.row.config` 槽缺席（更早的宿主，或本插件被当成普通 entry 而非 bundle 行挂载）时 `ctx.slots.inject` 的回调不会来，界面静默缺席 —— 注册处因此带一个超时窗口，超时后往**客户端控制台**写一条英文 WARN 提示；槽迟到则补一条 INFO 撤销它。只加提示路径，注册的槽名 / key / 时机一字不改，探测失败不影响任何既有功能。
 - 被谁依赖：DSH Web 的客户端模块系统按包清单的 `dsh.client` 扫描并加载 `lib/client.js`。
 - 改后必测：`npm test` 的 [产物契约](../../test/README.md)（信封 id、导出面、inject 装配、注册 key）与 [credential-store 单测](../../test/credential-store.test.ts)。
 
@@ -25,14 +26,14 @@
 
 ## 变更影响路由
 
-- 改 `index.tsx` 的注册 key（`BUNDLE_NAME`）→ 必须与 [package.json](../../package.json) 的 `name` 逐字一致，插件页按包名取配置，写错即整块不出现且不报错；同步 [src/README.md](../README.md)。改槽位名同理。
+- 改 `index.tsx` 的注册 key（`BUNDLE_NAME` 与 `ROW_ID`）→ 两半必须分别与 [package.json](../../package.json) 的 `name` 和 [cordis.patch.yml](../../cordis.patch.yml) 的行 id 逐字一致：包名错 = 整块不出现，行 id 错 = 页面认不出这一行有配置（控件的出现条件是 `ledger.rows.has(rowConfigKey(pkg.name, row.rowId))`）。两者都由 [test/settings-seam.test.ts](../../test/settings-seam.test.ts) 从文件解析后对账；同步 [src/README.md](../README.md)。改槽位名同理。
 - 改 `inject` 声明 → 同步 [test/client-bundle.test.ts](../../test/client-bundle.test.ts) 的导出面断言，并跑「按真实 Cordis 语义装配」组（**唯一**能看见 inject 门禁的地方）。`remote` 让 `ctx.remote` 属性访问合法、`remote.credentials` 等命名空间就绪，两个都不能删。
 - 改 `credential-store.ts` → 跑 [test/credential-store.test.ts](../../test/credential-store.test.ts)。两条不可弱化：**引用名一换旧答案立即作废**（徽标说谎比徽标迟到更糟）、**写失败必须抛**（安静停在「未配置」会让用户以为保存成功了）。
 - 改样式 → 只用 `--dsw-alias-*` 语义令牌，不写字面色值。
 - 加文案 → 只改 [locales.ts](locales.ts) 的 key 与两份字典；两处都补齐才编得过。
 - 改**渲染面**（文案值、JSX 结构、样式对象、可见状态）→ **必须同批重截** [assets/](../../assets/) 的两张卡片图；触发判据、步骤与验收见 [assets/AGENTS.md](../../assets/AGENTS.md)。
 - 改 locale 命名空间 → 必须与槽位注册的 `locale:` 一致，否则 `t` 取不到值、界面显示 key 本身。
-- 改探测窗口或提示文案 → 跑 [产物测试](../../test/client-bundle.test.ts) 的「配置槽能力探测」一组（三条：按时到达不发声 / 缺席时恰一条英文提示 / 迟到时撤销），并同步根 [README.md](../../README.md) 的「版本兼容」。
+- 改探测窗口或提示文案 → 跑 [产物测试](../../test/client-bundle.test.ts) 的「配置槽能力探测」一组（三条：按时到达不发声 / 缺席时恰一条英文提示 / 迟到时撤销），并同步根 [README.md](../../README.md) 的「版本兼容」。**提示里点名的槽必须是实际注册的那个**（`plugins.row.config`）—— 探测说要装 A、卡片装进 B，是最坏的一种「说谎」，测试对此有断言。
 - 改完必须 `npm run build`。客户端半体由 `dsh-client-hmr` 轮询 `lib/client.js` 就地换装；**host 半体换不了**。
   生效链**取决于本机 profile 怎么挂的**（先 `Get-Item <profile>\node_modules\dsh-zhihu-search | Select LinkType,Target`）：符号链接到仓库时构建**直接写线上浏览器半体**；版本化副本则要 build → 发版 → `dsh plugin --profile web add dsh-zhihu-search@<ver>`。两种模式下 host 半体都要重启 → 见 [../AGENTS.md](../AGENTS.md) 的活跃坑。
 

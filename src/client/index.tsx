@@ -1,8 +1,13 @@
 /**
- * 浏览器半体：侧边栏「插件（Plugins）」→「已安装（Installed）」组 → 本插件详情页里的「知乎搜索」配置卡片。
+ * 浏览器半体：侧边栏「插件（Plugins）」→「已安装（Installed）」组 → dsh-zhihu-search 那一行的
+ * **Configure** 页里的「知乎搜索」配置卡片。
  *
- * 挂载点是插件管理页声明的 `plugins.bundle.config` 槽，key 取本包的**包名**（`dsh-zhihu-search`）：
- * 页面按 bundle 的包名分派，写错 key 的表现是整块配置不出现，且页面不报错。
+ * 挂载点是插件管理页声明的 `plugins.row.config` 槽（0.1.7 起；旧槽 `plugins.bundle.config`
+ * 还在，但渲染它时页面**不传 `form`**，卡片拿不到读写面），key 是 `<包名>#<行 id>`，
+ * 两半逐字取自本仓自己的声明：[package.json](../../package.json) 的 `name` 与
+ * [cordis.patch.yml](../../cordis.patch.yml) 那条 insert 的 `id`。
+ * 写错 key 的表现是整块配置不出现，且页面不报错 —— 由
+ * [test/settings-seam.test.ts](../../test/settings-seam.test.ts) 解析这两个文件对账。
  *
  * 外壳对齐原生配置表单（`ui-settings-plugins` 的 PluginConfigForm + fields）：不可折叠、无外框，
  * 一列控件直接落在插件页的 `data-plugin-config` 区里；只读提示行 + 字段行（标签 / 状态标记 / 重置）
@@ -13,22 +18,23 @@
  * 注册时用 `locale:` 声明命名空间，框架据此把类型化的 `t` 座位注入组件 props。
  * 切语言无需重挂载：字典注册会推进 locale 版本号，已挂载的出口自动重取。
  *
- * 密钥**不经过设置文档**：它按引用名写进 `ctx.remote.credentials`（即 `.credentials.yaml`），
- * 与官方 web 搜索卡片同一套做法。设置里只留引用名，因此 settings.yaml 被截图或上传时不泄任何凭据。
+ * 密钥**不经过配置文件**：它按引用名写进 `ctx.remote.credentials`（即 `.credentials.yaml`），
+ * 与官方 web 搜索卡片同一套做法。配置里只留引用名，因此活动 profile 的 Cordis patch
+ * 被截图或上传时不泄任何凭据。
  *
  * 复用 `@deepseek-ai/dsh-client-ui-primitives` 的 `Tag` 与 `Switch`：那是公共基础库，
  * 不是别的插件 —— 被 bundle-purity gate 禁止的是跨插件值导入。
  * 其余控件按官方 CSS 自带样式，取值只用 `--dsw-alias-*` 语义令牌。
  */
 
-import { useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { Switch, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { Context } from '@deepseek-ai/cordis';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client';
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client';
-// 类型导入即声明：`plugins.bundle.config` 槽由插件管理页的浏览器半体合并进 SlotMap。
-import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
+// 类型导入即声明：`plugins.row.config` 槽由插件管理页的浏览器半体合并进 SlotMap，
+// 而 `ConfigPageForm`（宿主那侧算好的表单读写面）也从同一个入口导出 ——
+// 卡片刻意不欠 `dsh-client-ui-settings` 任何**类型边**：它只经由槽位 props 拿到表单。
+import type { ConfigPageForm } from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
 // 类型导入即声明：`ctx.locale` 由 locale 包的浏览器半体合并进 Context。
 import type {} from '@deepseek-ai/dsh-client-locale/client';
 // 类型导入即声明：ctx.slots 由 ui-renderer 的浏览器半体合并进 Context。
@@ -78,16 +84,27 @@ function remoteOf(ctx: Context): ClientRemoteFace {
  * 只写点号键的后果不是降级而是整块装不上：`cannot get property "remote" without inject`（v1.6.0 的回归）。
  * 官方 `ui-settings-plugins` 同样两个都写。
  */
-export const inject = ['slots', 'settingsScope', 'remote', 'remote.credentials', 'locale'];
-
-/** 与 Host 侧 `ZHIHU_SETTINGS_NAMESPACE` 逐字一致；设置段的命名空间，不再兼作分派 key。 */
-const NAMESPACE = 'zhihu-search';
+export const inject = ['slots', 'remote', 'remote.credentials', 'locale'];
 
 /**
- * 槽位分派 key：插件页按 bundle 的**包名**取配置，因此它必须与 [package.json](../../package.json)
- * 的 `name` 逐字一致。写错的表现是整块配置不出现（页面不报错）。
+ * 槽位分派 key 的两半。
+ *
+ * 插件页按 `<包名>#<行 id>` 取某一行的配置（DSH `config-ledger.ts` 的 `rowConfigKey`）：
+ * - 前半是 bundle 的**包名** = [package.json](../../package.json) 的 `name`；
+ * - 后半是 bundle patch 里那条 insert 的 **id** = [cordis.patch.yml](../../cordis.patch.yml)。
+ *
+ * 两半都不是「随便一个字符串」：包名写错 = 整块配置不出现，行 id 写错 = 页面认不出这一行有配置
+ * （控件的出现条件是 `ledger.rows.has(rowConfigKey(pkg.name, row.rowId))`）。两者都由
+ * [test/settings-seam.test.ts](../../test/settings-seam.test.ts) 从那两个文件里解析后对账 ——
+ * 不写死字符串，免得哪天 patch 的 id 改了这个常量悄悄失配。
  */
 const BUNDLE_NAME = 'dsh-zhihu-search';
+
+/** bundle patch 里那条 insert 的行 id；改了它必须同改 key，否则卡片静默消失。 */
+const ROW_ID = 'dsh-zhihu-search';
+
+/** 交给 `plugins.row.config` 槽的分派 key。 */
+const ROW_KEY = `${BUNDLE_NAME}#${ROW_ID}`;
 
 /** 凭据引用名字段，对应 Host 侧 `Config.accessSecretRef`。 */
 const REF_FIELD = 'accessSecretRef';
@@ -104,10 +121,15 @@ const DEFAULT_REF = 'ZHIHU_ACCESS_SECRET';
 /**
  * 配置槽的能力探测窗口。
  *
- * 探测的是**能力**不是版本号：版本在插件侧取不到，而「`plugins.bundle.config` 这个槽在不在」
+ * 探测的是**能力**不是版本号：版本在插件侧取不到，而「`plugins.row.config` 这个槽在不在」
  * 是当场可观测的事实 —— 槽由插件管理页的浏览器半体声明，缺席时 {@link apply} 里
  * `ctx.slots.inject` 的回调**永远不来**，且宿主不报任何错（静默）。
- * 窗口刻意给宽：迟到的声明只多留一条撤销提示，窗口太短反而会打扰新宿主上的用户。
+ *
+ * 它盯的是**一个真实故障**，不是「老宿主」：宿主把本插件当成普通 entry 挂载（而不是 bundle 行）时
+ * 就没有行、没有 Configure 控件，槽位注册也就无处可落。engine 声明是 advisory，装到旧宿主
+ * 不会报错，所以这条提示仍然有活干。
+ *
+ * 窗口刻意给宽：迟到的声明只多留一条撤销提示，窗口太短反而会打扰正常装配上的用户。
  */
 const SLOT_PROBE_TIMEOUT_MS = 10_000;
 
@@ -116,11 +138,11 @@ const SLOT_PROBE_TIMEOUT_MS = 10_000;
  * 本插件唯一的界面（这张卡片）就长在缺席的那个槽里，没有跨版本的 UI 面可落。
  */
 const SLOT_MISSING_WARNING =
-  '[WARN] dsh-zhihu-search: this Host provides no plugins.bundle.config slot, so the configuration card cannot be shown. The three tools keep working. For in-place configuration, upgrade the Host - see the version compatibility section of the README.';
+  '[WARN] dsh-zhihu-search: this Host renders no plugins.row.config entry, so the configuration card cannot be shown. The three tools keep working. Mount the plugin as a bundle row (dsh plugin --profile web add) to configure it in place.';
 
 /** 提示必须可撤销：槽迟于窗口才声明时补一条，声明前一条作废。 */
 const SLOT_LATE_INFO =
-  '[INFO] dsh-zhihu-search: plugins.bundle.config appeared after the probe window, so the earlier warning is withdrawn and the configuration card is registered.';
+  '[INFO] dsh-zhihu-search: plugins.row.config appeared after the probe window, so the earlier warning is withdrawn and the configuration card is registered.';
 
 /** 框架注入的 `t` 座位类型，绑定到本卡片的字典命名空间。 */
 type CardTranslate = TranslateNS<typeof LOCALE_NS>;
@@ -230,10 +252,27 @@ function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
   if (typeof candidate.unref === 'function') candidate.unref();
 }
 
+/**
+ * 一条字段写入操作。
+ *
+ * 用**结构类型**就地收窄，不引 `@deepseek-ai/dsh-api-remotes` 的类型边（会为两个字段的形状
+ * 多背一个客户端装配包）—— 与 {@link ClientRemoteFace} 同一套做法。
+ */
+type PathOp = Parameters<ConfigPageForm['mutate']>[0][number];
+
 /** 卡片 props；`t` 由框架按注册时声明的 locale 命名空间注入。 */
 interface CardProps {
-  readonly scope: SettingsScope<ZhihuSection>;
+  /**
+   * 宿主为**这一行**算好的表单读写面。页面在渲染期才确定它，而且**可能缺席**。
+   *
+   * 缺席的成因有两种，表现相同：这一行不在 describe 镜像里（我们那个 entry 没有 volatile
+   * 字段、或连接是 memory 模式），或者描述还没回来。缺席时按「不可写」渲染 ——
+   * 一个不可配置的宿主与一个还没回来的宿主，对用户是同一件事。
+   */
+  readonly form: ConfigPageForm | undefined;
   readonly store: ReturnType<typeof createCredentialStore>;
+  /** 把当前**生效**的引用名交回 apply —— 卡片是唯一看得到它的地方（`apply` 期 `form` 还不存在）。 */
+  readonly trackSavedRef: (ref: string) => void;
   readonly t: CardTranslate;
 }
 
@@ -243,14 +282,17 @@ interface CardProps {
  * 草稿只活在组件本地状态里 —— 卸载即丢弃（原生表单同款语义），因此没有「放弃」控件；
  * 保存成功同时清空草稿，失败则保留草稿与诊断供修正。
  *
- * @param props - 命名空间作用域、凭据状态源，以及框架注入的翻译座位。
+ * **受控，但不订阅表单**：`form.state` 是页面在渲染期取的一份快照（DSH 原文
+ * 「refreshed by the page owner」），不是订阅源。保存成功后由页面重渲染把新值推进来 ——
+ * `mutate` 会把宿主应答折回镜像（`config-form.ts` 的 `acceptView`）。
+ * 所以这里**不要**再引 `useSyncExternalStore` 去订阅表单值。
+ *
+ * @param props - 这一行的表单面、凭据状态源、引用名回传口，以及框架注入的翻译座位。
  * @returns 卡片元素。
  */
-function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
-  const snapshot: SettingsScopeSnapshot<ZhihuSection> = useSyncExternalStore(
-    (onChange) => scope.subscribe(onChange),
-    () => scope.getSnapshot(),
-  );
+function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
+  const snapshot = form?.state;
+  const section = (snapshot?.value ?? {}) as ZhihuSection;
   const credentialState = useSyncExternalStore(
     (onChange) => store.subscribe(onChange),
     () => store.getSnapshot(),
@@ -262,13 +304,13 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState('');
 
-  const writable = snapshot.writable && snapshot.status === 'ready';
+  const writable = snapshot?.status === 'ready' && snapshot.writable === true;
   const disabled = !writable || saving;
-  const effectiveRef = typeof snapshot.value?.[REF_FIELD] === 'string' ? snapshot.value[REF_FIELD] : '';
+  const effectiveRef = typeof section[REF_FIELD] === 'string' ? section[REF_FIELD] : '';
   const refText = refDraft ?? effectiveRef;
-  const refOverridden = asRecord(snapshot.user)?.[REF_FIELD] !== undefined;
+  const refOverridden = asRecord(snapshot?.user)?.[REF_FIELD] !== undefined;
   const refDirty = refText !== effectiveRef;
-  const hideEffective = snapshot.value?.[HIDE_FIELD] === true;
+  const hideEffective = section[HIDE_FIELD] === true;
   const hideText = hideDraft ?? hideEffective;
   const hideDirty = hideDraft !== undefined && hideDraft !== hideEffective;
   const dirty = secret !== '' || refDirty || hideDirty;
@@ -280,18 +322,33 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
   const secretDisabled = disabled || !credential.writable;
   const blocked = !dirty || disabled;
 
+  // 引用名一变就交回 apply 并重读 —— 徽标描述的是**现实**（配置里存下来的那个名字），
+  // 不是编辑中的草稿。只在这里回传：`apply` 拿不到 `form`，卡片是唯一看得到生效值的窗口。
+  // 顺序不能换：先交回名字，`store.refresh()` 才问得对。
+  useEffect(() => {
+    trackSavedRef(effectiveRef === '' ? DEFAULT_REF : effectiveRef);
+    void store.refresh();
+  }, [effectiveRef, store, trackSavedRef]);
+
   const save = async (): Promise<void> => {
     setSaving(true);
     setFailed('');
     try {
-      // 先落引用名，再写凭据：失败的写入不该留下一个指向不存在记录的引用。
+      // 一次**原子**写：引用名与开关攒成同一批 ops，共用同一个 revision 栅栏。
+      // 旧版是两三次独立写入，中间态在界面上可见（引用名已落、开关还没落）。
+      const ops: PathOp[] = [];
       if (refDirty) {
-        if (refText === '') await scope.unset(REF_FIELD);
-        else await scope.set(REF_FIELD, refText);
+        ops.push(refText === '' ? { op: 'unset', path: [REF_FIELD] } : { op: 'set', path: [REF_FIELD], value: refText });
+      }
+      if (hideDirty) ops.push({ op: 'set', path: [HIDE_FIELD], value: hideText });
+      if (ops.length > 0 && form !== undefined) {
+        // `mutate` 返回 boolean：false = 宿主拒绝（多半是 revision 冲突），传输错误仍然 reject，
+        // 由下面的 catch 一起收口。拒绝必须说出来 —— 悄悄丢弃草稿等于让用户以为保存成功了。
+        if (!(await form.mutate(ops, snapshot?.revision))) throw new Error(t('saveRejected'));
       }
       // 空白密钥表示「不修改」：凭据域拒收空值，清空得走 unset，不做成隐式副作用。
+      // 凭据写入**排在配置之后**：失败的配置写入不该留下一个指向不存在记录的引用。
       if (secret !== '') await store.write(refText === '' ? DEFAULT_REF : refText, secret);
-      if (hideDirty) await scope.set(HIDE_FIELD, hideText);
       setSecret('');
       setRefDraft(undefined);
       setHideDraft(undefined);
@@ -304,7 +361,9 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
 
   return (
     <div style={S.form}>
-      {!writable && snapshot.status !== 'loading'
+      {/* `form` 缺席（snapshot 也没有）时同样落到这里：读作「不可写」而不是新增一个可见状态，
+          语义与旧的 `status === 'unavailable'` 一致。 */}
+      {!writable && snapshot?.status !== 'loading'
         ? <p style={S.readOnly} role="status">{t('readOnly')}</p>
         : null}
 
@@ -416,38 +475,36 @@ function ZhihuCard({ scope, store, t }: CardProps): JSX.Element {
 /**
  * 注册配置卡片与它的字典。
  *
- * 槽是插件管理页的 `plugins.bundle.config`，`key` 必须等于本包的包名（见 {@link BUNDLE_NAME}）：
- * 页面按 bundle 的包名分派，写错即整块不出现。该槽只向条目要 `view: 'page'`（表单一处），
- * `summary` 因此返回空 —— 契约允许，也避免为一个不会被调用的视图另造一套渲染。
+ * 槽是插件管理页的 `plugins.row.config`，`key` 是 `<包名>#<行 id>`（见 {@link ROW_KEY}）：
+ * 页面按这两个字段寻址某一行的配置，写错即整块不出现。两个视图都要给：
+ * - `page` 是卡片本体，渲染在那行 Configure 页的 `data-plugin-config` 区里；
+ * - `summary` 是**行缺描述时的回退文案**（DSH `PluginManagerPage.tsx:496`），
+ *   而本插件 patch 的行没有 `description`，所以这条一定会被看到。
  *
  * 字典注册进 `ctx.effect`，插件卸载时随之注销（`register` 返回 disposer）。
  *
  * @param ctx - 浏览器端 Cordis 上下文。
  */
 export function apply(ctx: Context): void {
-  const scope = ctx.settingsScope.bind<ZhihuSection>({ namespace: NAMESPACE });
   const remote = remoteOf(ctx);
-  // 读的是**生效**的引用名（设置里存下来的那个），不是编辑中的草稿 ——
+  // 读的是**生效**的引用名（配置里存下来的那个），不是编辑中的草稿 ——
   // 徽标描述的是现实，草稿只是表单值。
-  const store = createCredentialStore(
-    () => remote.credentials,
-    () => {
-      const saved = scope.getSnapshot().value?.[REF_FIELD];
-      return typeof saved === 'string' && saved !== '' ? saved : DEFAULT_REF;
-    },
-  );
+  //
+  // 这个名字只能由卡片回传：`apply` 期拿不到宿主给这一行算的表单面（`form` 是页面在渲染期
+  // 才算的）。初值先用默认名，卡片一挂载就会把真实值交回来并触发一次重读。
+  let savedRef = DEFAULT_REF;
+  const trackSavedRef = (ref: string): void => {
+    savedRef = ref;
+  };
+  const store = createCredentialStore(() => remote.credentials, () => savedRef);
 
   ctx.effect(
     () => ctx.locale.register(LOCALE_NS, ZHIHU_LOCALES),
     'zhihu-search: card dictionaries',
   );
 
-  // 引用名一变就重读；密钥在别处被写（手改 `.credentials.yaml`、或别的页面写了同名引用）
-  // 时也重读，否则徽标会一直报告宿主早已替换掉的状态。
-  ctx.effect(
-    () => scope.subscribe(() => void store.refresh()),
-    'zhihu-search: credential refresh on reference change',
-  );
+  // 密钥在别处被写（手改 `.credentials.yaml`、或别的页面写了同名引用）时重读，
+  // 否则徽标会一直报告宿主早已替换掉的状态。
   ctx.effect(
     () =>
       remote.$on('credentials/reference-updated', (ref: string) => {
@@ -455,7 +512,6 @@ export function apply(ctx: Context): void {
       }),
     'zhihu-search: credential refresh on host update',
   );
-  void store.refresh();
 
   // 能力探测：**只新增提示路径**，注册的槽名 / key / 时机一字不动。
   // 状态活在 apply 的闭包里（模块顶层不得有状态），计时器由 ctx.effect 拥有并释放。
@@ -477,7 +533,7 @@ export function apply(ctx: Context): void {
     };
   }, 'zhihu-search: config slot capability probe');
 
-  ctx.slots.inject('plugins.bundle.config', () => {
+  ctx.slots.inject('plugins.row.config', () => {
     slotDeclared = true;
     if (probeTimer !== undefined) {
       clearTimeout(probeTimer);
@@ -487,9 +543,11 @@ export function apply(ctx: Context): void {
       console.info(SLOT_LATE_INFO);
     }
     return ctx.slots.register(
-      { name: 'plugins.bundle.config', key: BUNDLE_NAME, locale: LOCALE_NS },
-      (seat: { t: CardTranslate; view: 'summary' | 'page' }) =>
-        seat.view === 'page' ? <ZhihuCard scope={scope} store={store} t={seat.t} /> : null,
+      { name: 'plugins.row.config', key: ROW_KEY, locale: LOCALE_NS },
+      (seat: { t: CardTranslate; view: 'summary' | 'page'; form?: ConfigPageForm }) =>
+        seat.view === 'page'
+          ? <ZhihuCard form={seat.form} store={store} trackSavedRef={trackSavedRef} t={seat.t} />
+          : seat.t('rowSummary'),
     );
   });
 }

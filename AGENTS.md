@@ -14,8 +14,8 @@
 - 对外可见行为变化，同一次改动内同步 [README.md](README.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)，冲突以中文为准
 - 「版本兼容」章节只讲分水岭与真源指针，**不抄会漂的宿主版本**；判据：`engines.dsh` 一旦落后于实际部署的宿主线（[compat.yml](.github/workflows/compat.yml) 的 declaration 作业转红即为信号），该章与两份 README 的「前置」必须同批复核
-- **声明面应当自洽**：所有 `@deepseek-ai/dsh-*` 声明的下限不该低于 `engines.dsh` 的下限 —— 两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有 `plugins.bundle.config` 槽，而配置面只向该槽注册（落上去配置页**静默不出现**）。**但此刻不能抬**：本仓声明停在 next 线、`engines.dsh` 下限在 alpha 线，而 alpha 线的**类型面已红**（见下面「宿主兼容性」那条），抬上去默认安装会装不出来。**触发条件与尝试记录见[决策记录](.agents/notes/2026-09-20-declaration-floor-stays-on-next.md)**
-- **只做类型面（module augmentation）、运行时由宿主经 `dsh.client.inject` 提供的官方包，只写 `devDependencies`，不写 `peerDependencies`** —— 目前只有 `@deepseek-ai/dsh-client-ui-plugin-manager`，见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)
+- **声明面应当自洽**：`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明（9 条 peer + 18 条 dev，去重后 18 个包）**同形状**、落在同一条区间上。两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有本插件赖以工作的设置接缝，而接缝缺席是**静默**的（配置页不出现、宿主不报错）。**2026-09-22 起它成立了** —— 整条声明面跟到 alpha 线（此前停在 next 线，是已知的、有理由的例外；那条例外已作废）。由 [test/redlines.test.ts](test/redlines.test.ts) 的「声明面自洽」一组断言，理由是[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)
+- **只做类型面（module augmentation）、运行时由宿主提供的官方包，只写 `devDependencies`，不写 `peerDependencies`** —— 现有两个：客户端的 `@deepseek-ai/dsh-client-ui-plugin-manager`（由 `dsh.client.inject` 提供，见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)）、宿主侧的 `@deepseek-ai/cordis-plugin-loader`（只为 `loader/volatile-update` 的事件声明，2026-09-22 加）。**判断依据是「我们只 import type」**，不是包住在哪一侧
 - **四个「通用 lint 那一档」的编译器开关代替 linter**（`noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch`），缺任何一个覆盖面就不成立 → 由 [test/redlines.test.ts](test/redlines.test.ts) 断言；client / test 两个 project 都 extends 根 `tsconfig.json`，一处生效三处
 - **发布态不变量由脚本守卫**（`dsh.bundle.patch` 在、`private` 没设、`engines.dsh` 声明了、`files` 带 `cordis.patch.yml`、LICENSE 在）→ `npm run check:release`，[release.yml](.github/workflows/release.yml) 发布前跑
 - 决策理由 → [.agents/notes/](.agents/notes/)
@@ -35,7 +35,7 @@
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - 发版：`gh workflow run release.yml -f tier=patch|minor|major` —— 唯一入口，档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
-- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap next` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify next`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check next`
+- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap alpha` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify alpha`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check alpha`（承诺线就是 alpha；`next` 已低于我们的下限，只作记录）
 
 ## 验证快照（2026-09-16 实跑）
 
@@ -45,14 +45,15 @@
 - 真机验收：[scripts/acceptance.mjs](scripts/acceptance.mjs) 覆盖扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本；升级 + host 重启后在 profile 安装副本上跑通，工具面同参数复验一致
 - 发版守卫：只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
 - 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
-- 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `next`（承诺线）与 `alpha`（前瞻线）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动** —— alpha 线上类型面已红而 260 个测试全绿，所以「测试全绿」不能当作「兼容」的结论
-- 明文迁徙：**真机跑通**（2026-09-16）—— 装入 1.6.2 + 重启 host 后，`settings.yaml` 的 `zhihu-search:` 段只剩 `disableNativeWebSearch`，值（40 位十六进制、与原明文逐字一致）落进 `.credentials.yaml` 的 `refs`，两个文件同一秒被改写。此前在 `lib/` 产物 + 真实 provider + 本机 `settings.yaml` **副本**上也跑通过（段内清理、其他 section 与注释原样保留、第二次运行是空操作）
+- 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `alpha`（承诺线）与 `next`（**已低于声明下限，只记录**）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动**，所以「测试全绿」不能当作「兼容」的结论。**2026-09-22 更新**：此前那条「alpha 类型面已红」的记录随设置接缝迁移作废 —— 本机在 alpha 线上 build / typecheck / test 全绿（逐条退出码见[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)）
+- 明文迁徙：**真机跑通**（2026-09-16）—— 装入 1.6.2 + 重启 host 后，`settings.yaml` 的 `zhihu-search:` 段只剩 `disableNativeWebSearch`，值（40 位十六进制、与原明文逐字一致）落进 `.credentials.yaml` 的 `refs`，两个文件同一秒被改写。此前在 `lib/` 产物 + 真实 provider + 本机 `settings.yaml` **副本**上也跑通过（段内清理、其他 section 与注释原样保留、第二次运行是空操作）。
+  **2026-09-22 起范围收窄**：设置文档那一层随这次接缝换代（2026-09-22）一起没了（宿主按 section 名导入且只映射三个官方 section，我们那段到不了插件），迁徙只剩**组合配置**一条来源，`purge` 通道退场。上面那条真机结论仍然真实，但它描述的是接缝换代之前的宿主
 
 ## 待办
 
-- 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）
-- **声明面仍落后于实际部署**（2026-09-20 复核，仍未解）：`engines.dsh` 的下限在 alpha 线，而 `peerDependencies` 与 dev 面共 27 条声明停在 next 线。**这次试过抬上去，抬不动** —— 在 alpha 线上 `npm install` 能装（依赖图解得开），但 `npm run build` 过不了：`tsc` 在 `src/index.ts` 的 `agent/created` handler 上报类型不符，即 alpha 线的**类型面已红**（证据与备份路径见[决策记录](.agents/notes/2026-09-20-declaration-floor-stays-on-next.md)）。所以维持原计划：等 alpha 切到 next（或发正式版）时按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」放宽范围、同步两份 README，并按 Q1/Q2 定档；放宽时一并定下限 —— **新下限不得低于引入 `plugins.bundle.config` 的那个版本**（`engines.dsh` 现在声明的下限就是它）。
-- 处置 `@deepseek-ai/dsh-code-runtime`：`devDependencies` 里**没有任何文件引用它**，且它在 alpha 线上停在一个比 next 线还旧的版本（现查 `node scripts/compat-swap.mjs check latest`）—— 换包脚本因此每个 alpha 轮都要告警跳过它一次。删掉即消失；**它也是上面那条「抬不动」里唯一一个在 alpha 线上连版本都对不上的包**（抬了直接装不出来）
+- 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）。2026-09-22 起它服务的只剩**组合配置**一条来源
+- **卡片图待重截**：接缝换代后配置入口从「插件详情页里的配置区」变成「那一行的 Configure 页」，卡片本体没变但图里的上下文已经不符；本轮不重截（要占用维护者浏览器且真机要等插件装回 profile），判据与拍摄路径见 [assets/README.md](assets/README.md) 与 [assets/AGENTS.md](assets/AGENTS.md) 第 3 步
+- **真机验收未做**：迁移后的卡片只有在「插件装回 profile + 宿主重启」之后才谈得上验收，装回由主 agent 收尾统一做；验收口径见 [scripts/README.md](scripts/README.md) 与 [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - **npm 上已发布版本的头图会断**：npm 页面按 `main`（HEAD）取 README 里的图，而 v1.6.3 及更早的 README 写的是 `assets/cover.svg` —— 该文件已随头图换新（`banner.svg`）删除。**最新**那页会随下次发版自动修好；更早版本的页面文字在发布时就定死，除非把 `cover.svg` 补回。下次发版后顺手看一眼 npm 页面头图即可
 
 ## 活跃坑（工具链与 DSH 平台）
@@ -69,9 +70,10 @@
 - **inject 门禁按服务名逐字判**：`ctx.x` 属性访问要求 `x` **逐字**出现在某个 fiber 的 `inject` 里，点号键**不展开**成父级 —— 声明了 `remote.credentials` **不等于**能访问 `ctx.remote`。同一机制已踩中两次（agent scope 的 `tools`、客户端半体的 `remote`，后者让卡片整块装不上）；碰平台服务先看官方同类插件的 `inject` 怎么声明 → [复盘](docs/postmortem/2026-09-15-client-inject-remote-missing.md)。
 - **`ctx.get` 不是取服务的正路**：它按 cordis 文档是「不受 inject 约束的读取」，绕过的是门禁而非服务发现本身，跨挂载位置并不可靠。实测：同一上下文里 `ctx.tools`（inject + 属性访问）一直正常，而 `ctx.get('credentials')` 拿不到服务 —— 旧版有条兜底替它兜着，兜底一删工具就集体「没有 key」。**要服务就用 `inject` + 属性访问**；`agent.ctx.get('tools')` 是「agent scope 的依赖面不由我们决定」的特例，不是通用写法 → [复盘](docs/postmortem/2026-09-15-credential-service-unreachable.md)。
 - **告警可能到不了终端**：v1.6.x 的每一处失败都 `warn` 过，维护者终端里一条都没有。判断故障别只看日志，先看文件状态与工具报错。
-- **redact 是 schema 驱动的**：`redactSecrets` 只剥 schema 里带 `role('secret')` 的字段。把一个「代码已经不读」的密钥字段从 schema 里删掉，redact 会同时停止保护它 —— 明文改从 describe 线路走出，而功能测试全绿。删密钥字段前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「密钥解析契约」。
+- **redact 是 schema 驱动的**：`redactSecrets` 只剥 schema 里带 `role('secret')` 的字段。把一个「代码已经不读」的密钥字段从 schema 里删掉，redact 会同时停止保护它，而功能测试全绿。接缝换代后下行的配置描述**只投影 volatile 字段**，所以非 volatile 的密钥字段已经不在这条线路上（本仓的 `accessSecret` 就是如此）—— 但这层保护对**任何新加的密钥字段**仍然靠角色声明，删字段前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「密钥解析契约」。
 - **挂载方式**：只用官方 CLI `dsh plugin --profile web add <path>`（它会顺带 reconcile `dsh.profile.bundles`），不要手改 `cordis.patch.yml`。
-- **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：`next` = 当前承诺支持的线，`alpha` = 前瞻线，`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本，具体值一律现查（`npm view @deepseek-ai/dsh dist-tags`）。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+- **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：**`alpha` = 当前承诺线**（2026-09-22 起；声明面落在它上面），`next` = 已低于我们声明下限的旧线（只作记录），`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本，具体值一律现查（`npm view @deepseek-ai/dsh dist-tags`）。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+- **接缝缺席是静默的，两种缺席方式各踩过一次**：宿主早于这次接缝换代（2026-09-22）时，客户端 `inject` 里的 `settingsScope` 让整个 `apply` 不执行（**声明一个已删服务 = 激活门禁不过**，用户只看到 pending）；而接缝换代后的 `plugins.bundle.config` 槽**还在**、只是渲染时不传 `form`（**槽在 ≠ 拿得到读写面**）。两者都不报错。判据是「能不能拿到这一行的 `form`」，所以能力探测必须跟着卡片改槽 —— 说谎的探测比没有探测更坏，见 [src/client/AGENTS.md](src/client/AGENTS.md)。
 - **换包有两个方向相反的假信号，都踩过**：
   - **假红**：`npm install <包>@<tag>` 会把某个恰好没被点名的包**目录清空**（实测 `dsh-client-locale` 与 `dsh-client-ui-primitives` 都中过），随后 typecheck 报「找不到模块」。`--legacy-peer-deps` 也不是解药：它连 npm 的 peer 自动安装一起关掉，`dsh-tools` 自己的 peer 集体缺席。正路是 [scripts/compat-swap.mjs](scripts/compat-swap.mjs) 的「改写 package.json + 裸 `npm install`」。
   - **假绿**：`npm install` 因上游 peer 冲突退出时，`node_modules` 会**原封不动停在旧版本**上，随后 typecheck 与全套测试全绿。所以换包之后必须 `verify` 断言实装版本 —— **「测试全绿」不等于「跑在目标版本上」**。

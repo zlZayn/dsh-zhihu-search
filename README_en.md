@@ -100,16 +100,16 @@ The three sections below are each tool's full parameter set and limits. The mode
 
 ### Requirements
 
-- **DSH `0.1.5-rc.2` or newer, below `0.2.0`** — the range declared in [package.json](package.json)'s `peerDependencies`; `engines.dsh` separately records the Host version actually tested.
+- **DSH `0.1.7-alpha.1` or newer, below `0.2.0`** — the single range that [package.json](package.json) declares in both `engines.dsh` and every `@deepseek-ai/dsh-*` entry (the two must stay the same shape: a missing host seam makes the configuration UI disappear silently).
 - Node `>= 20`
 
 Install the Host from an **explicit dist-tag**: `latest` is not trustworthy across this family (on most `@deepseek-ai/dsh-*` packages it points at a much older version), so a default install can land outside the declared range — check it live with `npm view @deepseek-ai/dsh dist-tags`.
 
 ```bash
-npm install -g @deepseek-ai/dsh@next     # the line this plugin commits to
+npm install -g @deepseek-ai/dsh@alpha    # the line this plugin commits to
 ```
 
-Compatibility is measured, not inferred: [compat.yml](.github/workflows/compat.yml) swaps the DSH packages onto the `next` and `alpha` lines every week and runs the existing suite. Current results and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
+Compatibility is measured, not inferred: [compat.yml](.github/workflows/compat.yml) swaps the DSH packages onto the `alpha` line (the committed one) and the `next` line (now **below our declared floor**, kept as a record only) every week, and runs the existing suite. Current results and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ### From source
 
@@ -138,23 +138,23 @@ The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics
 
 ## Version compatibility
 
-The configuration UI registers into the Host's `plugins.bundle.config` slot, and that slot arrives with the **lower bound** of the range declared by `engines.dsh` in [package.json](package.json) — that declaration is the single source of truth, and this document does not copy version numbers.
+The configuration UI registers into the Host's `plugins.row.config` slot, and the two halves of its dispatch `key` come from this repository's [package.json](package.json) (package name) and [cordis.patch.yml](cordis.patch.yml) (row id). For the card to read and write, the Host must also hand it **this row's configuration form** (`form`) — which requires a Host settings seam at or above the **lower bound** declared by `engines.dsh`; that declaration is the single source of truth, and this document does not copy version numbers.
 
-- **Host provides the slot**: the configuration area shows up on this plugin's details page, and both the key and the switch are edited there.
-- **Earlier Host without the slot**: the three tools keep working, and the Plugins page simply **shows no configuration area** — silently, with no error. That is the watershed; the browser console keeps one WARN-level English note about it.
+- **Host is new enough**: under **Plugins → Installed → dsh-zhihu-search**, the row carries a **Configure** control, and both the key and the switch are edited on that page.
+- **Earlier Host, or this plugin mounted as a plain entry rather than a bundle row**: the three tools keep working, and the Plugins page simply **shows no configuration entry** — silently, with no error. That is the watershed; the browser console keeps one WARN-level English note about it.
 - **Want in-place configuration**: upgrade the Host to the version declared by `engines.dsh` or newer — that version currently lives on the `alpha` line only, so install it with `npm install -g @deepseek-ai/dsh@alpha`; which line points at which version is one command away: `npm view @deepseek-ai/dsh dist-tags`.
 
 How to install the Host from the right line: [Install → Requirements](#requirements). Weekly measurements and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Configuration
 
-The configuration UI lives in the Host's `plugins.bundle.config` slot; whether that slot is there, and what happens without it, is covered in [Version compatibility](#version-compatibility).
+The configuration UI lives in the Host Plugins page's **row configuration** slot (`plugins.row.config`); when it does not show up, and what happens then, is covered in [Version compatibility](#version-compatibility).
 
 ### On the Plugins page
 
-Open the **dsh-zhihu-search** details page under **Plugins → Installed**, enter the Access Secret and save. It takes effect immediately, with no DSH restart.
+Open **Plugins → Installed → dsh-zhihu-search**, then open the **Configure** control on that package's row, enter the Access Secret and save. It takes effect immediately, with no DSH restart.
 
-The key goes into DSH's credential store (`~/.dsh/.credentials.yaml`), **never into the settings file** — `settings.yaml` holds only the reference name, so it is safe to screenshot or share.
+The key goes into DSH's credential store (`~/.dsh/.credentials.yaml`), **never into a configuration file** — the active profile's Cordis patch holds only the reference name and the switch, so it is safe to screenshot or share.
 
 Get the Access Secret from the [Zhihu Open Platform profile](https://developer.zhihu.com/profile); the config card links to the same place.
 

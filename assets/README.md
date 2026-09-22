@@ -7,8 +7,14 @@
 - `banner.svg`：头图，双语共用，被 [README.md](../README.md) 与 [README_en.md](../README_en.md) 引用。
 - `zhihu-daily-quota.jpg`：知乎开放平台「各接口剩余配额」面板的截图，双语 README 共用（**额度**按自然日刷新，这张图是静态截图、不随日更换）。
 - `banner.jpg`、`logo.jpg`、`logo.svg`、`slogan.jpg`、`slogan.svg`：未引用。
-- `settings-card.png`：插件详情页里配置区的整屏实拍（中文），被 [README.md](../README.md) 引用。
+- `settings-card.png`：配置卡片所在页面的整屏实拍（中文），被 [README.md](../README.md) 引用。
 - `settings-card_en.png`：同一画面的英文版，被 [README_en.md](../README_en.md) 引用。
+
+> **两张卡片图待重截（2026-09-22 记）**：卡片的**本体**没变（JSX / 样式 / 可见状态都不动），
+> 但它所在的页面变了 —— 接缝换代后入口是「插件页 → 本插件 → **那一行的 Configure**」，
+> 不再是「插件详情页里的配置区」。所以旧图里的面包屑与标题已经**与真实入口不符**。
+> 本轮不重截（要占用维护者浏览器，且真机验收要等插件装回 profile 之后），
+> 下次动渲染面时**连同这两张一起重拍**；拍摄路径见 [AGENTS.md](AGENTS.md) 第 3 步。
 
 两份 README 都以 `width=600` 展示。
 `assets/` **不进 npm 包**：npm 会把 README 的相对图片路径改写到默认分支的 raw 地址，线上展示跟的是 `main` 上的图 —— **改图等于同时改所有历史版本的展示**。

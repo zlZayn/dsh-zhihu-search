@@ -99,7 +99,7 @@ gh workflow run release.yml -f tier=patch    # 或 Actions → Release → Run w
 - 新增可选开关（如「隐藏原生网页搜索」）→ 旧用法全部仍然正确，且能观察到新能力 → Q3 是 → minor。
 - 修复已发布功能里的逻辑缺陷（开关存了却不生效）→ 旧用法仍正确、只是真的开始工作 → Q1 否 Q3 否 → patch。
 - 补上漏声明的输出 schema 字段（宿主按 `additionalProperties: false` 校验，漏一处工具整体失败）→ 修复已发布缺陷 → patch；**发布后才发现**的回归另记[复盘](postmortem/2026-09-14-output-schema-drift.md)。
-- 把密钥从设置字面量迁到凭据存储（启动期自动迁徙 + 卡片改走 `remote.credentials`）→ Q1 否（旧用法自动搬走，仍正确）Q3 是（密钥不再落 `settings.yaml`、徽标改问凭据域、只读遮蔽可见）→ **minor**。理由见[决策记录](../.agents/notes/2026-09-15-credential-store-migration.md)。
+- 把密钥从设置字面量迁到凭据存储（启动期自动迁徙 + 卡片改走 `remote.credentials`）→ Q1 否（旧用法自动搬走，仍正确）Q3 是（密钥不再落 `settings.yaml`、徽标改问凭据域、只读遮蔽可见）→ **minor**。理由见[决策记录](../.agents/notes/2026-09-15-credential-store-migration.md)。2026-09-22 补记：迁徙此后只剩**组合配置**一条来源 —— 旧 `settings.yaml` 那半边随这次设置接缝换代（2026-09-22）一起消失（宿主按 section 名导入且只映射官方 section，结构上到不了本插件）。
 - **Q1 的边界：新增对某个平台服务的硬依赖**，若标准装配必然提供它、且依赖它的那一边在不满足时**整体不工作**（而不是退化成错误行为）→ 不算 Q1 的破坏。上一条即此例：`remote.credentials` 是官方 web 装配的必备件，缺它时新版卡片本就不工作，旧用法谈不上「变错」。前提不成立时（标准装配不保证提供该服务）仍按 Q1 判 major。
 - 修 v1.6.0 的卡片加载失败（`inject` 漏声明 `remote`，属性访问抛 `without inject`）→ 没有人**正确**的用法因此变错，也没有新能力 → Q1 否 Q3 否 → **patch**；**发布后才发现**的回归另记[复盘](postmortem/2026-09-15-client-inject-remote-missing.md)。
 - 修 v1.6.0/v1.6.1 的工具「没有 key」与迁徙失效（`ctx.get('credentials')` 在线上装配里拿不到服务）→ 同理，旧用法不会因此变错，只是真的开始工作 → **patch**；发布后才发现 → [复盘](postmortem/2026-09-15-credential-service-unreachable.md)。
@@ -198,36 +198,40 @@ npm publish --registry=https://registry.npmjs.org/ --access public
 
 ## 兼容性
 
-**声明面**只有一个事实来源：[package.json](../package.json) 的 `peerDependencies`。依赖的是 DSH 的**运行时行为**：`settings.installSection`、`settings.describe` / `mutate`、`role('secret')` 脱敏、**`ctx.inject` 的嵌套与属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.bundle.config` 的 keyed 分派规则、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、密钥读不到，或**明文开始出现在 describe 线路上**）。判断依据始终以 DSH 源码为准，不凭文档推断。
+**声明面**只有一个事实来源：[package.json](../package.json) 的 `engines.dsh` 与 `peerDependencies`（两处形状必须一致，由 [test/redlines.test.ts](../test/redlines.test.ts) 断言）。依赖的是 DSH 的**运行时行为**：`schema.volatile()` 的活引用语义（`.get()`）、**只有 volatile 字段进配置页**、`settings.configure({ auto: false }, fiber)`、`ctx.on('loader/volatile-update', …)`、`role('secret')` 脱敏、**`ctx.inject` 的属性访问语义**（不是 `ctx.get`）、`remote.credentials` 的 `describe`/`set`、`plugins.row.config` 的 keyed 分派与 `form` 座位、客户端模块格式。任一处改动都可能在升级后静默失效（卡片不显示、开关不生效、密钥读不到）。判断依据始终以 DSH 源码为准，不凭文档推断。
 
 **验证面**是 [compat.yml](../.github/workflows/compat.yml)。声明与验证必须对齐 —— 改动任意一边都要同步另一边。
 
 ### dist-tag 是唯一可用的锚点
 
-DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三个 tag 语义**各不相同**（2026-09-16 实测，`@deepseek-ai/dsh-*` 全家族一致）：
+DSH 至今全是 prerelease，版本号本身不构成承诺，tag 才是。三个 tag 语义**各不相同**（`@deepseek-ai/dsh-*` 全家族一致）：
 
 | tag | 含义 | compat.yml 怎么用 |
 | --- | --- | --- |
-| `next` | 当前承诺支持的线 | 换包 + 跑全套；红了**必须修**（run 红） |
-| `alpha` | 前瞻线，按设计在声明范围之外 | 换包 + 跑全套；红了**只记录**（job 红、run 绿） |
+| `alpha` | **当前承诺线**：声明面（`engines.dsh` + 27 条 DSH 依赖）落在这一条上 | 换包 + 跑全套；红了**必须修**（run 红） |
+| `next` | **已低于本仓声明的下限** | 换包 + 跑全套；红了**只记录**（job 红、run 绿） |
 | `latest` | **不可用** | 不碰 |
 
-`latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本，`@deepseek-ai/dsh` 自己那条也未必落在本插件的声明区间里 —— 逐包对照现查 `node scripts/compat-swap.mjs check latest`（`check` 收任意 dist-tag），宿主自己那条线现查 `npm view @deepseek-ai/dsh dist-tags`。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线；这也是 `next` 线存在的理由。
+**2026-09-22 两个 job 的角色对调了**（此前 next 承诺、alpha 前瞻）。理由不是口味：本仓的配置接缝只存在于 alpha 线上 —— 接缝换代之前 `next` 线上没有 `plugins.row.config` 那套配置面，声明面因此只能跟着 alpha 走。而一条**长期必红**的周更任务会让「红 = 出事」这个信号失效，所以判断哪条线是承诺线，判据是「声明面落在哪」，不是历史习惯。
+
+`latest` 为什么不可用：多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本，`@deepseek-ai/dsh` 自己那条也未必落在本插件的声明区间里 —— 逐包对照现查 `node scripts/compat-swap.mjs check latest`（`check` 收任意 dist-tag），宿主自己那条线现查 `npm view @deepseek-ai/dsh dist-tags`。按默认方式装宿主的人会落在声明范围之外，所以 [README](../README.md) 的前置版本必须写明装哪条线。
 
 ### 红了怎么办（按线分流）
 
-**`next` 红 = 使用者会装到，必须修。**先判类别，三类处理完全不同：
+**`alpha` 红 = 使用者会装到，必须修。**先判类别，三类处理完全不同：
 
 - **换包或核对步骤失败** → 树根本没换成，先解决安装问题再看别的（多半是上游包之间的 peer 冲突）。这一条不能省：旧版本的树会让后面每一步都绿，报出一个**假兼容**。
 - **类型面红** → 上游 API 签名变了。定位到具体包与符号，改调用点使其**新旧都能编译**；做不到就说明下限必须抬高，那是 Q2 是 → **major，先问人类**。
 - **全量测试红** → **行为差异**，最重。按 [test/README.md](../test/README.md) 的分层定位：L3b/L6a 红说明平台语义变了，L1/L2 红则先怀疑换包装错了（那几层对宿主版本不敏感）。
 
-**`alpha` 红 = 记录，等它切到 `next` 再处理。**不动 peer 范围 —— alpha 不产生承诺，按它放宽声明会把使用者引到未发布的线上。类型面红在 [.agents/notes/](../.agents/notes/) 记一条；行为面红提前开修，别等正式版。
+**`next` 红 = 记录，不阻断。**它已低于本仓声明的下限，换上去等于把依赖降到声明范围之外，红了通常只说明旧线上装不出新接缝 —— 那是**预期**，不是缺陷。这一类的价值只剩「旧线哪一步先坏」这份记录；不要按它去放宽声明（那会把使用者引到我们不再声明的线上）。
 
 ### 声明面变动要同步的地方
 
 - `peerDependencies` 的区间 → [README.md](../README.md) 与 [README_en.md](../README_en.md) 的「前置」版本（两份必同改）。
 - `engines.dsh` 的区间 → 两份 README 的「版本兼容」章节（那份章节只指真源，不抄版本）：它声明的是**实际验证过的最低宿主版本**与**排除下一个大版本的上界**。
-- 声明面与「README 让用户去装的那条线」由 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业对账：它红了就是声明面落后，失败会开一条固定标题的跟踪 issue。
+- **`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明形状必须一致**（2026-09-22 起：同一条区间字符串）→ 由 [test/redlines.test.ts](../test/redlines.test.ts) 的「声明面自洽」一组断言；改一处就要改全部，否则使用者按我们给的区间装出来的宿主可能没有本插件赖以工作的接缝。
+- [scripts/compat-swap.mjs](../scripts/compat-swap.mjs) 的换包写回是**保形**的：只替换区间里的下限版本，比较符与上界原样留下。别改成 `'^' + version` 那种硬编码 —— 它会把声明面在 CI 里悄悄变形，而人只看到 job 绿。
+- 声明面与「README 让用户去装的那条线」由 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业对账：它红了就是声明面落后，失败会开一条固定标题的跟踪 issue。**它只查承诺线（alpha）** —— 查一条我们不再声明的线，红只会变成每周的噪音。
 - 区间放宽本身不改行为（旧用法仍正确，只是允许更新的宿主）→ 按[版本号](#版本号)的 Q1/Q2 全否 → **patch**；但**必须发版**，声明在产物里。
 - 已知缺口与待办见 [AGENTS.md](../AGENTS.md)。

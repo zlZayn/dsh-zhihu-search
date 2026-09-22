@@ -100,16 +100,16 @@
 
 ### 前置
 
-- **DSH `0.1.5-rc.2` 或更高，且低于 `0.2.0`** —— 即 [package.json](package.json) 的 `peerDependencies` 声明的范围；`engines.dsh` 另记我们实际测试过的宿主版本。
+- **DSH `0.1.7-alpha.1` 或更高，且低于 `0.2.0`** —— 即 [package.json](package.json) 里 `engines.dsh` 与全部 `@deepseek-ai/dsh-*` 共同声明的那条区间（两处**同形状**是硬要求：接缝缺席时配置界面会静默不出现）。
 - Node `>= 20`
 
 装宿主时**要显式指定版本线**：本家族的 `latest` 标签不可靠（多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本），按默认方式装可能落在声明范围之外 —— 现查 `npm view @deepseek-ai/dsh dist-tags`。
 
 ```bash
-npm install -g @deepseek-ai/dsh@next     # 本插件承诺支持的线
+npm install -g @deepseek-ai/dsh@alpha    # 本插件承诺支持的线
 ```
 
-兼容性不是推断出来的：每周由 [compat.yml](.github/workflows/compat.yml) 对 `next` 与 `alpha` 两条线换包实跑一遍现有测试。当前结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+兼容性不是推断出来的：每周由 [compat.yml](.github/workflows/compat.yml) 对 `alpha`（承诺线）与 `next`（**已低于我们声明的下限，只作记录**）两条线换包实跑一遍现有测试。当前结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 
 ### 从源码安装
 
@@ -138,23 +138,23 @@ dsh plugin --profile web add dsh-zhihu-search
 
 ## 版本兼容
 
-配置界面注册在宿主的 `plugins.bundle.config` 槽，该槽由 [package.json](package.json) 的 `engines.dsh` 所声明的**下限版本**引入 —— 那份声明是唯一事实来源，本文件不抄版本号。
+配置界面注册在宿主插件页的 `plugins.row.config` 槽上，分派 `key` 的两半取自本仓的 [package.json](package.json)（包名）与 [cordis.patch.yml](cordis.patch.yml)（行 id）。这张卡片要能读写，宿主还得把**这一行的配置表单**（`form`）递进来 —— 那要求宿主的设置接缝达到 `engines.dsh` 声明的**下限版本**；那份声明是唯一事实来源，本文件不抄版本号。
 
-- **槽在的宿主**：插件页的本插件详情页里出现配置区，密钥与开关都在那里改。
-- **槽不在的更早宿主**：三个工具照常工作，插件页里**不会出现配置区** —— 静默，不报错。这就是分水岭；浏览器控制台会留一条 WARN 级英文提示说明这件事。
+- **宿主够新**：插件页 →「已安装（Installed）」组 → **dsh-zhihu-search** → 该插件的行上出现 **Configure** 控件，密钥与开关都在那个页面里改。
+- **宿主更早，或本插件不是以 bundle 行挂载的**：三个工具照常工作，插件页里**不会出现配置入口** —— 静默，不报错。这就是分水岭；浏览器控制台会留一条 WARN 级英文提示说明这件事。
 - **需要就地配置**：把宿主升到 `engines.dsh` 声明的版本或更高 —— 那个版本目前只在 `alpha` 线上，装法 `npm install -g @deepseek-ai/dsh@alpha`；哪条线指向哪个版本现查 `npm view @deepseek-ai/dsh dist-tags`。
 
 宿主版本线怎么装见[安装 → 前置](#前置)；每周的实测结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 
 ## 配置
 
-配置界面挂在宿主的 `plugins.bundle.config` 槽上；该槽在不在、不在时会发生什么，见[版本兼容](#版本兼容)。
+配置界面挂在宿主插件页的**行配置**槽（`plugins.row.config`）上；它在什么时候不出现、不出现时会发生什么，见[版本兼容](#版本兼容)。
 
 ### 在插件页填写
 
-打开侧边栏 **插件（Plugins）** →「已安装（Installed）」组的 **dsh-zhihu-search** 详情页，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
+打开侧边栏 **插件（Plugins）** →「已安装（Installed）」组的 **dsh-zhihu-search** → 点该插件的行上那个 **Configure**，填入 Access Secret 并保存。保存后立即生效，无需重启 DSH。
 
-密钥写进 DSH 的凭据存储（`~/.dsh/.credentials.yaml`），**不写进设置文件** —— `settings.yaml` 里只有引用名，可以安全地截图或分享。
+密钥写进 DSH 的凭据存储（`~/.dsh/.credentials.yaml`），**不写进配置文件** —— 活动 profile 的 Cordis patch 里只有凭据引用名与开关，可以安全地截图或分享。
 
 Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/profile)获取；配置卡片里有同一个链接。
 

@@ -1,12 +1,16 @@
 /**
- * redact 锚点契约。
+ * redact 锚点契约（**0.1.7 起理由换了一半，机制没变**）。
  *
- * 实测结论：`redactSecrets` 是**schema 驱动**的 —— 字段一旦移出 schema，
- * 它就不再被认作密钥，明文会**原样出现在发往浏览器的 describe 线路里**。
- * 所以 `Config.accessSecret` 不能因为「插件已经不再读它的值」而删除：
- * 它现在唯一的作用就是让 redact 认得这个位置。
+ * 实测结论仍然成立：`redactSecrets` 是 **schema 驱动** 的 —— 字段一旦移出 schema，
+ * 它就不再被认作密钥。但 0.1.7 的配置页只投影 **volatile** 字段
+ * （settings 包的 `volatileForm` + `projectForm`），而非 volatile 的 `accessSecret`
+ * 结构上不可能出现在发往浏览器的 value / base / user 里 ——
+ * **那条线路上已经没有保护对象了**，所以它不再是「字段必须留下」的理由。
  *
- * 这条测试是那次实测的固化 —— 谁删掉字段，它会立刻变红。
+ * 字段今天留下来的理由只有一个：它是**组合配置单向迁徙**的读取入口
+ * （见 [src/migrate.ts](../src/migrate.ts)）。相应地，这条测试守的是
+ * 「这个槽位仍然带 `role('secret')`、redact 仍然认得它」——
+ * 谁把角色摘掉、或把字段删掉，它会立刻变红。
  * 背景见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「密钥解析契约」。
  */
 
@@ -30,7 +34,7 @@ function redact(value: unknown): ReturnType<typeof redactSecrets> {
   return redactSecrets(Config as never, value);
 }
 
-describe('Config.accessSecret 是 redact 锚点', () => {
+describe('Config.accessSecret 仍带 secret 角色（redact 认得这个槽位）', () => {
   it('两个字段各自带 secret 与 credential-ref 角色', () => {
     const dict = (Config as unknown as { dict: Record<string, { meta?: { role?: string } }> }).dict;
     expect(dict['accessSecret']?.meta?.role).toBe('secret');
