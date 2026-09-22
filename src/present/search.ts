@@ -135,7 +135,7 @@ export function renderSearch(value: SearchOutput, context: SearchRenderContext =
     // 时间戳转日期，模型不必自己做时间戳算术；缺失时整段省略。
     const date = item.editTime === undefined ? '' : formatDate(item.editTime);
     if (date !== '') meta.push(`**时间**: ${date}`);
-    // 类型缺失时整段省略，而不是渲染成空的「类型: 」。
+    // 类型缺失时整段省略，而不是渲染成空的「类型: 」.
     if (item.contentType !== '') meta.push(`**类型**: ${item.contentType}`);
     lines.push(meta.join(' | '));
     lines.push(`> ${item.snippet}`);
@@ -202,21 +202,20 @@ export function searchMetaFromValue(value: SearchOutput): JsonValue {
  */
 export function searchMetaFromResult(meta: unknown): SearchMeta | undefined {
   if (typeof meta !== 'object' || meta === null) return undefined;
-  const record = meta as { sources?: unknown; truncated?: unknown };
-  if (!Array.isArray(record.sources)) return undefined;
+  const sources = 'sources' in meta && Array.isArray(meta.sources) ? meta.sources : undefined;
+  if (sources === undefined) return undefined;
 
-  const sources: WebSource[] = [];
-  for (const raw of record.sources) {
+  const results: WebSource[] = [];
+  for (const raw of sources) {
     if (typeof raw !== 'object' || raw === null) continue;
-    const item = raw as { url?: unknown; title?: unknown; snippet?: unknown };
-    if (typeof item.url !== 'string') continue;
-    sources.push({
-      url: item.url,
-      ...(typeof item.title === 'string' ? { title: item.title } : {}),
-      ...(typeof item.snippet === 'string' ? { snippet: item.snippet } : {}),
+    if (!('url' in raw) || typeof raw.url !== 'string') continue;
+    results.push({
+      url: raw.url,
+      ...(('title' in raw && typeof raw.title === 'string') ? { title: raw.title } : {}),
+      ...(('snippet' in raw && typeof raw.snippet === 'string') ? { snippet: raw.snippet } : {}),
     });
   }
-  return { sources, truncated: record.truncated === true };
+  return { sources: results, truncated: 'truncated' in meta && meta.truncated === true };
 }
 
 /**

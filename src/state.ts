@@ -200,13 +200,17 @@ export interface CacheKeyParts {
   readonly args: unknown;
 }
 
+/** 是不是普通对象（`null` 与数组都不算）。 */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /** 稳定的 JSON 序列化：递归按键名排序，保证同样的参数恒得同样的键。 */
 export function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
   if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`;
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
+  if (!isRecord(value)) return JSON.stringify(value) ?? 'null';
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
 }
 
 /** 计算 SHA-256 十六进制摘要。 */

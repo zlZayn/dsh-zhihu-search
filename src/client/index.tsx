@@ -177,9 +177,14 @@ interface ZhihuSection {
   disableNativeWebSearch?: boolean;
 }
 
+/** 是不是普通对象（`null` 与数组都不算）。 */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /** 把不透明的 user 层收窄为可查键的对象。 */
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
+  return isRecord(value) ? value : undefined;
 }
 
 // 取值逐条对齐官方配置表单的样式表（`ui-primitives/src/settings-form/{SettingsForm,fields}.module.css`；
@@ -273,8 +278,10 @@ function dimStyle(base: CSSProperties, disabled: boolean): CSSProperties {
  * @param timer - `setTimeout` 的返回值（浏览器是数字，Node 是带 `unref` 的对象）。
  */
 function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
-  const candidate = timer as unknown as { unref?: () => void };
-  if (typeof candidate.unref === 'function') candidate.unref();
+  const candidate: unknown = timer;
+  if (typeof candidate === 'object' && candidate !== null && 'unref' in candidate && typeof candidate.unref === 'function') {
+    candidate.unref();
+  }
 }
 
 /** 一条字段写入操作里能出现的 JSON 值（形状见 DSH `settings/src/types.ts:52-54`）。 */
