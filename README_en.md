@@ -140,7 +140,7 @@ The repository carries the GitHub topic [`dsh-plugin`](https://github.com/topics
 
 The configuration UI registers into the Host's `plugins.bundle.config` slot, and its dispatch `key` is this plugin's **package name** (the `name` in [package.json](package.json)). That slot does **not** hand the page a form, so the card fetches it itself from `ctx.configForms.get(<loader entry id>)` — `configForms` is a client service that arrived in 0.1.7, which is why the seam requires a Host at or above the **lower bound** declared by `engines.dsh`; that declaration is the single source of truth, and this document does not copy version numbers.
 
-- **Host is new enough**: **Plugins → Installed → click dsh-zhihu-search** to open its details page — the configuration section sits inline between the description and the components list, with **no extra Configure step**. Both the key and the switch are edited there.
+- **Host is new enough**: **Plugins → Installed → click "Zhihu Search"** to open its details page (that title comes from [locale/en.json](locale/en.json), the name shown on an English UI; the technical name `dsh-zhihu-search` stays right below it) — the configuration section sits inline between the description and the components list, with **no extra Configure step**. Both the key and the switch are edited there.
 - **Earlier Host (no `configForms`)**: the three tools keep working, and the Plugins page simply **shows no configuration entry** — silently, with no error. That is the watershed; the browser console keeps one WARN-level English note about it.
 - **Want in-place configuration**: upgrade the Host to the version declared by `engines.dsh` or newer — that version currently lives on the `alpha` line only, so install it with `npm install -g @deepseek-ai/dsh@alpha`; which line points at which version is one command away: `npm view @deepseek-ai/dsh dist-tags`.
 
@@ -152,7 +152,9 @@ The configuration UI lives in the Host Plugins page's **bundle configuration** s
 
 ### On the Plugins page
 
-Open **Plugins → Installed**, then **click dsh-zhihu-search** to open its details page — the configuration section sits between the description and the components list. Enter the Access Secret and save. It takes effect immediately, with no DSH restart.
+Open **Plugins → Installed**, then **click "Zhihu Search"** to open its details page — the configuration section sits between the description and the components list. Enter the Access Secret and save. It takes effect immediately, with no DSH restart.
+
+The name and the one-line description shown on the Plugins page and in Settings come from this package's language files (the `meta` in [locale/en.json](locale/en.json) and [locale/zh.json](locale/zh.json)). That is **display metadata only**: it takes no part in loading and changes no configuration or tool, and a Host that cannot read it merely falls back to the technical name (without an error). This document therefore does not copy those two sentences — edit the language files instead.
 
 The key goes into DSH's credential store (`~/.dsh/.credentials.yaml`), **never into a configuration file** — the active profile's Cordis patch holds only the reference name and the switch, so it is safe to screenshot or share.
 

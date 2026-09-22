@@ -11,6 +11,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
+import { inspectPluginMetadata } from './plugin-metadata.mjs';
 
 const failures = [];
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -29,6 +30,11 @@ require_('private', pkg.private !== true, '发布前要移除 "private": true。
 require_('engines.dsh', typeof pkg.engines?.dsh === 'string', '宿主兼容范围必须声明。');
 require_('files 含 cordis.patch.yml', Array.isArray(pkg.files) && pkg.files.includes('cordis.patch.yml'), 'bundle 层依赖它。');
 require_('LICENSE 存在', existsSync('LICENSE'), 'package.json 声明 MIT，仓库里必须有对应文件。');
+
+// 展示元数据随包且可解析：locale/<lang>.json 必须被 exports 暴露、被 files 收录、字段非空。
+// 缺任何一条宿主都不报错，只是插件页退回技术名 —— 静默故障，所以并进这道发布前守卫。
+// 判定在一个地方，测试读同一份（scripts/plugin-metadata.mjs）。
+for (const failure of inspectPluginMetadata('.').failures) failures.push(failure);
 
 if (failures.length > 0) {
   console.error('release check failed:');

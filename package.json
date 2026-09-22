@@ -1,7 +1,7 @@
 {
   "name": "dsh-zhihu-search",
   "version": "2.0.0-alpha.0",
-  "description": "DSH plugin: Zhihu in-site search, global web search, and Zhida over the official Zhihu Open Platform API — with a native settings card and source-cited results.",
+  "description": "Zhihu in-site search, global web search, and Zhida answers for the model, over the official Zhihu Open Platform API.",
   "keywords": [
     "dsh",
     "deepseek-harness",
@@ -32,11 +32,13 @@
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
     "!lib/**/*.map",
+    "locale/*.json",
     "cordis.patch.yml",
     "README.md",
     "README_en.md",

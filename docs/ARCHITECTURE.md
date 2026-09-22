@@ -133,6 +133,8 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 
 卡片文案走 DSH 的 locale 服务，不硬编码：字典在 [src/client/locales.ts](../src/client/locales.ts)，槽位注册声明 `locale:` 之后框架才把类型化的 `t` 座位注入组件 props。代价是一个**硬依赖**——声明了 `locale:` 的条目在渲染时要求已安装的 locale 面，缺席即报错而不是降级。标准 `dsh web` 装配必然带它（DSH `packages/bundle/web-app` 依赖 `dsh-client-locale`，多个核心客户端包也依赖它）。
 
+**插件自己的名字与描述不走这条线**（2026-09-22 加）：宿主画插件页与设置时，插件**还没被加载**（禁用、加载失败、预设里的条目都要能显示），所以名字与描述由宿主按**包名**去读包根 [locale/](../locale/) 下的语言文件与 [package.json](../package.json) —— 不执行任何插件代码，也不需要浏览器半体在场。因此这里有**两条都能独立静默失败的线**：卡片能不能渲染是**半体接缝**问题（上文的两环，症状是配置区不出现，控制台有 WARN）；名字怎么显示是**清单资源**问题（`exports` 没暴露或 `files` 没收录，症状是退回技术名，**完全没有提示**）。后者由 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs) 守卫，判定与 `npm run check:release` 同源。
+
 ## 工具描述约定
 
 工具描述是模型选工具与填参数的主要依据，按固定三槽写，顺序不变：

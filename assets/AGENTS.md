@@ -40,7 +40,9 @@
    - **截图期间请别改语言 / 主题 / 模型等全局设置** —— 它们直接进画面。
 1. **用自己的标签页，不动维护者的标签页**：agent 端点新开一个页面打开 GUI 即可（实测与原标签页并存、登录态照常），结束时关掉它。
 2. **开一个新会话**，再按 [README.md](README.md) 的「风格基准」把画面摆到位；摆好后**不再动任何别的东西**。
-3. 进侧边栏 **Plugins → Installed → 点 `zhihu-search`**（详情页里的短名是 `zhihu-search`，不是全包名）——
+3. 进侧边栏 **Plugins → Installed → 点页面上的插件名**（2026-09-22 起它就是包根 [locale/](../locale/) 里的
+   `meta.title`：英文界面 `Zhihu Search`、中文界面 `知乎检索`，**不再是**短名 `zhihu-search`；
+   点进去之后标题下方仍留着技术名 `dsh-zhihu-search`）——
    卡片就**内联在详情页里**（槽 `plugins.bundle.config`，以包名为键），位于描述与「包含的组件」之间，
    **没有 Configure 这一步**、也没有行子页。滚到配置区完整可见（底部**唯一的保存按钮**必须在图内）。
    判废项：图里出现 Configure 控件、右向箭头，或 `[data-plugin-row-detail]` —— 那是换槽之前那一版的入口。
@@ -71,6 +73,10 @@
 - 出现折叠头、「放弃」按钮或卡片外框，说明拍的是旧界面
 - **配置区里没有任何 Configure 控件**，且「包含的组件」那一行**没有右向箭头**（`aria-label` 形如 `配置 zhihu-search` / `Configure zhihu-search` 的按钮必须不存在）；`[data-plugin-row-detail]` 也不得出现 —— 有它们就是拍了 `plugins.row.config` 那一版，判废
 - 说明文案与当前 [locales.ts](../src/client/locales.ts) **逐字一致**（拍前 diff 一次）
+- **页面上的标题与描述与当前 [locale/](../locale/) 的 `meta` 逐字一致**（拍前 diff 一次）：标题在中文图里是
+  `知乎检索`、英文图里是 `Zhihu Search`，且标题下方仍须看得见技术名 `dsh-zhihu-search`（宿主刻意保留完整技术名）；
+  描述那行在两张图里都**不是空的**，英文图那句与 `package.json` 的 `description` 同内容。
+  图里若把 `zhihu-search` 这种**短化技术名当标题**、或描述那行是空的 → 拍的是加展示元数据之前的界面，判废
 - **图里左侧栏是收起态**：看不到任何会话标题、工作区名或对话内容（本仓没有例外）
 - **侧栏是动画中间帧 / 宽度不固定 → 判废重拍**（稳定性判据见第 4 步的轮询）
 - 尺寸与风格符合 [README.md](README.md) 的「风格基准」
