@@ -10,6 +10,11 @@
    界面上的版本 tag 显示的就是 `package.json` 里那个号，而 release.yml **不 bump**。
    所以「bump 并提交」是**发布之前的独立一步**，排在截图之前 —— 反过来的话，
    截图拍到的永远是**上一个已发布版本**的号（本仓 2026-09-22 就是这么翻的车）。
+0b. **远端必须已经有要发的那些提交**（2026-09-22 定，跨仓规则 5c）：`git rev-parse origin/main` **等于**
+   `git rev-parse HEAD`。发布守卫判的是**远端**「上个 tag..HEAD」的区间 ——
+   本地领先 11 个提交而没 push 时，远端那个区间是**空的**，守卫会正确地说「没有什么可发的」并拒发。
+   注意这与第 0 条是同一类：**动作依赖什么状态，就先核那个状态**；而这一次依赖的是**远端**的，不是本地的。
+   不对就先 `git push origin main`。
 1. 档位按下方[版本号](#版本号)的问题链定：**patch / minor 由维护 agent 定档后直接发，major 必须先经人类确认**。
 2. `README.md` 与 `README_en.md` 的安装与配置说明与当前行为一致（两份必同改，见 [AGENTS.md](../AGENTS.md) 的全局规则）。
 3. `cordis.patch.yml` 里**不含**任何凭据。
@@ -27,6 +32,13 @@ git commit -am "chore: release v2.0.0-alpha.1"
 gh workflow run release.yml                                 # 或 Actions → Release → Run workflow
 ```
 
+```bash
+# ③ 发布之后：核远端与 npm 的最终状态
+git fetch origin --tags && git log --oneline -1 origin/main   # main 已跟上
+gh release list --limit 3                                     # 新号在列、标着 Pre-release
+npm view dsh-zhihu-search dist-tags                           # alpha = 新号；latest 没动
+```
+
 一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移（`package.json` ↔ `package-lock.json`）→ **读出** `package.json` 的版本 → 按版本自己的预发布段推 dist-tag → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
 
 六条设计约束：
@@ -36,6 +48,9 @@ gh workflow run release.yml                                 # 或 Actions → Re
 - **发布不得改写版本号（版本驱动）**：`release.yml` 只发 `package.json` 里那个号，**没有 bump 步**。判据是**会执行的命令行**（[scripts/check-release.mjs](../scripts/check-release.mjs) 的 `findVersionWrites`，`npm run check:release` 与 [test/release-workflow.test.ts](../test/release-workflow.test.ts) 读同一份，带反向控制）。为什么写成硬规则：界面上的版本 tag 就是那个号，workflow 自己 bump 会让工作树永远停在「上一个已发布版本」，**截图必然拍出旧号**。
 - **dist-tag 由版本自己推导，不按输入参数判**：版本号带预发布段（`2.0.0-alpha.1`）就发到**那段本身**（`alpha`），否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出（`steps.version.outputs.dist_tag`）。判据只此一处，避免「推 latest 的那一档其实是预发布」—— 而 `latest` 停在 1.6.3。
 - **手工推 tag 不会发布**：tag 由工作流创建，绕过上面的顺序没有意义。
+- **tag 与 GitHub Release 都由工作流创建**（本项目与 `dsh-ds-balance` 不同 —— 那边只打 tag 并推，Release 是手工补的）：
+  最后两步是 `Push the release commit` → `Create the tag and the GitHub Release`（`gh release create … --generate-notes`，
+  预发布另加 `--prerelease`）。**跑完不会只剩一个本地 tag**，但**要自己核一遍**：见上面第 ③ 步。
 - **档位由判定链定，且在本地定完再发**：`npm version` 的档位（`patch` / `minor` / `major` / `prerelease` / `premajor`）写在**本地的 bump 命令**里，不从 commit 类型推断；patch / minor 由维护 agent 直接发，major 需人类确认。
 - **两个预发布档别选错**：`prerelease` 在**同一条 `X.Y.Z` 线**上把预发布计数 +1（`2.0.0-alpha.0` → `2.0.0-alpha.1`），`premajor` 开**新的 `X.Y.Z` 预发布线**（`1.6.3` → `2.0.0-alpha.0`）。在同一线上推下一个 alpha 时用 `premajor` 会得到 `3.0.0-alpha.0` —— semver 见 prerelease 不是 `[0]` 就给 major 加一；而 npm 上的版本号**不可覆盖**。判据与实测输出见[决策记录](../.agents/notes/2026-09-22-release-tiers-and-dist-tags.md)。
 - **不发无行为变更的版本**：bump 之前先比「上个 tag..HEAD」的改动清单，只剩非产物改动就红；`force` 是唯一的越过方式，且要说明理由。
