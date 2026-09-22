@@ -73,6 +73,9 @@
 - 出现折叠头、「放弃」按钮或卡片外框，说明拍的是旧界面
 - **配置区里没有任何 Configure 控件**，且「包含的组件」那一行**没有右向箭头**（`aria-label` 形如 `配置 zhihu-search` / `Configure zhihu-search` 的按钮必须不存在）；`[data-plugin-row-detail]` 也不得出现 —— 有它们就是拍了 `plugins.row.config` 那一版，判废
 - 说明文案与当前 [locales.ts](../src/client/locales.ts) **逐字一致**（拍前 diff 一次）
+- **左上角那格图标是包根的 [icon.svg](../icon.svg)**（拍前与它 diff 一次）：36 视口里的那只**蓝色圆角方标**
+  （知乎蓝 `#0084FF`、透明底、无字、无底板）。图里那格仍是**面板默认图案**、或出现白底 / 字标 / 别的图形
+  → 拍的是加图标之前的界面，判废。尺寸口径：卡片是 48px 框里画 36px，行内是 40px 框里画 30px。
 - **页面上的标题与描述与当前 [locale/](../locale/) 的 `meta` 逐字一致**（拍前 diff 一次）：标题在中文图里是
   `知乎检索`、英文图里是 `Zhihu Search`，且标题下方仍须看得见技术名 `dsh-zhihu-search`（宿主刻意保留完整技术名）；
   描述那行在两张图里都**不是空的**，英文图那句与 `package.json` 的 `description` 同内容。

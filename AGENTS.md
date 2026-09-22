@@ -16,7 +16,7 @@
 - 「版本兼容」章节只讲分水岭与真源指针，**不抄会漂的宿主版本**；判据：`engines.dsh` 一旦落后于实际部署的宿主线（[compat.yml](.github/workflows/compat.yml) 的 declaration 作业转红即为信号），该章与两份 README 的「前置」必须同批复核
 - **声明面应当自洽**：`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明（9 条 peer + 18 条 dev，去重后 18 个包）**同形状**、落在同一条区间上。两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有本插件赖以工作的设置接缝，而接缝缺席是**静默**的（配置页不出现、宿主不报错）。**2026-09-22 起它成立了** —— 整条声明面跟到 alpha 线（此前停在 next 线，是已知的、有理由的例外；那条例外已作废）。由 [test/redlines.test.ts](test/redlines.test.ts) 的「声明面自洽」一组断言，理由是[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)
 - **只做类型面（module augmentation）、运行时由宿主提供的官方包，只写 `devDependencies`，不写 `peerDependencies`** —— 现有两个：客户端的 `@deepseek-ai/dsh-client-ui-plugin-manager`（由 `dsh.client.inject` 提供，见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)）、宿主侧的 `@deepseek-ai/cordis-plugin-loader`（只为 `loader/volatile-update` 的事件声明，2026-09-22 加）。**判断依据是「我们只 import type」**，不是包住在哪一侧
-- **插件展示元数据（宿主界面上的名字与描述）只住在包根的 [locale/](locale/)**：`locale/zh.json` 与 `locale/en.json` 的 `meta.title` / `meta.description` 是唯一文案来源，别处只留指针、不复制 —— 抄一份就有两处会漂，而宿主**读不到时不报错**（退回技术名）。它只被 [scripts/plugin-metadata.mjs](scripts/plugin-metadata.mjs) 判定随包与可解析（`npm run check:release` 与 [test/plugin-metadata.test.ts](test/plugin-metadata.test.ts) 读同一份），理由与回落链见[决策记录](.agents/notes/2026-09-22-plugin-display-metadata.md)
+- **插件展示元数据（宿主界面上的名字、描述与图标）只住在包根**：[locale/](locale/) 的 `meta.title` / `meta.description` 是文案的唯一来源，[icon.svg](icon.svg) 是图标的唯一来源（由 `package.json` 顶层 `icon` 声明）。别处只留指针、不复制 —— 抄一份就有两处会漂，而宿主**读不到时不报错**（名字退回技术名；图标位空着就退回面板默认图案）。两者都由 [scripts/plugin-metadata.mjs](scripts/plugin-metadata.mjs) 判定随包与可解析（`npm run check:release` 与 [test/plugin-metadata.test.ts](test/plugin-metadata.test.ts) 读同一份），理由与回落链见[决策记录](.agents/notes/2026-09-22-plugin-display-metadata.md)，图标几何与配色判据见[图标记录](.agents/notes/2026-09-22-plugin-icon.md)
 - **四个「通用 lint 那一档」的编译器开关代替 linter**（`noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch`），缺任何一个覆盖面就不成立 → 由 [test/redlines.test.ts](test/redlines.test.ts) 断言；client / test 两个 project 都 extends 根 `tsconfig.json`，一处生效三处
 - **发布态不变量由脚本守卫**（`dsh.bundle.patch` 在、`private` 没设、`engines.dsh` 声明了、`files` 带 `cordis.patch.yml`、LICENSE 在）→ `npm run check:release`，[release.yml](.github/workflows/release.yml) 发布前跑
 - 决策理由 → [.agents/notes/](.agents/notes/)
@@ -52,10 +52,12 @@
 
 ## 待办
 
-- **卡片图重拍时要连页面上的名字一起核对**：2026-09-22 起插件页与设置里显示的是 `locale` 里的 `meta.title` / `meta.description`
-  （详情页标题从 `zhihu-search` 变成 `知乎检索` / `Zhihu Search`，标题下方仍留着技术名 `dsh-zhihu-search`，
-  描述那一行从空变成一句话）。这几处都在两张卡片图的画面里，因此重拍时它们是新的**判废项** ——
-  拍前按 [locale/](locale/) diff 一次文案，判据与拍摄路径见 [assets/AGENTS.md](assets/AGENTS.md) 与 [assets/README.md](assets/README.md)
+- **卡片图重拍时要连页面上的名字与图标一起核对**：2026-09-22 起插件页与设置里显示的是 `locale` 里的
+  `meta.title` / `meta.description`（详情页标题从 `zhihu-search` 变成 `知乎检索` / `Zhihu Search`，
+  标题下方仍留着技术名 `dsh-zhihu-search`，描述那一行从空变成一句话），左上角那格图标也换成
+  [icon.svg](icon.svg)（36 视口里的蓝色方标）。这几处都在两张卡片图的画面里，因此重拍时它们是新的**判废项** ——
+  拍前按 [locale/](locale/) 与 [icon.svg](icon.svg) 各 diff 一次，判据与拍摄路径见 [assets/AGENTS.md](assets/AGENTS.md)
+  与 [assets/README.md](assets/README.md)
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）。2026-09-22 起它服务的只剩**组合配置**一条来源
 - **卡片图待重截（降级为「更新」）**：配置入口**回到了 bundle 详情页内联**（点插件名进去就是配置区，行上没有 Configure），
   也就是现有两张旧图拍的**正是**这个形态 —— 卡片本体 JSX / 样式 / 可见状态一字未改，要更新的只有图里的**版本 tag** 与开关 / 徽标现状。

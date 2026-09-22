@@ -51,8 +51,9 @@ function fixture(mutate: (dir: string) => void): string {
   for (const language of ['en', 'zh']) {
     writeFileSync(join(dir, 'locale', `${language}.json`), readFileSync(join(root, 'locale', `${language}.json`)));
   }
-  // 清单先照抄本仓那份：只改一处，红了才说明是那一处引起的。
+  // 清单与图标先照抄本仓那份：只改一处，红了才说明是那一处引起的。
   writeFileSync(join(dir, 'package.json'), JSON.stringify(readManifest(root), null, 2));
+  writeFileSync(join(dir, 'icon.svg'), readFileSync(join(root, 'icon.svg')));
   mutate(dir);
   return dir;
 }
@@ -75,8 +76,21 @@ function writeManifest(dir: string, manifest: Manifest): void {
  * @returns 命中的失败提示。
  */
 function failureFor(dir: string, label: string): string | undefined {
-  const { failures } = inspectPluginMetadata(dir);
-  return failures.find((entry) => entry.includes(label)) ?? (failures.length === 0 ? undefined : failures.join('\n'));
+  return failuresFor(dir, label)[0];
+}
+
+/**
+ * 命中某个标签的全部失败条目。
+ *
+ * 用**全量匹配**而不是「第一条」：判定的名字互为前缀（`icon 声明留在…` 与 `icon 文件在…`），
+ * 只看第一条会把「另一条也红了」当成「这一条红了」。
+ *
+ * @param dir - 副本根目录。
+ * @param label - 判定名的一部分。
+ * @returns 命中的失败提示（可能为空）。
+ */
+function failuresFor(dir: string, label: string): string[] {
+  return inspectPluginMetadata(dir).failures.filter((entry) => entry.includes(label));
 }
 
 describe('展示元数据：宿主读得到（本仓现状）', () => {
@@ -118,8 +132,20 @@ describe('展示元数据：宿主读得到（本仓现状）', () => {
     expect(meta.description).toBe(descriptions.en);
   });
 
-  it('未声明图标（可选字段；判定见决策记录，不是遗漏）', () => {
-    expect(meta.icon).toBeUndefined();
+  it('图标：声明了、在包内、且是自包含的 SVG（2026-09-22 起）', () => {
+    // 声明与随包由守卫那几条钉住；这里管的是**文件本身**：
+    // 宿主把图标 base64 成 data URL **按图片**渲染，所以 currentColor / 外链 / 外部字体一律不起作用。
+    expect(meta.icon).toBe('./icon.svg');
+    const svg = readFileSync(join(root, 'icon.svg'), 'utf8');
+    expect(svg).toContain('viewBox="0 0 36 36"');
+    for (const forbidden of ['currentColor', '<image', 'href', 'url(', '@import', 'font-family', '<style']) {
+      expect(svg, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it('locale 的 meta 与卡片字典的 key 互不重叠（两个命名空间，谁也不读对方）', () => {
+    const en = JSON.parse(readFileSync(join(root, 'locale', 'en.json'), 'utf8')) as Record<string, unknown>;
+    expect(Object.keys(en)).toEqual(['meta']);
     expect(displayMetadata(root, 'en')?.title).toBe(titles.en);
   });
 });
@@ -179,10 +205,57 @@ describe('展示元数据守卫：反向控制', () => {
         manifest.icon = icon;
         writeManifest(target, manifest);
       });
-      expect(failureFor(dir, 'icon 声明在主清单目录内'), icon).toBeDefined();
+      expect(failureFor(dir, 'icon 声明留在主清单目录内'), icon).toBeDefined();
     }
 
-    // 未声明图标（本仓现状）：这一条不该红。
-    expect(failureFor(fixture(() => undefined), 'icon 声明在主清单目录内')).toBeUndefined();
+    // 未声明图标：这几条都不该红（图标是可选字段）。
+    const none = fixture((target) => {
+      const manifest = readManifest(root);
+      delete manifest.icon;
+      writeManifest(target, manifest);
+    });
+    expect(failureFor(none, 'icon 声明留在主清单目录内')).toBeUndefined();
+    expect(failureFor(none, 'icon 文件在')).toBeUndefined();
+    expect(failureFor(none, 'icon 扩展名在宿主名单内')).toBeUndefined();
+    expect(failureFor(none, 'icon 不超过 256 KiB')).toBeUndefined();
+  });
+
+  it('声明了图标但文件不在 / 扩展名不认 / 没随包 / 超 256 KiB 时各红一条', () => {
+    /**
+     * 造一个副本：清单里声明 icon，并按需写（或不写）那个文件。
+     *
+     * @param icon - 清单里要声明的路径。
+     * @param fill - 写文件的方式；`undefined` 表示故意不写（验「文件不在」那条）。
+     * @param inFiles - 是否把该路径留在 `files` 里。
+     * @returns 副本根目录。
+     */
+    const withIcon = (icon: string, fill: ((dir: string, path: string) => void) | undefined, inFiles = true): string =>
+      fixture((target) => {
+        const manifest = readManifest(root);
+        manifest.icon = icon;
+        const relative = icon.replace(/^\.\//u, '');
+        if (!inFiles) manifest.files = manifest.files.filter((entry) => entry !== relative);
+        writeManifest(target, manifest);
+        // 副本基线里那份 icon.svg 先删掉：这个用例只留「被改的那一处」不成立。
+        rmSync(join(target, 'icon.svg'), { force: true });
+        if (fill !== undefined) fill(target, relative);
+      });
+    /** 写一个指定字节数的占位文件（内容对判定不重要，大小才是）。 */
+    const bytes = (count: number) => (dir: string, path: string): void => {
+      writeFileSync(join(dir, path), 'x'.repeat(count));
+    };
+
+    // 两件事各自单独验：文件不在（files 里还留着）与没随包（文件在）。
+    const missing = withIcon('./icon.svg', undefined);
+    expect(failureFor(missing, 'icon 文件在（icon.svg）')).toBeDefined();
+    expect(failureFor(missing, 'files 收录 icon.svg')).toBeUndefined();
+
+    const present = withIcon('./icon.svg', bytes(16));
+    expect(failureFor(present, 'icon 文件在（icon.svg）')).toBeUndefined();
+    expect(failureFor(present, 'icon 不超过 256 KiB')).toBeUndefined();
+
+    expect(failureFor(withIcon('./icon.ico', bytes(16)), 'icon 扩展名在宿主名单内')).toBeDefined();
+    expect(failureFor(withIcon('./icon.svg', bytes(256 * 1024 + 1)), 'icon 不超过 256 KiB')).toBeDefined();
+    expect(failureFor(withIcon('./icon.svg', bytes(16), false), 'files 收录 icon.svg')).toBeDefined();
   });
 });

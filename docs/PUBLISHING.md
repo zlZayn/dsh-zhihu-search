@@ -99,7 +99,7 @@ gh workflow run release.yml -f tier=prerelease -f preid=alpha    # 预发布：�
 - 补上端点本来就有、只是没透出的信号 → Q3 否（不是新能力）→ patch。
 - 调整打包清单（排除 source map、补进英文 README）→ Q1 否 Q3 否 → patch。
 - 包元数据纠错（`keywords`、npm 页面描述）→ Q1 否 Q3 否 → patch。
-- **加插件展示元数据**（包根 `locale/<lang>.json` 的 `meta.title` / `meta.description` 进 `files` 与 `exports`，即宿主界面上的名字与那句描述）→ Q0 **是**（渲染文本变了：插件页与设置里显示的不再是技术名，详情页描述那行从空变成一句话；`files` 也只增不减）；Q1 否（旧版上正确的用法不因此变错）；Q2 否（不需要改用法、不需要改配置）；Q3 否（**不是新能力** —— 只是同一件东西显示得更清楚，与上面两条包元数据判例同类；`README` 里「点哪个名字进详情页」这句话跟着改，属描述同步而不是新用法）→ **patch**。2026-09-22 判，本次带这份元数据的版本是 `2.0.0-alpha.1`（预发布线上按 SemVer 语义取整到 `2.0.0`）；图标（可选字段）本次未加，判据见[决策记录](../.agents/notes/2026-09-22-plugin-display-metadata.md)。
+- **加插件展示元数据**（包根 `locale/<lang>.json` 的 `meta.title` / `meta.description` 进 `files` 与 `exports`，即宿主界面上的名字与那句描述；**同一批还给包根加了 `icon.svg`**，理由与几何判据见[图标记录](../.agents/notes/2026-09-22-plugin-icon.md)）→ Q0 **是**（渲染文本变了：插件页与设置里显示的不再是技术名，详情页描述那行从空变成一句话；`files` 也只增不减）；Q1 否（旧版上正确的用法不因此变错）；Q2 否（不需要改用法、不需要改配置）；Q3 否（**不是新能力** —— 只是同一件东西显示得更清楚，与上面两条包元数据判例同类；`README` 里「点哪个名字进详情页」这句话跟着改，属描述同步而不是新用法）→ **patch**。2026-09-22 判，本次带这份元数据的版本是 `2.0.0-alpha.1`（预发布线上按 SemVer 语义取整到 `2.0.0`）；图标（可选字段）本次未加，判据见[决策记录](../.agents/notes/2026-09-22-plugin-display-metadata.md)。
 - 更新截图与 README 展示 → Q1 否 Q3 否 → patch —— 这是**搭车时的档位**，不是「为图发版」：`assets/` 与 `.md` 都不进产物，只含它们的区间会被[守卫](../scripts/release-guard.mjs)拦下，重截图随引起它的那次改动一起走（判例 `d0a3adb` 搭了 v1.4.0）。
 - 新增可选开关（如「隐藏原生网页搜索」）→ 旧用法全部仍然正确，且能观察到新能力 → Q3 是 → minor。
 - 修复已发布功能里的逻辑缺陷（开关存了却不生效）→ 旧用法仍正确、只是真的开始工作 → Q1 否 Q3 否 → patch。
@@ -119,8 +119,9 @@ gh workflow run release.yml -f tier=prerelease -f preid=alpha    # 预发布：�
 
 发布内容由 [package.json](../package.json) 的 `files` 决定，**以它为准，本文不复制清单** —— 复制的清单会漂移，已经漏过一次 `README_en.md`。
 
-五处需要解释，其余自明：
+六处需要解释，其余自明：
 
+- `icon.svg` 必须随包：插件在**插件页卡片 / 详情页 / 设置清单**里的图标由宿主读清单声明的那个相对路径（顶层 `"icon": "./icon.svg"`，路径相对声明它的清单且必须留在包目录内）。缺了它**不报错**，只是那一格退回面板默认图案 —— 与 `locale` 同一族静默故障，判定同在 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs)（另含扩展名、≤ 256 KiB）。**注意它与 `assets/logo.svg` 不是同一个文件**：图标是派生出来的 36×36 独立资产，改一个不动另一个。
 - `locale/*.json` 必须随包，且被 `exports` 的 `./locale/*.json` 暴露：插件在**插件页与设置里的名字与描述**由宿主按包名读这两个文件（`meta.title` / `meta.description`），不走任何运行时通道。缺一条它**不报错**，只是退回技术名 —— 落地包与仓库里长得不一样，而本地开发（`link:` 挂载）永远看不出来。判定在 [scripts/plugin-metadata.mjs](../scripts/plugin-metadata.mjs)，`npm run check:release` 与 [test/plugin-metadata.test.ts](../test/plugin-metadata.test.ts) 读同一份。
 - `lib/**/*.map` 被排除：这些 source map 指向未随包的 `src/`，对使用者是悬空的，却占了三分之一体积。tsconfig 仍生成它们，本地调试照常。
 - `README_en.md` 必须随包：`README.md` 顶部链接指向它，不随包就是 npm 页面上的死链。

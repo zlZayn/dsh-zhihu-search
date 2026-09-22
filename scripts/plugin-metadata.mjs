@@ -1,5 +1,5 @@
 /**
- * 插件展示元数据（`locale/<lang>.json` 的 `meta`）**随包**与**可解析**的守卫。
+ * 插件展示元数据（`locale/<lang>.json` 的 `meta` 与顶层 `icon`）**随包**与**可解析**的守卫。
  *
  * 为什么要有它：宿主读这份元数据的路是「按插件名做 Node 资源解析」——
  * `dsh-zhihu-search/locale/en.json` 必须先出现在 `exports` 里，文件又必须先随包发出去。
@@ -15,13 +15,25 @@
  * 两个消费者读同一份判定，避免两处各写一套：
  * - [check-release.mjs](check-release.mjs)（`npm run check:release`，release.yml 发布前跑）
  * - [../test/plugin-metadata.test.ts](../test/plugin-metadata.test.ts)（`npm test`）
+ *
+ * 图标那几条的判据照抄宿主 `iconOf`：扩展名名单、**留在清单目录内**、普通文件、≤ 256 KiB
+ * （`packages/boot/app-boot/src/package-meta.ts:14-41`）。
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** 语言 id 的形状，与宿主 `package-meta.ts` 的 `LANGUAGE_ID` 同源。 */
 const LANGUAGE_ID = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u;
+
+/** 宿主 `iconOf` 认的扩展名与媒体类型（`package-meta.ts:16-19`）。 */
+const ICON_MEDIA_TYPES = new Map([
+  ['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'], ['.webp', 'image/webp'],
+]);
+
+/** 宿主 `iconOf` 的上限：`MAX_ICON_BYTES = 256 * 1024`。 */
+const MAX_ICON_BYTES = 256 * 1024;
 
 /**
  * 从仓库根读展示元数据并逐条判定随包不变量。
@@ -104,8 +116,27 @@ export function inspectPluginMetadata(root, pkg = readManifest(root)) {
 
   require_('exports 暴露 ./package.json', Object.hasOwn(exportsMap, './package.json'),
     '标题与描述的包级回落、以及图标声明都经 <包名>/package.json 读；不导出就没有这两档回落。');
-  require_('icon 声明在主清单目录内', iconIsLocal(pkg.icon),
+  // 图标（可选字段）：声明了就得真的能读 —— 路径留在清单目录内、文件在、扩展名与大小都合宿主的口径。
+  // 缺一处宿主只留一条诊断、图标位空着，界面不报错。本仓 2026-09-22 起声明了它。
+  require_('icon 声明留在主清单目录内', iconIsLocal(pkg.icon),
     '顶层 icon 的路径相对**声明它的清单**解析，且必须留在该目录内（绝对路径、URL 与越界路径都会被宿主拒绝，只留一条诊断）。');
+
+  if (pkg.icon !== undefined) {
+    const iconPath = String(pkg.icon).replace(/^\.\//u, '');
+    const absolute = join(root, iconPath);
+    const mediaType = ICON_MEDIA_TYPES.get(iconPath.slice(iconPath.lastIndexOf('.')).toLowerCase());
+    require_(`icon 扩展名在宿主名单内（${ICON_MEDIA_TYPES.size} 种）`, mediaType !== undefined,
+      '宿主只认 SVG / PNG / JPEG / WebP；其余扩展名一律拒绝。');
+    require_(`icon 文件在（${iconPath}）`, existsSync(absolute),
+      '声明了却读不到：宿主留一条诊断、图标位空着 —— 与不声明同效。');
+    require_(`files 收录 ${iconPath}`, files.includes(iconPath),
+      '没随包的图标在 npm 上不存在；本地 link: 挂载照样显示，落地包却是空的。');
+    if (existsSync(absolute)) {
+      const size = statSync(absolute).size;
+      require_(`icon 不超过 256 KiB（当前 ${size} B）`, size <= MAX_ICON_BYTES,
+        '宿主对超限的图标只留一条诊断并弃用；上限是 256 KiB。');
+    }
+  }
 
   return {
     languageIds,

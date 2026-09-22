@@ -12,6 +12,7 @@
     "tool"
   ],
   "license": "MIT",
+  "icon": "./icon.svg",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zlZayn/dsh-zhihu-search.git"
@@ -38,6 +39,7 @@
   "files": [
     "lib",
     "!lib/**/*.map",
+    "icon.svg",
     "locale/*.json",
     "cordis.patch.yml",
     "README.md",

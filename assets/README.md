@@ -6,7 +6,10 @@
 
 - `banner.svg`：头图，双语共用，被 [README.md](../README.md) 与 [README_en.md](../README_en.md) 引用。
 - `zhihu-daily-quota.jpg`：知乎开放平台「各接口剩余配额」面板的截图，双语 README 共用（**额度**按自然日刷新，这张图是静态截图、不随日更换）。
-- `banner.jpg`、`logo.jpg`、`logo.svg`、`slogan.jpg`、`slogan.svg`：未引用。
+- `logo.svg`：523×346 的横版**字标**，本身未被引用，但它是包根 [icon.svg](../icon.svg) 的**来源** ——
+  图标取的是它三块里那只 261×261 的蓝色方标（`fill="#0084FF"`），按官方留白等比缩进 36×36 画布。
+  **两者不是同一份东西**：改 logo 不自动改图标，改图标也不必动 logo → [图标记录](../.agents/notes/2026-09-22-plugin-icon.md)。
+- `banner.jpg`、`logo.jpg`、`slogan.jpg`、`slogan.svg`：未引用。
 - `settings-card.png`：配置卡片所在页面的整屏实拍（中文），被 [README.md](../README.md) 引用。
 - `settings-card_en.png`：同一画面的英文版，被 [README_en.md](../README_en.md) 引用。
 
@@ -16,7 +19,9 @@
 > 开关 / 徽标的现状，以及**页面上的名字与描述**。
 > 后者是同一批改动的后半段：宿主界面里的显示名与那句描述改成读包根 [locale/](../locale/) 的
 > `meta`（中文 `知乎检索`、英文 `Zhihu Search`），于是详情页**标题**变了、
-> 标题下方那句**描述从空变成一句话** —— 两处都在画面里（同一批还有设置页的插件清单，不进这两张图）。
+> 标题下方那句**描述从空变成一句话**；左上角那格图标也换成包根 [icon.svg](../icon.svg) ——
+> 三处都在画面里（同一批还有设置页的插件清单，不进这两张图）。
+> **图标那一条把重拍从「更新」升级为必拍**：它直接改变卡片外观，不再是只换版本号。
 > 本轮仍不重截（要占用维护者浏览器）；拍摄路径与**判废项**见 [AGENTS.md](AGENTS.md) 第 3 步与「验收」一节。
 
 两份 README 都以 `width=600` 展示。
@@ -50,6 +55,8 @@
 ## 变更影响路由
 
 - 改卡片渲染面 → **必须同批重截**两张卡片图，判据与步骤见 [AGENTS.md](AGENTS.md)。
+- 改包根 [icon.svg](../icon.svg) → 同上**必须重截**（它就是卡片左上角那格图）；改 [../assets/logo.svg](logo.svg)
+  **不**自动改图标，但两份 README 的头图引用面要一起看。
 - 改包根 [locale/](../locale/) 的 `meta.title` / `meta.description` → 图里的**页面标题与描述**跟着变
   （卡片本体不变，但它画在详情页里）。按 [AGENTS.md](AGENTS.md) 的「拿不准时按必须重截办」处理；
   这一条也顺带挪动两份根 README 的「配置」节与 [assets/AGENTS.md](AGENTS.md) 的判废项。
