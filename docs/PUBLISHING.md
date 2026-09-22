@@ -47,6 +47,11 @@ npm view dsh-zhihu-search dist-tags                           # alpha = 新号�
 - **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
 - **发布不得改写版本号（版本驱动）**：`release.yml` 只发 `package.json` 里那个号，**没有 bump 步**。判据是**会执行的命令行**（[scripts/check-release.mjs](../scripts/check-release.mjs) 的 `findVersionWrites`，`npm run check:release` 与 [test/release-workflow.test.ts](../test/release-workflow.test.ts) 读同一份，带反向控制）。为什么写成硬规则：界面上的版本 tag 就是那个号，workflow 自己 bump 会让工作树永远停在「上一个已发布版本」，**截图必然拍出旧号**。
 - **dist-tag 由版本自己推导，不按输入参数判**：版本号带预发布段（`2.0.0-alpha.1`）就发到**那段本身**（`alpha`），否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出（`steps.version.outputs.dist_tag`）。判据只此一处，避免「推 latest 的那一档其实是预发布」—— 而 `latest` 停在 1.6.3。
+- **tag 名 = `v` + `package.json` 里的版本号**（`v2.0.0-alpha.1`），与全部历史 tag 同形；**前缀是显式补的、
+  不从值里推**。2026-09-22 踩过：版本号原来取自 `npm version` 的输出（**自带 `v`**），改成读 `package.json`
+  之后变成裸号，而 workflow 把那串**直接当 tag 名**用 —— 建出的 tag 与历史全不同形，还让本仓
+  `git describe --tags --match 'v[0-9]*'` 的守卫**看不见它**。由 [test/release-workflow.test.ts](../test/release-workflow.test.ts)
+  的正向断言 + 反向控制钉住。**换一个值的来源时，要连它的形状一起核**（前缀 / 大小写 / 末尾斜杠 / 是字符串还是数字）。
 - **手工推 tag 不会发布**：tag 由工作流创建，绕过上面的顺序没有意义。
 - **tag 与 GitHub Release 都由工作流创建**（本项目与 `dsh-ds-balance` 不同 —— 那边只打 tag 并推，Release 是手工补的）：
   最后两步是 `Push the release commit` → `Create the tag and the GitHub Release`（`gh release create … --generate-notes`，
