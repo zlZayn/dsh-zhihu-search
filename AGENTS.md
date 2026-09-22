@@ -15,7 +15,20 @@
 - 改根 [README.md](README.md) 必同改 [README_en.md](README_en.md)，冲突以中文为准
 - 「版本兼容」章节只讲分水岭与真源指针，**不抄会漂的宿主版本**；判据：`engines.dsh` 一旦落后于实际部署的宿主线（[compat.yml](.github/workflows/compat.yml) 的 declaration 作业转红即为信号），该章与两份 README 的「前置」必须同批复核
 - **声明面应当自洽**：`engines.dsh` 与全部 27 条 `@deepseek-ai/dsh-*` 声明（9 条 peer + 18 条 dev，去重后 18 个包）**同形状**、落在同一条区间上。两份声明矛盾时，使用者按我们给的区间装出来的宿主未必有本插件赖以工作的设置接缝，而接缝缺席是**静默**的（配置页不出现、宿主不报错）。**2026-09-22 起它成立了** —— 整条声明面跟到 alpha 线（此前停在 next 线，是已知的、有理由的例外；那条例外已作废）。由 [test/redlines.test.ts](test/redlines.test.ts) 的「声明面自洽」一组断言，理由是[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)
-- **只做类型面（module augmentation）、运行时由宿主提供的官方包，只写 `devDependencies`，不写 `peerDependencies`** —— 现有两个：客户端的 `@deepseek-ai/dsh-client-ui-plugin-manager`（由 `dsh.client.inject` 提供，见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)）、宿主侧的 `@deepseek-ai/cordis-plugin-loader`（只为 `loader/volatile-update` 的事件声明，2026-09-22 加）。**判断依据是「我们只 import type」**，不是包住在哪一侧
+- **依赖写在 peer 还是 dev，判据是「我们与它的关系」，不是它住在哪一侧** —— 两类，缺一类就会出事：
+  - **只做类型面（module augmentation）、我们只 `import type`** → 只写 `devDependencies`。现有两个：
+    客户端的 `@deepseek-ai/dsh-client-ui-plugin-manager`（运行时关系由 `dsh.client.inject` 表达，peer 是重复声明）、
+    宿主侧的 `@deepseek-ai/cordis-plugin-loader`（只为 `loader/volatile-update` 的事件声明，2026-09-22 加）。
+  - **我们消费它提供的服务（运行时真的要用）** → 必须 `peerDependencies`（外加同一区间的 `devDependencies`，红线钉着版本相等）：
+    装载器得把它与我们装在同一棵树里，否则 `ctx.<服务>` 在运行期就是 undefined。
+    `@deepseek-ai/dsh-client-ui-settings` 属于这一类 —— 它是宿主服务 **`configForms` 的提供方**
+    （宿主 `packages/client/ui-settings/src/client/config-form.ts:241` 的 `class ConfigForms extends Service`、
+    `:266` 的 `super(ctx, 'configForms')`，行号以当前检出为准），而卡片经 `ctx.configForms.get(<entry id>)` **属性访问**它。
+    源码里连一行 `import` 都没有；它留在 `devDependencies` 只是为了让 `plugin-manager` 的 `.d.ts` 能解析 ——
+    **那不构成「只能写 dev」的理由，两种关系同时成立就该两边都写。**
+    **注意那三条例行断言**（[test/redlines.test.ts](test/redlines.test.ts) 的 `peer ↔ dev 版本一致`、上下文相关包名单、声明面自洽）
+    **都不覆盖「服务提供方是否被声明」** —— 删掉 peer 它们照样全绿，所以「全绿」不能当作这类改动的判据。
+  理由、机制出处与替代方案见[决策记录](.agents/notes/2026-09-20-plugin-manager-dependency-kind.md)。
 - **插件展示元数据（宿主界面上的名字、描述与图标）只住在包根**：[locale/](locale/) 的 `meta.title` / `meta.description` 是文案的唯一来源，[icon.svg](icon.svg) 是图标的唯一来源（由 `package.json` 顶层 `icon` 声明）。别处只留指针、不复制 —— 抄一份就有两处会漂，而宿主**读不到时不报错**（名字退回技术名；图标位空着就退回面板默认图案）。两者都由 [scripts/plugin-metadata.mjs](scripts/plugin-metadata.mjs) 判定随包与可解析（`npm run check:release` 与 [test/plugin-metadata.test.ts](test/plugin-metadata.test.ts) 读同一份），理由与回落链见[决策记录](.agents/notes/2026-09-22-plugin-display-metadata.md)，图标几何与配色判据见[图标记录](.agents/notes/2026-09-22-plugin-icon.md)
 - **四个「通用 lint 那一档」的编译器开关代替 linter**（`noUnusedLocals` / `noUnusedParameters` / `noImplicitReturns` / `noFallthroughCasesInSwitch`），缺任何一个覆盖面就不成立 → 由 [test/redlines.test.ts](test/redlines.test.ts) 断言；client / test 两个 project 都 extends 根 `tsconfig.json`，一处生效三处
 - **发布态不变量由脚本守卫**（`dsh.bundle.patch` 在、`private` 没设、`engines.dsh` 声明了、`files` 带 `cordis.patch.yml`、LICENSE 在）→ `npm run check:release`，[release.yml](.github/workflows/release.yml) 发布前跑
