@@ -77,6 +77,20 @@ npm view dsh-zhihu-search dist-tags                           # alpha = 新号�
 
 判例：1.3.0（开关静默无效）、1.4.0（两个搜索工具整体失败）、1.6.0（卡片装不上）、1.6.1（工具无密钥）四个版本已按此标掉；理由与证据见 [docs/postmortem/](postmortem/)。
 
+### 工作流文件头里的话也是「会执行的东西」的判据
+
+[release.yml](../.github/workflows/release.yml) 顶部的注释是**给人读的用法说明**（怎么触发、有哪些输入），
+所以它和正文一样会漂 —— 而**文档漂移不报错**，比代码漂移更耐久：
+
+- 2026-09-22 实测：`tier` / `preid` 两个输入在改成版本驱动时撤掉了，
+  但**文件头第 1 行还写着** `gh workflow run release.yml -f tier=patch`。
+  GH Actions 对不存在的输入**不报错**（它只把没声明的 `-f` 忽略掉），
+  所以照那行敲的人会**以为**自己选了档位，其实什么都没选 —— 所幸版本驱动下档位本来就在本地定，没造成实际后果。
+- 判据落在 [test/release-workflow.test.ts](../test/release-workflow.test.ts) 的「工作流文本里没有过期指针」：
+  文件里不得出现 `-f tier=` 与 `inputs.tier`，且必须写着无参数的 `gh workflow run release.yml`。
+- **推广**：任何「用法说明 + 输入集」成对出现的地方（workflow 文件头、README 的安装段、脚本的 `--help`），
+  改输入集时**同批改说明**；能落成断言的就落一条（这里落得动，因为它读的是同一个文件）。
+
 ## 版本号
 
 按 SemVer 定档。判据是**原则加判定链**，不是清单：新情况按问题链推，不靠枚举命中。
@@ -166,6 +180,30 @@ npm pack --dry-run
 
 需要证明 npm 上的产物与本地已验证的一致时：下载该版本的 tarball、解包，与仓库 `lib/` 逐文件比对 SHA-256 —— 一致即「发布产物 == 已验证产物」。
 不必对裸包再跑一遍验收：包的 peer 依赖由宿主提供，裸包本来就跑不起来。
+
+最省事的等价做法（也是唯一适合写进脚本的）：**先让两个来源本该相同，再比** ——
+
+```bash
+git status --porcelain --ignored=no   # 先确认工作树干净
+npm pack --pack-destination "$TMP"    # 只放临时目录，别在仓里留 .tgz
+npm view dsh-zhihu-search@<版本> dist.shasum   # 与上面那个 tarball 的 SHA-1 比
+```
+
+**比对之前必须先确认本机没有「不该有的东西」** —— 这条是本仓实测踩出来的（2026-09-22）：
+
+| 来源 | 文件数 | 结果 |
+|---|---|---|
+| 本机 `npm pack` | **43** | shasum `9b8e1ead…` ✗ |
+| npm 上（workflow 在干净检出里打的包） | **42** | shasum `bdd4d510…` |
+
+差异只有一处：本机多一个 `lib/client.d.ts` —— **2026-09-13 遗留、不在 git 里**，
+而 workflow 是 `npm ci` 之后从干净检出构建的，天然没有它。删掉即逐字节一致。
+**错的是本机，不是远端产物** —— 这类假红与「假绿」是同一个病的两面：比对的两个来源本来就不同源。
+
+- 同一批残留还有 `lib/client.d.ts.map` 与 `lib/client.js.map`（同为 9-13）：它们被 `files` 的
+  `!lib/**/*.map` 挡在包外，**这次没影响，但同类残留还会再有** —— 别指望每次都被 `files` 挡住。
+- 更稳的做法是**在干净检出里 pack**（`git clone` 一份 / `git worktree add` 一个临时树 + `npm ci` + `npm run build`），
+  本机那份只用来开发。两种做法都行，**但不能跳过这一步直接比**。
 
 ## 构建链的两个事实
 
