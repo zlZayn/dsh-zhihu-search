@@ -238,7 +238,7 @@ export function compileFilter(spec: FilterSpec, scope: FilterScope = 'global'): 
  * @param allowed - 该工具声明的参数名；由调用方从自己的参数定义推导，避免两处漂移。
  * @throws CompileError 当出现未声明的键时。
  */
-export function assertKnownParams(args: Record<string, unknown>, allowed: readonly string[]): void {
+export function assertKnownParams(args: object, allowed: readonly string[]): void {
   const known = new Set(allowed);
   const unknown = Object.keys(args).filter((key) => !known.has(key));
   if (unknown.length === 0) return;

@@ -187,7 +187,7 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
       const query = args.query.trim();
 
       try {
-        assertKnownParams(args as Record<string, unknown>, PARAM_NAMES);
+        assertKnownParams(args, PARAM_NAMES);
         if (query === '') throw new CompileError('搜索关键词不能为空。');
 
         const count = resolveRequestedCount(args.count);

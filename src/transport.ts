@@ -128,7 +128,7 @@ function isAbortError(error: unknown): boolean {
     typeof error === 'object' &&
     error !== null &&
     'name' in error &&
-    (error as { name?: unknown }).name === 'AbortError'
+    error.name === 'AbortError'
   );
 }
 
@@ -355,13 +355,15 @@ export interface ZhihuChatChunk {
  */
 export function classifyChatFailure(failure: unknown, status?: number): ZhihuClientError | undefined {
   if (typeof failure !== 'object' || failure === null) return undefined;
-  const record = failure as { message?: unknown; type?: unknown; code?: unknown };
   const message =
-    typeof record.message === 'string' && record.message.trim() !== '' ? record.message : '知乎直答返回错误。';
-  const codeText = typeof record.code === 'string' ? record.code : '';
-  const typeText = typeof record.type === 'string' ? record.type : '';
+    'message' in failure && typeof failure.message === 'string' && failure.message.trim() !== ''
+      ? failure.message
+      : '知乎直答返回错误。';
+  const codeValue = 'code' in failure ? failure.code : undefined;
+  const codeText = typeof codeValue === 'string' ? codeValue : '';
+  const typeText = 'type' in failure && typeof failure.type === 'string' ? failure.type : '';
   const hay = `${typeText} ${codeText} ${message}`.toLowerCase();
-  const numericCode = typeof record.code === 'number' ? record.code : undefined;
+  const numericCode = typeof codeValue === 'number' ? codeValue : undefined;
   const codeField = numericCode === undefined ? {} : { code: numericCode };
 
   if (status === 429 || /rate.?limit|too many requests|quota|30001/.test(hay)) {
@@ -419,13 +421,19 @@ export function deltaFromPayload(payload: string): ZhihuChatChunk | undefined {
     return undefined;
   }
   if (typeof envelope !== 'object' || envelope === null) return undefined;
-  const choices = (envelope as { choices?: unknown }).choices;
+  const choices = 'choices' in envelope ? envelope.choices : undefined;
   if (!Array.isArray(choices) || choices.length === 0) return undefined;
-  const first = choices[0] as { delta?: unknown; finish_reason?: unknown } | undefined;
-  const delta = first?.delta;
+  const first = choices[0];
+  const delta = typeof first === 'object' && first !== null && 'delta' in first ? first.delta : undefined;
   const finishReason =
-    typeof first?.finish_reason === 'string' && first.finish_reason !== '' ? first.finish_reason : undefined;
-  const failure = classifyChatFailure((envelope as { error?: unknown }).error);
+    typeof first === 'object' &&
+    first !== null &&
+    'finish_reason' in first &&
+    typeof first.finish_reason === 'string' &&
+    first.finish_reason !== ''
+      ? first.finish_reason
+      : undefined;
+  const failure = classifyChatFailure('error' in envelope ? envelope.error : undefined);
   const error =
     failure ??
     (finishReason === 'error'
@@ -436,11 +444,14 @@ export function deltaFromPayload(payload: string): ZhihuChatChunk | undefined {
 
   const chunk: { content?: string; reasoningContent?: string; finishReason?: string; error?: ZhihuClientError } = {};
   if (typeof delta === 'object' && delta !== null) {
-    const record = delta as { content?: unknown; reasoning_content?: unknown };
-    if (typeof record.content === 'string' && record.content !== '') chunk.content = record.content;
-    if (typeof record.reasoning_content === 'string' && record.reasoning_content !== '') {
-      chunk.reasoningContent = record.reasoning_content;
-    }
+    const content =
+      'content' in delta && typeof delta.content === 'string' && delta.content !== '' ? delta.content : undefined;
+    if (content !== undefined) chunk.content = content;
+    const reasoning =
+      'reasoning_content' in delta && typeof delta.reasoning_content === 'string' && delta.reasoning_content !== ''
+        ? delta.reasoning_content
+        : undefined;
+    if (reasoning !== undefined) chunk.reasoningContent = reasoning;
   }
   if (finishReason !== undefined) chunk.finishReason = finishReason;
   if (error !== undefined) chunk.error = error;
