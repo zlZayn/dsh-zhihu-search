@@ -12,11 +12,11 @@
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools';
 import { assertKnownParams, CompileError, compileFilter, compileSortBy, SORT_FIELDS } from '../utils/compiler.js';
 import { mapError } from '../utils/errors.js';
-import { sanitizeSnippet, stripTrackingParams } from '../utils/text.js';
 import { LocalRateLimitError } from '../state.js';
 import { presentSearchCall, presentSearchResult, renderSearch, searchMetaFromValue } from '../present/search.js';
-import type { SearchOutput, ZhihuSearchItem } from '../types.js';
+import type { SearchOutput } from '../types.js';
 import { ZHIHU_SEARCH_MAX_COUNT } from '../transport.js';
+import { projectItem, rawRequestedCount, resolveRequestedCount, SEARCH_OUTPUT_SCHEMA } from './search-shared.js';
 import { cacheKeyFor, type ToolDeps } from './deps.js';
 
 /** 工具名。 */
@@ -43,28 +43,7 @@ const DEFAULT_COUNT = 5;
  */
 const FILTERED_CANDIDATE_COUNT = MAX_COUNT;
 
-/**
- * 模型**原始**请求的条数：只取下界与整数，**不按端点上限夹取**。
- *
- * 渲染层要用它判断「是不是请求得比端点允许的还多」—— 传夹取后的值会让
- * `requestedCount > maxCount` 恒为假，到顶提示变成永不触发的死代码（v1.5.1 的回归）。
- *
- * @param raw - 模型给的条数，未指定时用 {@link DEFAULT_COUNT}。
- * @returns 不小于 1 的整数（可能大于 {@link MAX_COUNT}）。
- */
-function rawRequestedCount(raw: number | undefined): number {
-  return Math.max(1, Math.trunc(raw ?? DEFAULT_COUNT));
-}
 
-/**
- * 实际请求用的条数：在原始请求值之上再按端点上限夹取。
- *
- * @param raw - 模型给的条数。
- * @returns 落在 1..{@link MAX_COUNT} 的整数。
- */
-function resolveRequestedCount(raw: number | undefined): number {
-  return Math.min(rawRequestedCount(raw), MAX_COUNT);
-}
 
 /**
  * 按本次请求的条数截断候选池的筛选结果。
@@ -92,36 +71,6 @@ const PARAM_NAMES = ['query', 'count', 'sortField', 'order', 'minValue', 'publis
 /** 协作式超时预算；超时必须早于 DSH 的外层截断，才能返回结构化错误。 */
 const TIMEOUT_MS = 15_000;
 
-/**
- * 把一条原始结果投影为 Canonical Output 条目。
- *
- * 为什么返回 `undefined` 而不是带空 URL 的条目：
- * 没有链接的结果无法被引用，占着上下文却没用。
- *
- * @param item - 知乎原始条目。
- * @returns 投影结果；缺少 URL 时返回 `undefined`。
- */
-function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number] | undefined {
-  const url = stripTrackingParams(typeof item.Url === 'string' ? item.Url : '');
-  if (url === '') return undefined;
-
-  return {
-    title: sanitizeSnippet(typeof item.Title === 'string' ? item.Title : '', 200) || '(无标题)',
-    url,
-    snippet: sanitizeSnippet(typeof item.ContentText === 'string' ? item.ContentText : ''),
-    author: sanitizeSnippet(typeof item.AuthorName === 'string' ? item.AuthorName : '', 60),
-    // 上游没报点赞数时整个键省略，不兜底成 0 —— 写 0 等于告诉模型「没人赞」。
-    // 注意实测结论：上游**从未省略**该字段，外站网页也有这个键、值是占位的 0。
-    // 省略分支是防伪造的兜底；外站那个 0 由渲染层决定不展示（present/search.ts）。
-    ...(typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? { voteUpCount: item.VoteUpCount } : {}),
-    // 投影规则同上：上游没报就省略，绝不兜底成 0。
-    ...(typeof item.CommentCount === 'number' && Number.isFinite(item.CommentCount) ? { commentCount: item.CommentCount } : {}),
-    ...(typeof item.EditTime === 'number' && Number.isFinite(item.EditTime) ? { editTime: item.EditTime } : {}),
-    // ContentType 缺失时留空，不编造标签：实测外站网页的类型是**空串**（字段在、值为空），
-    // 兜底成 'Answer' 会让模型把一个陌生网页当成知乎回答。
-    contentType: typeof item.ContentType === 'string' ? item.ContentType : '',
-  };
-}
 
 /**
  * 构造 `zhihu_search` 工具。
@@ -169,49 +118,11 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
     },
 
     output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          ok: { type: 'boolean', required: true },
-          query: { type: 'string', required: true },
-          items: {
-            type: 'array',
-            required: true,
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                title: { type: 'string', required: true },
-                url: { type: 'string', required: true },
-                snippet: { type: 'string', required: true },
-                author: { type: 'string', required: true },
-                voteUpCount: { type: 'number' },
-                // ⚠ 可选字段也必须在这里声明：output.schema 是 additionalProperties: false，
-                // **宿主按它校验工具返回值** —— 投影了却没声明 = 整个调用被判非法
-                // （v1.4.0 就是这样让所有搜索调用失败的，回归守卫见 test/tool.test.ts）。
-                commentCount: { type: 'number' },
-                editTime: { type: 'number' },
-                contentType: { type: 'string', required: true },
-              },
-            },
-          },
-          hasMore: { type: 'boolean', required: true },
-          error: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              kind: { type: 'string', required: true },
-              message: { type: 'string', required: true },
-              hint: { type: 'string' },
-            },
-          },
-        },
-      },
+      schema: SEARCH_OUTPUT_SCHEMA,
       render: (args, value) =>
         renderSearch(value, {
           // 必须传**原始**请求值：传夹取后的值会让到顶提示永远不触发。
-          requestedCount: rawRequestedCount(args.count),
+          requestedCount: rawRequestedCount(args.count, DEFAULT_COUNT),
           minValue: args.minValue,
           maxCount: MAX_COUNT,
           filtered:
@@ -234,7 +145,7 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
         assertKnownParams(args, PARAM_NAMES);
         if (query === '') throw new CompileError('搜索关键词不能为空。');
 
-        const requestedCount = resolveRequestedCount(args.count);
+        const requestedCount = resolveRequestedCount(args.count, { max: MAX_COUNT, fallback: DEFAULT_COUNT });
         const sortField = args.sortField ?? 'default';
         const order = args.order ?? 'desc';
         const minValue = args.minValue;
