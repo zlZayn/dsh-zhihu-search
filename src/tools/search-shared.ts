@@ -8,8 +8,12 @@
  */
 
 import type { ObjectValueSchemaSpec } from '@deepseek-ai/dsh-tools';
+import { assertKnownParams, CompileError } from '../utils/compiler.js';
+import { mapError } from '../utils/errors.js';
+import { LocalRateLimitError } from '../state.js';
 import { sanitizeSnippet, stripTrackingParams } from '../utils/text.js';
-import type { SearchOutput, ZhihuSearchItem } from '../types.js';
+import type { SearchOutput, ZhihuSearchData, ZhihuSearchItem } from '../types.js';
+import { cacheKeyFor, type ToolDeps } from './deps.js';
 
 /** 两工具共用的 `output.schema`。宿主按它校验返回值（`additionalProperties: false`）。 */
 export const SEARCH_OUTPUT_SCHEMA = {
@@ -114,4 +118,73 @@ export function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number
     // 兜底成 'Answer'（站内）或 'Article'（全网）都会让模型把陌生网页当成知乎内容。
     contentType: typeof item.ContentType === 'string' ? item.ContentType : '',
   };
+}
+
+/** 一次搜索调用的差异部分：编译出的请求参数、上游调用与返回变换。 */
+export interface SearchExecutionPlan {
+  /** 计入缓存键的参数（**必须**是归一化后的值；站内还必须是候选池大小）。 */
+  cacheArgs: unknown;
+  /** 调上游（差异点：`searchZhihu` / `searchGlobal`）。 */
+  fetch: (signal: AbortSignal | undefined) => Promise<ZhihuSearchData>;
+  /** 返回变换：站内按本次条数截断、全网原样。缓存命中与缓存写入**两条**返回路径共用，别只改一处。 */
+  onReturn: (value: SearchOutput) => SearchOutput;
+}
+
+/**
+ * 搜索类工具的共享执行骨架。
+ *
+ * **顺序是契约，别改**：白名单 → 空查询 → 缓存（优先于限流：命中不该消耗令牌与额度）
+ * → 限流 → 上游 → 投影 → 缓存写（写**完整池子**）→ 返回（在返回路径上截断）。
+ * 差异全部经 `plan` 注入；「`execute` 绝不 throw」的契约也收在这里（唯一 try/catch），
+ * 任何失败都变成结构化 Canonical Output。
+ */
+export async function executeSearch(options: {
+  deps: ToolDeps;
+  /** 模型给的原始参数（含 query 与各工具自己的旋钮）。 */
+  args: { query: string };
+  /** 该工具的未知参数白名单。 */
+  paramNames: readonly string[];
+  /** 工具名，用于隔离缓存空间。 */
+  toolName: string;
+  /** 归一化 + 编译出的差异部分（可能抛 `CompileError`，由本函数的 catch 转结构化错误）。 */
+  plan: (query: string) => SearchExecutionPlan;
+  signal: AbortSignal | undefined;
+}): Promise<SearchOutput> {
+  const { deps, args, paramNames, toolName, plan, signal } = options;
+  const query = args.query.trim();
+
+  try {
+    assertKnownParams(args, paramNames);
+    if (query === '') throw new CompileError('搜索关键词不能为空。');
+
+    const { cacheArgs, fetch, onReturn } = plan(query);
+    const key = cacheKeyFor(deps, toolName, cacheArgs);
+
+    // 缓存优先于限流：命中缓存不该消耗任何令牌，也不该消耗知乎额度。
+    const cached = deps.cache.get(key);
+    if (cached !== undefined) return onReturn(cached as SearchOutput);
+
+    if (!deps.searchBucket.tryConsume()) {
+      throw new LocalRateLimitError(
+        `本地频率限制：搜索类请求超过每分钟上限。`,
+        deps.searchBucket.retryAfterMs(),
+      );
+    }
+
+    const data = await fetch(signal);
+
+    const items: SearchOutput['items'] = [];
+    for (const raw of data.Items ?? []) {
+      const projected = projectItem(raw);
+      if (projected !== undefined) items.push(projected);
+    }
+
+    const value: SearchOutput = { ok: true, query, items, hasMore: data.HasMore };
+    // 缓存完整池子，返回按本次条数截断 —— 顺序不可颠倒（站内的 onReturn 负责截断）。
+    deps.cache.set(key, value);
+    return onReturn(value);
+  } catch (error) {
+    // 契约：execute 绝不 throw。任何失败都要变成结构化 Canonical Output。
+    return { ok: false, query, items: [], hasMore: false, error: mapError(error) };
+  }
 }
