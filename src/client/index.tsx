@@ -190,7 +190,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 // 取值逐条对齐官方配置表单的样式表（`ui-primitives/src/settings-form/{SettingsForm,fields}.module.css`；
 // 旧那份 `ui-settings-plugins/PluginConfigForm.module.css` 在接缝换代之后的线上已不存在）：无外框、无圆角、无底色、无内边距 ——
 // 一列控件直接铺在插件页的 `data-plugin-config` 区里；没有折叠头（标题与面包屑由插件页自己画）。
-const S: Record<string, CSSProperties> = {
+const S = {
   form: { display: 'flex', flexDirection: 'column' },
   readOnly: { margin: '12px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary)' },
   field: { display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0' },
@@ -264,7 +264,7 @@ const S: Record<string, CSSProperties> = {
     background: 'var(--dsw-alias-label-primary)',
     color: 'var(--dsw-alias-bg-layer-3)',
   },
-};
+} satisfies Record<string, CSSProperties>;
 
 /** 官方 CSS 的 `:disabled { opacity: .4 }`。 */
 function dimStyle(base: CSSProperties, disabled: boolean): CSSProperties {
