@@ -6,6 +6,7 @@
 ## 文件索引
 
 - `search.ts`：搜索类工具共用。导出 `renderSearch`（第二参数 `SearchRenderContext` 携带请求条数、下限、端点上限、是否有筛选条件、工具作用域 —— 四条诚实渲染不变量都靠它：到顶提示、来源构成分流、空态条件限定、下限只筛候选）、`searchMetaFromValue`、`searchMetaFromResult`、`presentSearchCall`、`presentSearchResult` 与 `SearchMeta` / `SearchRenderContext` 类型。被 `tools/search.ts` 与 `tools/global-search.ts` 依赖。
+- `error-block.ts`：搜索与直答共用的失败分支渲染。导出 `errorBlock(prefix, error)` —— 两处错误文本原本逐字重复，只有前缀文案不同；`error` 用 `utils/errors` 的 `CanonicalError` 收窄，纯类型导入。
 - `zhida.ts`：直答专用。导出 `renderZhida`、`presentZhidaCall`、`presentZhidaResult` —— **刻意不声明 `presentationMeta`**：直答没有可持久化的结构化元数据，为此凑一个空壳只会把「三者严格分离」变成形式主义。
 
 ## 变更影响路由

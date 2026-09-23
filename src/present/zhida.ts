@@ -10,6 +10,7 @@
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import type { GenericCallView, GenericResultView, ToolResult } from '@deepseek-ai/dsh-tools';
 import type { ZhidaOutput } from '../types.js';
+import { errorBlock } from './error-block.js';
 
 /**
  * 渲染模型可见的 Markdown。
@@ -22,11 +23,7 @@ import type { ZhidaOutput } from '../types.js';
  * @returns 单个文本块。
  */
 export function renderZhida(value: ZhidaOutput, includeReasoning = false): ContentBlock[] {
-  if (!value.ok) {
-    const lines = [`❌ 知乎直答失败：${value.error?.message ?? '未知错误'}`];
-    if (value.error?.hint !== undefined && value.error.hint !== '') lines.push(value.error.hint);
-    return [{ type: 'text', text: lines.join('\n') }];
-  }
+  if (!value.ok) return errorBlock('知乎直答失败', value.error);
 
   const parts: string[] = [];
   parts.push(`**知乎直答（${value.model}）**`, '');

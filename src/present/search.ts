@@ -15,6 +15,7 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import type { GenericCallView, ToolResult, WebSearchResultView, WebSource } from '@deepseek-ai/dsh-tools';
 import type { JsonValue } from '@deepseek-ai/dsh-util-values';
 import type { SearchOutput } from '../types.js';
+import { errorBlock } from './error-block.js';
 
 /**
  * 渲染模型可见文本时需要的调用上下文。
@@ -100,11 +101,7 @@ function escapeLinkText(input: string): string {
  * @returns 单个文本块。
  */
 export function renderSearch(value: SearchOutput, context: SearchRenderContext = {}): ContentBlock[] {
-  if (!value.ok) {
-    const lines = [`❌ 搜索失败：${value.error?.message ?? '未知错误'}`];
-    if (value.error?.hint !== undefined && value.error.hint !== '') lines.push(value.error.hint);
-    return [{ type: 'text', text: lines.join('\n') }];
-  }
+  if (!value.ok) return errorBlock('搜索失败', value.error);
 
   const scopeNoun = context.scope === 'global' ? '全网内容' : '知乎内容';
 
