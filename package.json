@@ -63,7 +63,7 @@
   },
   "scripts": {
     "build": "tsc && tsc -p tsconfig.client.json && node scripts/build-client.mjs",
-    "typecheck": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.client.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "npm run build && vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.ts",
