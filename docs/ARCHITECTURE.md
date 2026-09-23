@@ -23,6 +23,7 @@
 
 - `index.ts` 是**唯一**接触 Cordis 的模块，也是唯一创建状态的模块。其余模块都不认识框架，因此可脱离框架单测。
 - `present/` 与 `utils/` 是**叶子**：不反向依赖任何模块，也不做运行时 `@deepseek-ai/*` 导入。前者的理由是纯度必须可测，后者同理。
+- `utils/describe-error.ts` 是**零导入的叶子**，它存在的理由就是避开环：`utils/errors.ts` 值导入 `transport.ts` / `state.ts` / `compiler.ts` 取错误类做 `instanceof` 判定，若「异常 → 一行文本」住在那里，最上游的 `transport.ts` 就无法复用它。所以 `transport.ts` 可以依赖这个叶子，但**不得反向依赖 `utils/errors.ts`**。
 - `transport.ts` 位于编译器的**下游**而非上游——它不认识语义化参数（见「不可破坏的约束」）。
 - 浏览器半体 `client/` 与 Node 侧**不共享任何模块**：它通过 `ctx.slots` 的 `plugins.bundle.config` 槽与 Host 通信，表单则由它自己向 `ctx.configForms.get(<loader entry id>)` 取 —— **该槽的座位里没有 form**（见下方「两半体约束」）。它不 import `src/` 下的实现。
 

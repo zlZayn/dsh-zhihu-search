@@ -14,6 +14,7 @@
 
 import { TextDecoder } from 'node:util';
 import type { ZhihuApiResponse, ZhihuChatError, ZhihuErrorKind, ZhihuSearchData } from './types.js';
+import { describeError } from './utils/describe-error.js';
 
 /** 接口统一接入域名（实测可用）。 */
 export const ZHIHU_BASE_URL = 'https://developer.zhihu.com';
@@ -138,7 +139,7 @@ function toClientError(error: unknown, signal: AbortSignal | undefined): ZhihuCl
   if (signal?.aborted === true || isAbortError(error)) {
     return new ZhihuClientError('aborted', '请求已被取消。', { cause: error });
   }
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = describeError(error);
   return new ZhihuClientError('network', `请求知乎失败：${detail}`, {
     cause: error,
     hint: '网络不可达或 TLS 失败。请确认本机能访问 developer.zhihu.com（可能需要代理）。',

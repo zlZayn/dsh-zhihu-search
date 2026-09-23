@@ -38,6 +38,7 @@
  */
 
 import { hasSecretValue } from './credentials.js';
+import { describeError } from './utils/describe-error.js';
 
 /** 旧版明文可能来自的组合配置层；插件删不掉它。 */
 export interface LegacySecret {
@@ -57,19 +58,6 @@ export interface MigrationDeps {
   readonly referenceName: () => string;
   /** 一条告警通道。 */
   readonly warn: (message: string) => void;
-}
-
-/**
- * 取一条可读的失败描述。
- *
- * 远程失败是 `Error` 实例，但注入的替身与设置层可能抛别的东西，
- * 诊断本身不该成为故障源。
- *
- * @param error - 捕获到的值。
- * @returns 一行描述。
- */
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -93,7 +81,7 @@ export async function migrateLegacySecret(deps: MigrationDeps): Promise<void> {
     await deps.adopt(composition);
   } catch (error) {
     // 写不进去时明文原样留在组合配置里 —— 这里没有任何删除动作，所以不存在「搬一半丢密钥」。
-    deps.warn(`[zhihu-search] 旧明文迁入凭据存储失败，已原样保留：${describe(error)}`);
+    deps.warn(`[zhihu-search] 旧明文迁入凭据存储失败，已原样保留：${describeError(error)}`);
     return;
   }
 

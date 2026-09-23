@@ -28,6 +28,7 @@ import type { ToolDeps } from './tools/deps.js';
 import { createZhihuGlobalSearchTool } from './tools/global-search.js';
 import { createZhihuSearchTool } from './tools/search.js';
 import { createZhihuZhidaTool } from './tools/zhida.js';
+import { describeError } from './utils/describe-error.js';
 
 /** Cordis 插件名，用于 loader 诊断。 */
 export const name = 'zhihu-search';
@@ -446,7 +447,7 @@ export function apply(ctx: Context, config: Config): void {
     // 迁徙应尽早完成 —— 明文留在活动 profile 的 patch 里就是风险。
     // 整条路径幂等，服务重新就绪时重复进入无害。
     void prepareCredentials().catch((error: unknown) => {
-      warn(`[zhihu-search] 启动期凭据体检失败：${error instanceof Error ? error.message : String(error)}`);
+      warn(`[zhihu-search] 启动期凭据体检失败：${describeError(error)}`);
     });
 
     return () => {
