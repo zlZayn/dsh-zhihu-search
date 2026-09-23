@@ -12,7 +12,7 @@
  *   ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs <包目录>
  *
  * 退出码：0 = 全部通过；1 = 有未通过项；2 = 缺少凭据。
- * 不进 CI：花真实配额，且验的是「本机装的那份」。
+ * 不进 `ci.yml`（花真实配额）；发布闸在 `release.yml` 里跑一次，目标写 `.` —— 本次构建产物。
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';

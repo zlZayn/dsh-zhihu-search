@@ -28,7 +28,7 @@
 - 改信封格式或 external 清单 → 跑 `test/client-bundle.test.ts`（只请求平台模块）与 `test/dist.test.ts`（编译图可求值）。
 - 改产物路径 → 必须同时确认不与 `tsc` 输出撞车，并同步根 [package.json](../package.json) 的 `exports['./client']`。
 - 改构建脚本 → 同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「构建链的两个事实」。
-- 改验收脚本 → 在真机 profile 上实跑一次（默认目标就是它），确认结论可复现；它不进 CI（花真实配额）。
+- 改验收脚本 → 在真机 profile 上实跑一次（默认目标就是它），确认结论可复现；不进 `ci.yml`（花真实配额），但**发布闸**在 [release.yml](../.github/workflows/release.yml) 里跑一次，目标写 `.`（本次产物）。
 - 改守卫的判定口径 → 同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的 Q0 与判例库；改完用「纯文档区间」和「含源码区间」各喂一次 stdin，确认两个方向都对。
 - **改 `package.json` 的 `exports` / `files` / `description` / `icon`，或改 [locale/](../locale/) 的语言文件与包根 [icon.svg](../icon.svg) → 三处必须同批走**：① 包根 `locale/*.json` 两份（文案真源）与 `icon.svg`（图标真源）；② `package.json`（`files` 收录 `locale/*.json` 与 `icon.svg`、`exports` 暴露 `./locale/*.json` 与 `./package.json`、`description` 与 `locale/en.json` 的 `meta.description` 同内容、`icon` 声明留在清单目录内）；③ 回归 `npm run check:release` 与 `test/plugin-metadata.test.ts`（读同一份判定，含反向控制）。改了 `meta.title` 或图标还会挪动插件页上的显示名与外观 → 顺带走一次 [README.md](../README.md) / [README_en.md](../README_en.md) 的「配置」节与 [assets/AGENTS.md](../assets/AGENTS.md) 的判废项（**改图标 = 必须重截卡片图**）。
 - 改换包脚本的参与范围或判据 → 同步 [compat.yml](../.github/workflows/compat.yml) 的注释与 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」节；`check` 与 `swap` 的参赛集合必须保持一致，否则声明面会出现脚本看不见的缺口。
