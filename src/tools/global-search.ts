@@ -11,14 +11,11 @@
  */
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools';
-import { assertKnownParams, CompileError, compileFilter } from '../utils/compiler.js';
-import { mapError } from '../utils/errors.js';
-import { LocalRateLimitError } from '../state.js';
+import { compileFilter } from '../utils/compiler.js';
 import { presentSearchCall, presentSearchResult, renderSearch, searchMetaFromValue } from '../present/search.js';
-import type { SearchOutput } from '../types.js';
 import { GLOBAL_SEARCH_MAX_COUNT } from '../transport.js';
-import { projectItem, rawRequestedCount, resolveRequestedCount, SEARCH_OUTPUT_SCHEMA } from './search-shared.js';
-import { cacheKeyFor, type ToolDeps } from './deps.js';
+import { executeSearch, rawRequestedCount, resolveRequestedCount, SEARCH_OUTPUT_SCHEMA } from './search-shared.js';
+import type { ToolDeps } from './deps.js';
 
 /** 工具名。 */
 export const ZHIHU_GLOBAL_SEARCH_TOOL = 'zhihu_global_search';
@@ -98,59 +95,43 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
     presentResult: (args, result) => presentSearchResult(args, result),
 
     async execute(args, exec) {
-      const query = args.query.trim();
+      return executeSearch({
+        deps,
+        args,
+        paramNames: PARAM_NAMES,
+        toolName: ZHIHU_GLOBAL_SEARCH_TOOL,
+        signal: exec.signal,
+        plan: (query) => {
+          const count = resolveRequestedCount(args.count, { max: MAX_COUNT, fallback: DEFAULT_COUNT });
 
-      try {
-        assertKnownParams(args, PARAM_NAMES);
-        if (query === '') throw new CompileError('搜索关键词不能为空。');
-
-        const count = resolveRequestedCount(args.count, { max: MAX_COUNT, fallback: DEFAULT_COUNT });
-
-        // 全网作用域：允许 host；编译器会拦下知乎域名并给出「请用站内搜索」的提示。
-        const filter = compileFilter(
-          {
-            ...(args.site === undefined ? {} : { site: args.site }),
-            ...(args.publishedAfter === undefined ? {} : { publishedAfter: args.publishedAfter }),
-            ...(args.publishedBefore === undefined ? {} : { publishedBefore: args.publishedBefore }),
-          },
-          'global',
-        );
-
-        const searchDb = args.searchDb ?? 'all';
-        const key = cacheKeyFor(deps, ZHIHU_GLOBAL_SEARCH_TOOL, { query, count, filter, searchDb });
-
-        const cached = deps.cache.get(key);
-        if (cached !== undefined) return cached as SearchOutput;
-
-        if (!deps.searchBucket.tryConsume()) {
-          throw new LocalRateLimitError(
-            `本地频率限制：搜索类请求超过每分钟上限。`,
-            deps.searchBucket.retryAfterMs(),
+          // 全网作用域：允许 host；编译器会拦下知乎域名并给出「请用站内搜索」的提示。
+          const filter = compileFilter(
+            {
+              ...(args.site === undefined ? {} : { site: args.site }),
+              ...(args.publishedAfter === undefined ? {} : { publishedAfter: args.publishedAfter }),
+              ...(args.publishedBefore === undefined ? {} : { publishedBefore: args.publishedBefore }),
+            },
+            'global',
           );
-        }
 
-        const data = await deps.client.searchGlobal(
-          {
-            query,
-            count,
-            ...(filter === undefined ? {} : { filter }),
-            ...(searchDb === 'all' ? {} : { searchDb }),
-          },
-          exec.signal,
-        );
-
-        const items: SearchOutput['items'] = [];
-        for (const raw of data.Items ?? []) {
-          const projected = projectItem(raw);
-          if (projected !== undefined) items.push(projected);
-        }
-
-        const value: SearchOutput = { ok: true, query, items, hasMore: data.HasMore };
-        deps.cache.set(key, value);
-        return value;
-      } catch (error) {
-        return { ok: false, query, items: [], hasMore: false, error: mapError(error) };
-      }
+          const searchDb = args.searchDb ?? 'all';
+          return {
+            cacheArgs: { query, count, filter, searchDb },
+            fetch: (signal) =>
+              deps.client.searchGlobal(
+                {
+                  query,
+                  count,
+                  ...(filter === undefined ? {} : { filter }),
+                  ...(searchDb === 'all' ? {} : { searchDb }),
+                },
+                signal,
+              ),
+            // 全网不扩池、不截断：缓存里存什么就返回什么。
+            onReturn: (value) => value,
+          };
+        },
+      });
     },
   });
 }

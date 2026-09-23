@@ -10,14 +10,12 @@
  */
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools';
-import { assertKnownParams, CompileError, compileFilter, compileSortBy, SORT_FIELDS } from '../utils/compiler.js';
-import { mapError } from '../utils/errors.js';
-import { LocalRateLimitError } from '../state.js';
+import { compileFilter, compileSortBy, SORT_FIELDS } from '../utils/compiler.js';
 import { presentSearchCall, presentSearchResult, renderSearch, searchMetaFromValue } from '../present/search.js';
 import type { SearchOutput } from '../types.js';
 import { ZHIHU_SEARCH_MAX_COUNT } from '../transport.js';
-import { projectItem, rawRequestedCount, resolveRequestedCount, SEARCH_OUTPUT_SCHEMA } from './search-shared.js';
-import { cacheKeyFor, type ToolDeps } from './deps.js';
+import { executeSearch, rawRequestedCount, resolveRequestedCount, SEARCH_OUTPUT_SCHEMA } from './search-shared.js';
+import type { ToolDeps } from './deps.js';
 
 /** 工具名。 */
 export const ZHIHU_SEARCH_TOOL = 'zhihu_search';
@@ -139,68 +137,49 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
     presentResult: (args, result) => presentSearchResult(args, result),
 
     async execute(args, exec) {
-      const query = args.query.trim();
+      return executeSearch({
+        deps,
+        args,
+        paramNames: PARAM_NAMES,
+        toolName: ZHIHU_SEARCH_TOOL,
+        signal: exec.signal,
+        plan: (query) => {
+          const requestedCount = resolveRequestedCount(args.count, { max: MAX_COUNT, fallback: DEFAULT_COUNT });
+          const sortField = args.sortField ?? 'default';
+          const order = args.order ?? 'desc';
+          const minValue = args.minValue;
 
-      try {
-        assertKnownParams(args, PARAM_NAMES);
-        if (query === '') throw new CompileError('搜索关键词不能为空。');
-
-        const requestedCount = resolveRequestedCount(args.count, { max: MAX_COUNT, fallback: DEFAULT_COUNT });
-        const sortField = args.sortField ?? 'default';
-        const order = args.order ?? 'desc';
-        const minValue = args.minValue;
-
-        const sortBy = compileSortBy({
-          sortField,
-          order,
-          ...(minValue === undefined ? {} : { minValue }),
-        });
-        // 站内搜索作用域：只允许 publish_time，site 会被编译器拒绝。
-        const filter = compileFilter(
-          {
-            ...(args.publishedAfter === undefined ? {} : { publishedAfter: args.publishedAfter }),
-            ...(args.publishedBefore === undefined ? {} : { publishedBefore: args.publishedBefore }),
-          },
-          'zhihu',
-        );
-
-        // 有下限时把候选池取满（理由见 FILTERED_CANDIDATE_COUNT）。
-        const poolCount = minValue === undefined ? requestedCount : Math.max(requestedCount, FILTERED_CANDIDATE_COUNT);
-
-        // 缓存键必须用**归一化后**的参数，且必须用候选池大小：
-        // 否则 count=3 与 count=10 会各占一个键，却发出两个内容相同的请求。
-        const key = cacheKeyFor(deps, ZHIHU_SEARCH_TOOL, { query, count: poolCount, sortBy, filter });
-
-        // 缓存优先于限流：命中缓存不该消耗任何令牌，也不该消耗知乎额度。
-        const cached = deps.cache.get(key);
-        if (cached !== undefined) return sliceItems(cached as SearchOutput, requestedCount);
-
-        if (!deps.searchBucket.tryConsume()) {
-          throw new LocalRateLimitError(
-            `本地频率限制：搜索类请求超过每分钟上限。`,
-            deps.searchBucket.retryAfterMs(),
+          const sortBy = compileSortBy({
+            sortField,
+            order,
+            ...(minValue === undefined ? {} : { minValue }),
+          });
+          // 站内搜索作用域：只允许 publish_time，site 会被编译器拒绝。
+          const filter = compileFilter(
+            {
+              ...(args.publishedAfter === undefined ? {} : { publishedAfter: args.publishedAfter }),
+              ...(args.publishedBefore === undefined ? {} : { publishedBefore: args.publishedBefore }),
+            },
+            'zhihu',
           );
-        }
 
-        const data = await deps.client.searchZhihu(
-          { query, count: poolCount, ...(sortBy === undefined ? {} : { sortBy }), ...(filter === undefined ? {} : { filter }) },
-          exec.signal,
-        );
+          // 有下限时把候选池取满（理由见 FILTERED_CANDIDATE_COUNT）。
+          const poolCount = minValue === undefined ? requestedCount : Math.max(requestedCount, FILTERED_CANDIDATE_COUNT);
 
-        const items: SearchOutput['items'] = [];
-        for (const raw of data.Items ?? []) {
-          const projected = projectItem(raw);
-          if (projected !== undefined) items.push(projected);
-        }
-
-        const value: SearchOutput = { ok: true, query, items, hasMore: data.HasMore };
-        // 缓存完整池子，返回按本次条数截断 —— 顺序不可颠倒。
-        deps.cache.set(key, value);
-        return sliceItems(value, requestedCount);
-      } catch (error) {
-        // 契约：execute 绝不 throw。任何失败都要变成结构化 Canonical Output。
-        return { ok: false, query, items: [], hasMore: false, error: mapError(error) };
-      }
+          // 缓存键必须用**归一化后**的参数，且必须用候选池大小：
+          // 否则 count=3 与 count=10 会各占一个键，却发出两个内容相同的请求。
+          return {
+            cacheArgs: { query, count: poolCount, sortBy, filter },
+            fetch: (signal) =>
+              deps.client.searchZhihu(
+                { query, count: poolCount, ...(sortBy === undefined ? {} : { sortBy }), ...(filter === undefined ? {} : { filter }) },
+                signal,
+              ),
+            // 缓存完整池子，返回按本次条数截断 —— 顺序不可颠倒。
+            onReturn: (value) => sliceItems(value, requestedCount),
+          };
+        },
+      });
     },
   });
 }
