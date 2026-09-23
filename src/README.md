@@ -17,13 +17,13 @@
 
 ## 依赖方向
 
-`index.ts` → `tools/` + `state.ts` + `transport.ts` + `credentials.ts` + `migrate.ts`；`tools/` → `utils/` + `present/` + `transport.ts` + `state.ts`；`utils/errors.ts` → `transport.ts` + `state.ts` + `utils/compiler.ts`（只为 `instanceof` 判定取错误类）。`present/` 与 `types.ts` 无值依赖。
+`index.ts` → `tools/` + `state.ts` + `transport.ts` + `credentials.ts` + `migrate.ts`；`tools/` → `utils/` + `present/` + `transport.ts` + `state.ts`；`utils/errors.ts` → `transport.ts` + `state.ts` + `utils/compiler.ts`（只为 `instanceof` 判定取错误类）。`present/` 与 `types.ts` 无值依赖；`utils/describe-error.ts` 零导入，被 `transport.ts`、`migrate.ts`、`index.ts` 依赖。
 
 逐条：
 
 - `tools/*.ts` 还值导入 `@deepseek-ai/dsh-tools`（工具定义类型与常量），依赖注入经 `tools/deps.ts` 收口，因此三个工具实现本身不认识 Cordis。
-- `utils/compiler.ts` 与 `utils/text.ts` 无内部依赖；`utils/errors.ts` 是 `utils/` 唯一的例外。
-- `present/` 只有 `import type`，`types.ts` 是纯类型 —— 这两个是真正的「不反向依赖任何模块」。
+- `utils/compiler.ts`、`utils/text.ts` 与 `utils/describe-error.ts` 无内部依赖；`utils/errors.ts` 是 `utils/` 唯一的例外。
+- `present/` 只有 `import type`，`types.ts` 是纯类型、`utils/describe-error.ts` 零导入 —— 这些是真正的「不反向依赖任何模块」。
 
 为什么必须单向、哪些模块不认识框架 → 见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) 的「模块骨架与依赖方向」。
 
