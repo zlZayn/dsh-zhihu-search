@@ -7,6 +7,7 @@
 - `deps.ts`：各工具共用的依赖包与缓存键计算。
 - `search.ts`：`zhihu_search` 站内搜索。不接受站点过滤。
 - `global-search.ts`：`zhihu_global_search` 全网搜索，本地拒绝知乎域名。
+- `search-shared.ts`：两搜索工具逐字共用的三件套（`output.schema` 常量、`projectItem` 投影、条数解析）。
 - `zhida.ts`：`zhihu_zhida` 知乎直答。走 SSE，语义化档位映射为真实模型 id。
 
 ## 契约要点
