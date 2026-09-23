@@ -39,7 +39,7 @@ gh release list --limit 3                                     # 新号在列、�
 npm view dsh-zhihu-search dist-tags                           # alpha = 新号；latest 没动
 ```
 
-一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移（`package.json` ↔ `package-lock.json`）→ **读出** `package.json` 的版本 → 按版本自己的预发布段推 dist-tag → `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
+一次运行按顺序做完：校验触发分支是 `main` → **守卫**（[`scripts/release-guard.mjs`](../scripts/release-guard.mjs)：上个 tag 以来没有产物改动就直接红）→ `npm ci` / typecheck / test → 拦两处版本号漂移（`package.json` ↔ `package-lock.json`）→ **读出** `package.json` 的版本 → 按版本自己的预发布段推 dist-tag → 幂等判据（这个号已在 npm 上就跳过 publish）→ **验收闸**（`node scripts/acceptance.mjs .`：打真实接口并过宿主 `output.schema`，需仓库 secret `ZHIHU_ACCESS_SECRET`；**红了不发**）→ `npm publish` → 推 `main` → `gh release create`（建 tag 与 GitHub Release，说明由 `--generate-notes` 依提交历史生成）。
 
 六条设计约束：
 
