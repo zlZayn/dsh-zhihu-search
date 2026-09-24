@@ -117,6 +117,15 @@ DSH 的凭据契约只有一句：**设置存引用，provider 存值**。本插
 - 浏览器半体声明 `dsh.client`，并向插件页的 `plugins.bundle.config` 注册一张卡片，`key` 是**包名**（`package.json` 的 `name`）；页面把它内联渲染在 bundle 详情页的描述与「包含的组件」之间，**没有多一次 Configure**。
 - **这个槽的座位里没有 `form`**（DSH 契约原文「Bundle configuration renders only `page`」，且渲染点只递 `view` 与 `entryKey`），所以卡片自己经客户端服务取：`ctx.configForms.get(<loader entry id>)` —— 该服务的命名空间就是 Host 插件条目的 id，取值即 `cordis.patch.yml` 那条 insert 的 `id`。
 - 于是有**两个今天同串、却不是一回事**的 id：槽 key 取**包名**、`get()` 取**loader entry id**。写错前者 = 整块配置不出现（页面不报错）；写错后者 = 卡片照常出现、**永远只读且不报错**。这是本设计唯一新引入的静默耦合点，防线是 [test/settings-seam.test.ts](../test/settings-seam.test.ts) 从源码与 `cordis.patch.yml` 解析后对账。
+- **`dsh-` 串的三层（命名耦合地图）**：
+
+  | 层 | 字符串 | 谁定的 | 单真源 |
+  | :--- | :--- | :--- | :--- |
+  | 宿主强制 = 包名 | `package.json.name` / `cordis.patch.yml` 的 `name` / 槽 key `BUNDLE_NAME` / 信封 `BUNDLE_ID` | 宿主按包名索引 | `package.json`（构建脚本读它；测试断言源码字面量 = `readPackageName()`） |
+  | 自选同串 | `ENTRY_ID` = patch 行 `id` = 设置命名空间 | 我们选的约定 | **独立手写字面量**（浏览器半体不 import package.json；由 settings-seam / client-bundle 对账） |
+  | 故意不同 | 无（本仓 UI 不另设 slot id） | — | — |
+
+  改名时：第一层跟着 `package.json` 走（构建自动）；第二层要**手动**改 `src/client/index.tsx` 与 `cordis.patch.yml` 两处字面量并迁移用户设置（旧命名空间的值不会自动搬）。
 
 拿不到表单这条链上有**两环**，各自缺席都不报错 —— 界面**静默缺席**：
 

@@ -6,6 +6,7 @@
 
 - `build-client.mjs`：用 esbuild 生成浏览器半体的 lazy-CJS 工厂信封（`window.__ModuleLoader__.load({ id, factory })`），被 `npm run build` 调用，产物为 `lib/client.js`。
   信封为何必须长这样、官方预设为何不能直接用 → 见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「构建链的两个事实」，此处不重述。
+  **信封 id（`BUNDLE_ID`）读 `package.json` 的 `name`**，不在脚本里手抄包名；它必须等于包名（模块表以它作 key）。
 - `release-guard.mjs`：**发版守卫**。从 stdin 读「上个 tag..HEAD」的改动清单，判定这段区间是否真的改变了已发布产物；只剩非产物改动时以非零退出码拦下发布。
 - `plugin-metadata.mjs`：**展示元数据守卫**。读包根 [locale/](../locale/) 下的语言文件、[icon.svg](../icon.svg) 与 [package.json](../package.json)，断言「宿主要读得到插件名、描述与图标」所需的条件：`locale/<lang>.json` 被 `exports` 暴露（`./locale/*.json`）、被 `files` 收录、且 `meta.title` / `meta.description` 是非空字符串；图标侧照抄宿主 `iconOf` 的口径 —— 声明留在清单目录内、文件在、扩展名在名单里、`files` 收录、≤ 256 KiB（未声明图标时整组跳过，它是可选字段）。
   为什么需要它：宿主是**按插件名做 Node 资源解析**去读这份元数据的，上面任一条缺了它都**不报错** —— 插件页与设置静默退回技术名（`dsh-zhihu-search` / `zhihu-search`）。判定只写在这一处，[check-release.mjs](check-release.mjs) 与 [test/plugin-metadata.test.ts](../test/plugin-metadata.test.ts) 读**同一份**，避免红只红一边。

@@ -21,6 +21,7 @@ function stripComments(source: string): string {
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+  name?: string;
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -301,7 +302,7 @@ describe('工具集不变量', () => {
       .filter((line) => !line.trimStart().startsWith('#'))
       .join('\n');
     expect(effective).not.toContain('@local/');
-    expect(effective).toContain('name: dsh-zhihu-search');
+    expect(effective).toContain(`name: ${packageJson.name}`)
   });
 
 

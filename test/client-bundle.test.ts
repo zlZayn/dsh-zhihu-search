@@ -224,8 +224,8 @@ describe('client bundle 注册行为', () => {
     expect(injected).toEqual(['plugins.bundle.config']);
     expect(registrations).toHaveLength(1);
     expect(registrations[0]).toMatchObject({ name: 'plugins.bundle.config', key: BUNDLE_KEY });
-    // 反向控制：那个 key 真的就是 package.json 的 name —— 而不是这边写死一个、那边也写死一个。
-    expect(BUNDLE_KEY).toBe('dsh-zhihu-search');
+    // key 的真源是 package.json 的 name（PACKAGE_NAME 已读出）；再对一条反向控制防空串。
+    expect(PACKAGE_NAME.length).toBeGreaterThan(0);
     expect(PATCH_ROW.name).toBe(PACKAGE_NAME);
   });
 

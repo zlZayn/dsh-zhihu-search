@@ -98,8 +98,9 @@ export const inject = ['slots', 'remote', 'remote.credentials', 'locale'];
  *
  * 插件页按包名寻址一个 bundle 的配置（DSH `PluginManagerPage.tsx:1269` 的
  * `ledger.bundles.has(openPkg.name)`），写错的表现是整块配置不出现、页面也不报错。
- * 由 [test/settings-seam.test.ts](../../test/settings-seam.test.ts) 解析声明文件对账 ——
- * 不写死字符串，免得哪天包名改了这个常量悄悄失配。
+ * **真源是 package.json 的 name**；本处手写一份字面量是因为浏览器半体不 import
+ * package.json，由 [test/settings-seam.test.ts](../../test/settings-seam.test.ts)
+ * 断言与 `readPackageName()` 逐字相等 —— 不写死在测试里，免得哪天包名改了常量悄悄失配。
  */
 const BUNDLE_NAME = 'dsh-zhihu-search';
 

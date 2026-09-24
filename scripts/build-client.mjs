@@ -13,7 +13,7 @@
  * 信封提供这两者即可，无需自写 ESM→CJS 转换。
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 
 // 路径冲突守卫：tsc 把 src/<name>.ts 编译到 lib/<name>.js，rootDir 是 src、outDir 是 lib。
@@ -29,8 +29,8 @@ for (const stale of ['src/client.ts', 'src/client.tsx']) {
   }
 }
 
-/** bundle id 必须等于包名：模块表以它作 key。 */
-const BUNDLE_ID = 'dsh-zhihu-search';
+/** bundle id 必须等于包名：模块表以它作 key。真源是 package.json 的 name。 */
+const BUNDLE_ID = JSON.parse(readFileSync('package.json', 'utf8')).name;
 
 /** 宿主基线模块与同侪包，一律不打包进去。 */
 const HOST_PROVIDED = ['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client', '@deepseek-ai/*'];
