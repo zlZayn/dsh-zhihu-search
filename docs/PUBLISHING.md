@@ -46,7 +46,7 @@ npm view dsh-zhihu-search dist-tags                           # alpha = 新号�
 - **先发布、后动远端**：publish 失败时远端不发生任何变化，tag 与 Release 也只可能在发布成功后创建。
 - **幂等**：目标版本已在 npm 上时跳过 publish，只补齐 git 侧 —— 重跑一次即可修复「已发布但推送失败」的中断。
 - **发布不得改写版本号（版本驱动）**：`release.yml` 只发 `package.json` 里那个号，**没有 bump 步**。判据是**会执行的命令行**（[scripts/check-release.mjs](../scripts/check-release.mjs) 的 `findVersionWrites`，`npm run check:release` 与 [test/release-workflow.test.ts](../test/release-workflow.test.ts) 读同一份，带反向控制）。为什么写成硬规则：界面上的版本 tag 就是那个号，workflow 自己 bump 会让工作树永远停在「上一个已发布版本」，**截图必然拍出旧号**。
-- **dist-tag 由版本自己推导，不按输入参数判**：版本号带预发布段（`2.0.0-alpha.1`）就发到**那段本身**（`alpha`），否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出（`steps.version.outputs.dist_tag`）。判据只此一处，避免「推 latest 的那一档其实是预发布」—— 而 `latest` 停在 1.6.3。
+- **dist-tag 由版本自己推导，不按输入参数判**：版本号带预发布段（`2.0.0-alpha.1`）就发到**那段本身**（`alpha`），否则走默认 `latest`；GitHub Release 的 `--prerelease` 与 publish 读同一个输出（`steps.version.outputs.dist_tag`）。判据只此一处，避免「推 latest 的那一档其实是预发布」—— `latest` 具体停在哪版一律现查 `npm view <包名> dist-tags`，本文不抄现值。
 - **tag 名 = `v` + `package.json` 里的版本号**（`v2.0.0-alpha.1`），与全部历史 tag 同形；**前缀是显式补的、
   不从值里推**。2026-09-22 踩过：版本号原来取自 `npm version` 的输出（**自带 `v`**），改成读 `package.json`
   之后变成裸号，而 workflow 把那串**直接当 tag 名**用 —— 建出的 tag 与历史全不同形，还让本仓

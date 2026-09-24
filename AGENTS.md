@@ -51,7 +51,7 @@
 - **发版两步，顺序是死的**：① 本地 `npm version <档位> [--preid=alpha] --no-git-tag-version` → `git commit`；② `gh workflow run release.yml`（**没有 tier 参数** —— workflow 只发 `package.json` 里那个号，它不 bump）。档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由版本自己那段推**（`2.0.0-alpha.1` → `alpha`，稳定档 → `latest`）；同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
 - 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap alpha` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify alpha`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check alpha`（承诺线就是 alpha；`next` 已低于我们的下限，只作记录）
 
-## 验证快照（2026-09-16 实跑）
+## 验证快照（定性结论出自 2026-09-16 实跑；2026-09-24 复核过 main 的 CI、tag `v2.0.0` 与 npm `latest`，结论未变）
 
 数字与版本一律看自更新来源（理由见「[文档网络与自更新](#文档网络与自更新)」）：测试与类型检查 → [Actions](https://github.com/zlZayn/dsh-zhihu-search/actions)，发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)。下面只记不随数字漂移的定性结论；更早轮次的真机验证见 [.agents/notes/](.agents/notes/) 与 `git log`。
 
@@ -71,7 +71,9 @@
   都要**同批重截**两张（中英各一），判废项与拍摄路径见 [assets/AGENTS.md](assets/AGENTS.md) 与 [assets/README.md](assets/README.md)
 - 清理旧明文通道：等使用者跨过当前版本后，删 `Config.accessSecret` 与 [src/migrate.ts](src/migrate.ts)（**必须一起删**，理由见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「`accessSecret` 为什么仍留在 schema 里」）。2026-09-22 起它服务的只剩**组合配置**一条来源
 - **真机验收未做**：迁移后的卡片只有在「插件装回 profile + 宿主重启」之后才谈得上验收，装回由主 agent 收尾统一做；验收口径见 [scripts/README.md](scripts/README.md) 与 [docs/PUBLISHING.md](docs/PUBLISHING.md)
-- **npm 上已发布版本的头图会断**：npm 页面按 `main`（HEAD）取 README 里的图，而 v1.6.3 及更早的 README 写的是 `assets/cover.svg` —— 该文件已随头图换新（`banner.svg`）删除。**最新**那页会随下次发版自动修好；更早版本的页面文字在发布时就定死，除非把 `cover.svg` 补回。下次发版后顺手看一眼 npm 页面头图即可
+- **npm 上已发布版本的头图**：已核结清 —— `latest` 现为 2.0.0（现查 `npm view dsh-zhihu-search dist-tags`），那一页按 HEAD 的 README 渲染、图指 `assets/banner.svg`（现存文件），**不再断**。更早版本（v1.6.3 及以前）的页面文字发布时已定死、仍指被删的 `cover.svg`；**裁定：不为几个历史页面把 `cover.svg` 补回仓库**（那等于让一个没人引用的文件常驻），要真有人被误导再谈。
+- **文档校验脚本还没落进本仓**：AGENTS 的「能落成校验的不写散文」这条目前对文档是空的（链接与行尾没有执行体）。容器仓 `dsh-plugins/scripts/check-links.py` 是本机可用的实现，收进来时要顺带回答「CI 跑不跑它」（`ci.yml` 现在没有 docs 步骤）
+- **`prepare` 与 `dsh-ds-balance` 相反，本仓零解释**：本仓 `package.json` 声明 `"prepare": "npm run build"`，而 DSB 明文「本仓**不**声明 `prepare` —— 声明了 CI 的 `npm ci` 会先产出 `lib/`，`artifacts.test.ts` 那种『干净检出』判据就永远绿不到点上（那边踩过，见其决策记录）」。两仓同源，一个声明一个刻意不声明。**要么删掉本仓的 `prepare`，要么写清本仓为什么例外**（例如 profile 用 `link:` 挂载时依赖它保证产物新鲜）—— 属跨仓取舍，未裁
 
 ## 活跃坑（工具链与 DSH 平台）
 
@@ -106,7 +108,7 @@
 
 - **一条事实只有一个 home**：根 README 讲门面（给访客），本文件讲规则与仪表盘；子目录双件分讲「有什么 / 改哪」（README）与「在这里要怎么干」（AGENTS.md，进入该目录时自动注入）；[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 讲不变的设计与防错，[.agents/notes/](.agents/notes/) 讲为什么，[docs/PUBLISHING.md](docs/PUBLISHING.md) 讲怎么发。别处一律链接，不复制。
 - **能自证的不抄（自更新）**：凡是有「会自己更新的来源」的事实就指向它 —— 测试与类型检查 → [Actions](https://github.com/zlZayn/dsh-zhihu-search/actions)，发布版本 → [npm](https://www.npmjs.com/package/dsh-zhihu-search)，产物一致性 → 哈希比对。抄一次数字就要手动跟一次（本文件已经因此过时过两回），所以只留指针与不随数字漂移的定性结论。
-- **能落成校验的不写散文**：五条红线 → 测试；发版噪音 → [release-guard](scripts/release-guard.mjs)；上游契约 → [contract.yml](.github/workflows/contract.yml)；**宿主版本线 → [compat.yml](.github/workflows/compat.yml)**；文档链接与换行 → 校验脚本。机器判得了的规则，就别指望人记得。
+- **能落成校验的不写散文**：五条红线 → 测试；发版噪音 → [release-guard](scripts/release-guard.mjs)；上游契约 → [contract.yml](.github/workflows/contract.yml)；**宿主版本线 → [compat.yml](.github/workflows/compat.yml)**；**文档链接与换行：本仓暂无校验脚本**（容器仓 `dsh-plugins` 有 `check-links.py`，没收进来）—— 改文档后手工做一遍相对链接与锚点检查，再加 `git diff --check`。把它做成仓内脚本是待办（见下）。机器判得了的规则，就别指望人记得。
 - **改一处要查得到同步点**：每个子目录 README 的「变更影响路由」是同步清单的入口；新增或改名文件后必须回填，否则下一个人只能靠运气。
 - **坑按作用域分流**：跨模块、踩了整条链就崩的留在本文件；模块内的下放到对应子目录 `AGENTS.md`，本文件不重复。
 
