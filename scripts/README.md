@@ -12,7 +12,8 @@
   机制与回落链（标题 `meta.title` → `name` → 完整 Cordis 名；描述 `meta.description` → `package.json.description` → 不显示）归 DSH：`docs/cookbook/adding-a-package.md` 的「5. Add optional plugin display metadata」与 `packages/boot/app-boot/src/package-meta.ts`，本仓库不复制。
 - `plugin-metadata.d.mts`：上面那个判定模块的**类型面**（手写）。为什么手写而不是打开 `allowJs`：`tsconfig.test.json` 要 import 这个 `.mjs`，而 `allowJs` 会把本目录另外几个脚本一起拖进 `strict` 的检查面 —— 那是另一件事。**改实现时同批改它**，漂了不会静默（typecheck 与测试都会红）。
 
-`check-release.mjs`：**发布态守卫**。断言五条发布态不变量（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在）**外加展示元数据与图标那几条**，被 `npm run check:release` 调用、[release.yml](../.github/workflows/release.yml) 发布前跑。
+- `check-release.d.mts`：上面那个守卫的**类型面**（手写，理由与 `plugin-metadata.d.mts` 同：开 `allowJs` 会把本目录另外几个 `.mjs` 一起拖进 `strict` 检查面）。**改实现时同批改它**，漂了不会静默 —— `npm run typecheck` 会红。
+- `check-release.mjs`：**发布态守卫**。断言五条发布态不变量（`dsh.bundle.patch` 在、`private` 未设、`engines.dsh` 已声明、`files` 含 `cordis.patch.yml`、LICENSE 在）**外加展示元数据与图标那几条**，被 `npm run check:release` 调用、[release.yml](../.github/workflows/release.yml) 发布前跑。
   口径是「能否改变 npm 上的产物」而非「文件是否随包发布」：`build-client.mjs` 自己不随包，却决定 `lib/client.js` 长什么样，所以算产物改动。接线在 [release.yml](../.github/workflows/release.yml)，判定规则归 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的 Q0。
 - `acceptance.mjs`：**验收脚本**。对指定包目录的产物打真实接口，验三件事：下限扩池、输出面与排序档位对称、`site` 归一化；每条都过一遍宿主的 `output.schema` 校验器，并打印模型可见文本。
   用法 `ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]`，默认验本机 profile 里装的那份；退出码非 0 即有未通过项。
