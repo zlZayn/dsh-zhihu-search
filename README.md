@@ -101,16 +101,16 @@
 
 ### 前置
 
-- **DSH `0.1.7-alpha.1` 或更高，且低于 `0.2.0`** —— 即 [package.json](package.json) 里 `engines.dsh` 与全部 `@deepseek-ai/dsh-*` 共同声明的那条区间（两处**同形状**是硬要求：接缝缺席时配置界面会静默不出现）。
+- **DSH `0.1.7-rc.2` 或更高，且低于 `0.2.0`** —— 即 [package.json](package.json) 里 `engines.dsh` 与全部 `@deepseek-ai/dsh-*` 共同声明的那条区间（两处**同形状**是硬要求：接缝缺席时配置界面会静默不出现）。
 - Node `>= 20`
 
 装宿主时**要显式指定版本线**：本家族的 `latest` 标签不可靠（多数 `@deepseek-ai/dsh-*` 包上它指向很早的版本），按默认方式装可能落在声明范围之外 —— 现查 `npm view @deepseek-ai/dsh dist-tags`。
 
 ```bash
-npm install -g @deepseek-ai/dsh@alpha    # 本插件承诺支持的线
+npm install -g @deepseek-ai/dsh@next    # 本插件承诺支持的线
 ```
 
-兼容性不是推断出来的：每周由 [compat.yml](.github/workflows/compat.yml) 对 `alpha`（承诺线）与 `next`（**已低于我们声明的下限，只作记录**）两条线换包实跑一遍现有测试。当前结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+兼容性不是推断出来的：每周由 [compat.yml](.github/workflows/compat.yml) 对 `next`（承诺线）与 `alpha`（**已低于我们声明的下限，只作记录**）两条线换包实跑一遍现有测试。当前结论与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 
 ### 从源码安装
 

@@ -101,16 +101,16 @@ The three sections below are each tool's full parameter set and limits. The mode
 
 ### Requirements
 
-- **DSH `0.1.7-alpha.1` or newer, below `0.2.0`** — the single range that [package.json](package.json) declares in both `engines.dsh` and every `@deepseek-ai/dsh-*` entry (the two must stay the same shape: a missing host seam makes the configuration UI disappear silently).
+- **DSH `0.1.7-rc.2` or newer, below `0.2.0`** — the single range that [package.json](package.json) declares in both `engines.dsh` and every `@deepseek-ai/dsh-*` entry (the two must stay the same shape: a missing host seam makes the configuration UI disappear silently).
 - Node `>= 20`
 
 Install the Host from an **explicit dist-tag**: `latest` is not trustworthy across this family (on most `@deepseek-ai/dsh-*` packages it points at a much older version), so a default install can land outside the declared range — check it live with `npm view @deepseek-ai/dsh dist-tags`.
 
 ```bash
-npm install -g @deepseek-ai/dsh@alpha    # the line this plugin commits to
+npm install -g @deepseek-ai/dsh@next    # the line this plugin commits to
 ```
 
-Compatibility is measured, not inferred: [compat.yml](.github/workflows/compat.yml) swaps the DSH packages onto the `alpha` line (the committed one) and the `next` line (now **below our declared floor**, kept as a record only) every week, and runs the existing suite. Current results and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
+Compatibility is measured, not inferred: [compat.yml](.github/workflows/compat.yml) swaps the DSH packages onto the `next` line (the committed one) and the `alpha` line (now **below our declared floor**, kept as a record only) every week, and runs the existing suite. Current results and what to do when a line breaks: [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ### From source
 
