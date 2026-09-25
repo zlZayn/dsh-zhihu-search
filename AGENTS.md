@@ -75,6 +75,8 @@
 - **文档校验脚本还没落进本仓**：AGENTS 的「能落成校验的不写散文」这条目前对文档是空的（链接与行尾没有执行体）。容器仓 `dsh-plugins/scripts/check-links.py` 是本机可用的实现，收进来时要顺带回答「CI 跑不跑它」（`ci.yml` 现在没有 docs 步骤）
 - **`prepare` 与 `dsh-ds-balance` 相反，本仓零解释**：本仓 `package.json` 声明 `"prepare": "npm run build"`，而 DSB 明文「本仓**不**声明 `prepare` —— 声明了 CI 的 `npm ci` 会先产出 `lib/`，`artifacts.test.ts` 那种『干净检出』判据就永远绿不到点上（那边踩过，见其决策记录）」。两仓同源，一个声明一个刻意不声明。**要么删掉本仓的 `prepare`，要么写清本仓为什么例外**（例如 profile 用 `link:` 挂载时依赖它保证产物新鲜）—— 属跨仓取舍，未裁
 
+- **承诺线已迁到 `next`（2026-09-24），本仓下限未动**：声明仍是 `>=0.1.7-alpha.1 <0.2.0`（区间本就罩得住 rc 线，`node scripts/check-declaration.mjs` rc=0），`compat.yml` 的两个 job 已改名为 `committed` / `record`。**下次发版时顺带核两件**：① `npm view @deepseek-ai/dsh dist-tags` 与 `committed` 指的那条线是否仍一致；② 本次（纯文档 + 不随包的脚本 + 两行注释）按 Q0 否**不发版**，改动搭下次车
+
 ## 活跃坑（工具链与 DSH 平台）
 
 知乎 API 自身的反直觉处归 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；**模块内的坑下放到对应子目录的 `AGENTS.md`**（在那里工作时自动注入），此处只留跨模块、踩了整条链就崩的几条。
