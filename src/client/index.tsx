@@ -4,7 +4,7 @@
  *
  * 挂载点是插件管理页声明的 `plugins.bundle.config` 槽，key 是**包名**。
  * 这个槽**只渲染 `view: 'page'`，且座位里没有任何 `form`**（DSH `slot-contract.ts:12-16`
- * 「Bundle configuration renders only `page`」；`PluginManagerPage.tsx:584` 只递 `view` 与
+ * 「Bundle configuration renders only `page`」；`PluginManagerPage.tsx:579` 只递 `view` 与
  * `entryKey`）—— 表单因此由卡片自己向 `ctx.configForms.get(<loader entry id>)` 取，
  * 这也是该槽唯一的官方取表单路径。
  *
@@ -96,7 +96,7 @@ export const inject = ['slots', 'remote', 'remote.credentials', 'locale'];
 /**
  * 槽 key：bundle 的**包名** = [package.json](../../package.json) 的 `name`。
  *
- * 插件页按包名寻址一个 bundle 的配置（DSH `PluginManagerPage.tsx:1269` 的
+ * 插件页按包名寻址一个 bundle 的配置（DSH `PluginManagerPage.tsx:1298` 的
  * `ledger.bundles.has(openPkg.name)`），写错的表现是整块配置不出现、页面也不报错。
  * **真源是 package.json 的 name**；本处手写一份字面量是因为浏览器半体不 import
  * package.json，由 [test/settings-seam.test.ts](../../test/settings-seam.test.ts)

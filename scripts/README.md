@@ -25,6 +25,10 @@
   —— 硬编码 `'^' + version` 会让声明面在 CI 里悄悄变形，而人只看到 job 绿。
   为什么是「改写 package.json + 裸 `npm install`」而不是 `npm install <包>@<tag>`、以及 `verify` 为什么必须有 —— 见脚本头部注释，那里写的是实测结论而不是推断。
 
+- `check-declaration.mjs`：**声明面判定**（本地版，与 [compat.yml](../.github/workflows/compat.yml) 的 `declaration` 作业同一判据）。只读 `package.json`、再问 npm，断言「我们声明的区间还罩不罩得住**承诺线**」。
+  承诺线是脚本里的 `TRACKED_LINE` 常量（当前 `next`）——为什么是它，见 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」。
+  红了 = 声明面落后于我们推荐用户装的那条线：要么放宽声明，要么抬下限（抬下限会动使用者面，档位按 PUBLISHING 的判定问题链走）。
+  注意：声明下限**不等于**推荐线 —— 区间只要**罩得住**那条线就成立（区间形状见 [package.json](../package.json) 的 `engines.dsh`，具体宿主版本一律现查）。
 ## 变更影响路由
 
 - 改信封格式或 external 清单 → 跑 `test/client-bundle.test.ts`（只请求平台模块）与 `test/dist.test.ts`（编译图可求值）。
@@ -32,6 +36,7 @@
 - 改构建脚本 → 同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「构建链的两个事实」。
 - 改验收脚本 → 在真机 profile 上实跑一次（默认目标就是它），确认结论可复现；不进 `ci.yml`（花真实配额），但**发布闸**在 [release.yml](../.github/workflows/release.yml) 里跑一次，目标写 `.`（本次产物）。
 - 改守卫的判定口径 → 同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的 Q0 与判例库；改完用「纯文档区间」和「含源码区间」各喂一次 stdin，确认两个方向都对。
+- 改声明面判定（`TRACKED_LINE`、区间形状）→ 同步 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」两节与两份 README 的前置版本（必同改）。
 - **改 `package.json` 的 `exports` / `files` / `description` / `icon`，或改 [locale/](../locale/) 的语言文件与包根 [icon.svg](../icon.svg) → 三处必须同批走**：① 包根 `locale/*.json` 两份（文案真源）与 `icon.svg`（图标真源）；② `package.json`（`files` 收录 `locale/*.json` 与 `icon.svg`、`exports` 暴露 `./locale/*.json` 与 `./package.json`、`description` 与 `locale/en.json` 的 `meta.description` 同内容、`icon` 声明留在清单目录内）；③ 回归 `npm run check:release` 与 `test/plugin-metadata.test.ts`（读同一份判定，含反向控制）。改了 `meta.title` 或图标还会挪动插件页上的显示名与外观 → 顺带走一次 [README.md](../README.md) / [README_en.md](../README_en.md) 的「配置」节与 [assets/AGENTS.md](../assets/AGENTS.md) 的判废项（**改图标 = 必须重截卡片图**）。
 - 改换包脚本的参与范围或判据 → 同步 [compat.yml](../.github/workflows/compat.yml) 的注释与 [docs/PUBLISHING.md](../docs/PUBLISHING.md) 的「兼容性」节；`check` 与 `swap` 的参赛集合必须保持一致，否则声明面会出现脚本看不见的缺口。
 

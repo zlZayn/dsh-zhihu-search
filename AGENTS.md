@@ -49,7 +49,7 @@
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - **发版两步，顺序是死的**：① 本地 `npm version <档位> [--preid=alpha] --no-git-tag-version` → `git commit`；② `gh workflow run release.yml`（**没有 tier 参数** —— workflow 只发 `package.json` 里那个号，它不 bump）。档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由版本自己那段推**（`2.0.0-alpha.1` → `alpha`，稳定档 → `latest`）；同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）
-- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap alpha` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify alpha`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check alpha`（承诺线就是 alpha；`next` 已低于我们的下限，只作记录）
+- 兼容性换包（本地复现 [compat.yml](.github/workflows/compat.yml)）：`node scripts/compat-swap.mjs swap next` → `npm install --ignore-scripts` → `node scripts/compat-swap.mjs verify next`。**它会改写 `package.json`**，只在一次性 clone 里跑；声明面单独查用 `check next`（承诺线就是 next；`alpha` 已低于我们的下限，只作记录）
 
 ## 验证快照（定性结论出自 2026-09-16 实跑；2026-09-24 复核过 main 的 CI、tag `v2.0.0` 与 npm `latest`，结论未变）
 
@@ -59,7 +59,7 @@
 - 真机验收：[scripts/acceptance.mjs](scripts/acceptance.mjs) 覆盖扩池 / 输出对称 / www 归一化 + 宿主 schema 校验 + 渲染文本；升级 + host 重启后在 profile 安装副本上跑通，工具面同参数复验一致
 - 发版守卫：只有文档 / 工具脚本改动的区间在 `npm ci` 之前被拦下（后续步骤全 skipped，npm 侧零动作）；含 `src/` 的区间正常放行
 - 诚实渲染：到顶必说 / 来源构成分流 / 空态首句条件限定由 [test/presentation.test.ts](test/presentation.test.ts) 固化；`count` 回满上限不额外提示（刻意防噪音）
-- 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `alpha`（承诺线）与 `next`（**已低于声明下限，只记录**）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动**，所以「测试全绿」不能当作「兼容」的结论。**2026-09-22 更新**：此前那条「alpha 类型面已红」的记录随设置接缝迁移作废 —— 本机在 alpha 线上 build / typecheck / test 全绿（逐条退出码见[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)）
+- 宿主兼容性：由 [compat.yml](.github/workflows/compat.yml) 每周对 `next`（承诺线）与 `alpha`（**已低于声明下限，只记录**）换包，跑的是现有套件、不写新测试；结论与处理链归 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。这里只留定性结论：**类型面会先于行为面动**，所以「测试全绿」不能当作「兼容」的结论。**2026-09-22 更新**：此前那条「alpha 类型面已红」的记录随设置接缝迁移作废 —— 本机在 alpha 线上 build / typecheck / test 全绿（逐条退出码见[决策记录](.agents/notes/2026-09-22-declaration-floor-moves-to-alpha.md)）。**2026-09-24 再对调回 `next`**：宿主把新线（rc 档）发在 `next` 上、`alpha` 停在旧档 —— 具体值一律现查 `npm view @deepseek-ai/dsh dist-tags`；本仓声明面**不跟着抬**（区间本就罩得住 `next`），要靠区间判断就查 `package.json` 的 `engines.dsh`
 - 明文迁徙：**真机跑通**（2026-09-16）—— 装入 1.6.2 + 重启 host 后，`settings.yaml` 的 `zhihu-search:` 段只剩 `disableNativeWebSearch`，值（40 位十六进制、与原明文逐字一致）落进 `.credentials.yaml` 的 `refs`，两个文件同一秒被改写。此前在 `lib/` 产物 + 真实 provider + 本机 `settings.yaml` **副本**上也跑通过（段内清理、其他 section 与注释原样保留、第二次运行是空操作）。
   **2026-09-22 起范围收窄**：设置文档那一层随这次接缝换代（2026-09-22）一起没了（宿主按 section 名导入且只映射三个官方 section，我们那段到不了插件），迁徙只剩**组合配置**一条来源，`purge` 通道退场。上面那条真机结论仍然真实，但它描述的是接缝换代之前的宿主
 
@@ -91,7 +91,7 @@
 - **告警可能到不了终端**：v1.6.x 的每一处失败都 `warn` 过，维护者终端里一条都没有。判断故障别只看日志，先看文件状态与工具报错。
 - **redact 是 schema 驱动的**：`redactSecrets` 只剥 schema 里带 `role('secret')` 的字段。把一个「代码已经不读」的密钥字段从 schema 里删掉，redact 会同时停止保护它，而功能测试全绿。接缝换代后下行的配置描述**只投影 volatile 字段**，所以非 volatile 的密钥字段已经不在这条线路上（本仓的 `accessSecret` 就是如此）—— 但这层保护对**任何新加的密钥字段**仍然靠角色声明，删字段前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「密钥解析契约」。
 - **挂载方式**：只用官方 CLI `dsh plugin --profile web add <path>`（它会顺带 reconcile `dsh.profile.bundles`），不要手改 `cordis.patch.yml`。
-- **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：**`alpha` = 当前承诺线**（2026-09-22 起；声明面落在它上面），`next` = 已低于我们声明下限的旧线（只作记录），`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本，具体值一律现查（`npm view @deepseek-ai/dsh dist-tags`）。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
+- **DSH 的 dist-tag 语义各不相同，`latest` 是陷阱**：**`next` = 当前承诺线**（2026-09-24 起；声明面落在它上面），`alpha` = 已低于我们声明下限的旧线（只作记录），`latest` **不可用** —— 多数 `@deepseek-ai/dsh-*` 上它指向很早的版本，具体值一律现查（`npm view @deepseek-ai/dsh dist-tags`）。装宿主必须点名线；锚点语义与红了怎么办见 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的「兼容性」。
 - **发版的两档预发布不是同义词，选错要赔一个版本号**：`prerelease` 在**同一条 `X.Y.Z` 线**上把预发布计数 +1，`premajor` **开新线**。从 `2.0.0-alpha.0` 跑 `premajor` 得到的是 **`3.0.0-alpha.0`**（semver 见 prerelease 不是 `[0]` 就给 major 加一），而 npm 上的版本号**不可覆盖**。本仓踩过一次：初版提案正是「先人工 bump 到 alpha.1 再跑 premajor」，被 Lead 用同一张实测表推翻 —— **别拿文档推断 semver，量一次**（`npm version <tier> --preid=alpha --no-git-tag-version` 在临时目录里跑）。另：**2026-09-22 起本仓改成版本驱动** —— workflow **不 bump**，bump 是发布前的本地一步（先 bump → 提交 → 再截图 → 最后发布），所以现在这句话反过来成立：**本地 bump 才是正路**。全套判据与实测输出见[决策记录](.agents/notes/2026-09-22-release-tiers-and-dist-tags.md)与[版本驱动那条](.agents/notes/2026-09-22-version-driven-release.md)。
 - **接缝缺席是静默的，缺法有三种、各踩过一次**：
   - 宿主早于接缝换代时，客户端 `inject` 里的 `settingsScope` 让整个 `apply` 不执行（**声明一个已删服务 = 激活门禁不过**，用户只看到 pending）；
