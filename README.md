@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="icon.svg" alt="dsh-zhihu-search" width="80" height="80">
+</p>
+
+<p align="center">
   <h1 align="center">dsh-zhihu-search</h1>
 </p>
 
