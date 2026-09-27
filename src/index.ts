@@ -11,7 +11,11 @@
  */
 
 import type { Context, Volatile } from '@deepseek-ai/cordis';
-import { credentialRef, isCredentialRefName, type CredentialRef } from '@deepseek-ai/dsh-credentials';
+import {
+  credentialRef,
+  isCredentialRefName,
+  type CredentialRef,
+} from '@deepseek-ai/dsh-credentials';
 import type {} from '@deepseek-ai/dsh-agent';
 // 类型导入即声明：`ctx.settings`（Host 侧设置服务面）由 settings 包合并进 Context。
 import type {} from '@deepseek-ai/dsh-settings';
@@ -20,7 +24,12 @@ import type {} from '@deepseek-ai/dsh-settings';
 // packages/experimental/speech-to-text/src/index.ts:6-7。
 import type {} from '@deepseek-ai/cordis-plugin-loader';
 import z from '@deepseek-ai/schemastery';
-import { DEFAULT_STREAM_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, ZHIHU_BASE_URL, ZhihuClient } from './transport.js';
+import {
+  DEFAULT_STREAM_TIMEOUT_MS,
+  DEFAULT_TIMEOUT_MS,
+  ZHIHU_BASE_URL,
+  ZhihuClient,
+} from './transport.js';
 import { resolveAccessSecret as resolveAccessSecretFrom } from './credentials.js';
 import { migrateLegacySecret } from './migrate.js';
 import { createState } from './state.js';
@@ -457,16 +466,19 @@ export function apply(ctx: Context, config: Config): void {
 
   // 插件卸载（含 HMR 换装）：撤掉我们装过的 restriction ——
   // 它们挂在 agent 的 scope 上，不会随本插件卸载自动消失。
-  ctx.effect(() => () => {
-    for (const dispose of restrictions.values()) {
-      try {
-        dispose();
-      } catch {
-        // 同上：卸载路径不因单个撤销失败而中断。
+  ctx.effect(
+    () => () => {
+      for (const dispose of restrictions.values()) {
+        try {
+          dispose();
+        } catch {
+          // 同上：卸载路径不因单个撤销失败而中断。
+        }
       }
-    }
-    restrictions.clear();
-  }, 'zhihu-search: native web tool restrictions');
+      restrictions.clear();
+    },
+    'zhihu-search: native web tool restrictions',
+  );
 
   ctx.effect(() => {
     // 全部可变状态在此创建，随 effect 一起销毁。
@@ -490,9 +502,12 @@ export function apply(ctx: Context, config: Config): void {
     };
 
     const disposers: Array<() => void> = [];
-    if (config.enableSearch !== false) disposers.push(ctx.tools.register(createZhihuSearchTool(deps)));
-    if (config.enableGlobalSearch !== false) disposers.push(ctx.tools.register(createZhihuGlobalSearchTool(deps)));
-    if (config.enableZhida !== false) disposers.push(ctx.tools.register(createZhihuZhidaTool(deps)));
+    if (config.enableSearch !== false)
+      disposers.push(ctx.tools.register(createZhihuSearchTool(deps)));
+    if (config.enableGlobalSearch !== false)
+      disposers.push(ctx.tools.register(createZhihuGlobalSearchTool(deps)));
+    if (config.enableZhida !== false)
+      disposers.push(ctx.tools.register(createZhihuZhidaTool(deps)));
 
     return () => {
       // 逆序释放：后注册的先撤销，与创建顺序严格对称。

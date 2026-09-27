@@ -23,7 +23,9 @@ export interface PatchRow {
 
 /** @returns `package.json` 的 `name`。 */
 export function readPackageName(): string {
-  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { name?: unknown };
+  const manifest = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  ) as { name?: unknown };
   if (typeof manifest.name !== 'string') throw new Error('package.json 里没有 name');
   return manifest.name;
 }
@@ -51,6 +53,7 @@ export function readPatchRow(): PatchRow {
   }
   const id = fields.get('id');
   const name = fields.get('name');
-  if (id === undefined || name === undefined) throw new Error('cordis.patch.yml 的 insert 块里缺 id 或 name');
+  if (id === undefined || name === undefined)
+    throw new Error('cordis.patch.yml 的 insert 块里缺 id 或 name');
   return { id, name };
 }

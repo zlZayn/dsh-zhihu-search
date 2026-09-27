@@ -1,7 +1,7 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import tseslint from 'typescript-eslint'
-import eslintConfigPrettier from 'eslint-config-prettier'
+import js from '@eslint/js';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
   { ignores: ['lib/**', 'node_modules/**'] },
@@ -34,4 +34,4 @@ export default [
     },
   },
   eslintConfigPrettier,
-]
+];

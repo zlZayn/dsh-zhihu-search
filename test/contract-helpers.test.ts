@@ -22,16 +22,20 @@ import {
 
 /** 构造一条最小结果。 */
 function item(overrides: Partial<RawItem>): RawItem {
-  return { ContentID: 'c1', Url: 'https://example.com/a', VoteUpCount: 1, EditTime: 1_700_000_000, ...overrides };
+  return {
+    ContentID: 'c1',
+    Url: 'https://example.com/a',
+    VoteUpCount: 1,
+    EditTime: 1_700_000_000,
+    ...overrides,
+  };
 }
 
 describe('契约指纹工具', () => {
   it('idsOf 保序，缺 ContentID 时用位置占位（不静默丢条目）', () => {
-    expect(idsOf([item({ ContentID: 'a' }), item({ ContentID: 'b' }), item({ ContentID: undefined })])).toEqual([
-      'a',
-      'b',
-      '#2',
-    ]);
+    expect(
+      idsOf([item({ ContentID: 'a' }), item({ ContentID: 'b' }), item({ ContentID: undefined })]),
+    ).toEqual(['a', 'b', '#2']);
   });
 
   it('hostsOf 取主机名并小写，非法 URL 退化成空串而不是抛错', () => {
@@ -42,7 +46,10 @@ describe('契约指纹工具', () => {
   });
 
   it('votesOf / editTimesOf 对缺失字段给 NaN，避免把「没有」当成 0 参与比较', () => {
-    expect(votesOf([item({ VoteUpCount: 0 }), item({ VoteUpCount: undefined })])).toEqual([0, Number.NaN]);
+    expect(votesOf([item({ VoteUpCount: 0 }), item({ VoteUpCount: undefined })])).toEqual([
+      0,
+      Number.NaN,
+    ]);
     expect(editTimesOf([item({ EditTime: undefined })])).toEqual([Number.NaN]);
   });
 

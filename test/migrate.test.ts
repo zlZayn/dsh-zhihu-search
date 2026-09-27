@@ -48,7 +48,9 @@ describe('migrateLegacySecret', () => {
   });
 
   it('组合配置里的明文搬进凭据域，并告警请人手动删掉那一行', async () => {
-    const { deps, calls, warnings } = makeDeps({ readLegacy: () => ({ fromComposition: 'FROM-PATCH' }) });
+    const { deps, calls, warnings } = makeDeps({
+      readLegacy: () => ({ fromComposition: 'FROM-PATCH' }),
+    });
     await migrateLegacySecret(deps);
     expect(calls).toEqual(['hasCredential', 'adopt:FROM-PATCH']);
     expect(warnings.join('')).toContain('cordis.patch.yml');

@@ -66,7 +66,12 @@ describe('接缝不变量：客户端 inject', () => {
     const source = effective('src/client/index.tsx');
     const match = /export const inject = (\[[^\]]*\]);/.exec(source);
     expect(match, 'src/client/index.tsx 里找不到 inject 声明').not.toBeNull();
-    expect(JSON.parse(match![1]!.replace(/'/g, '"'))).toEqual(['slots', 'remote', 'remote.credentials', 'locale']);
+    expect(JSON.parse(match![1]!.replace(/'/g, '"'))).toEqual([
+      'slots',
+      'remote',
+      'remote.credentials',
+      'locale',
+    ]);
   });
 });
 
@@ -125,7 +130,9 @@ describe('接缝不变量：configForms.get() 的实参', () => {
 });
 
 describe('接缝不变量：schema 的 volatile 字段恰好两个', () => {
-  const dict = (Config as unknown as { dict: Record<string, { meta?: { volatile?: boolean; role?: string } }> }).dict;
+  const dict = (
+    Config as unknown as { dict: Record<string, { meta?: { volatile?: boolean; role?: string } }> }
+  ).dict;
 
   it('volatile 集合 == {accessSecretRef, disableNativeWebSearch}', () => {
     // 只有 volatile 字段会进 describe 的 value/base/user —— 少一个，卡片上那一格就永远是空的；

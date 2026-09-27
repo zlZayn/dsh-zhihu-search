@@ -230,7 +230,9 @@ function sha256(input: string): string {
  */
 export function buildCacheKey(parts: CacheKeyParts): string {
   const secretFingerprint = sha256(parts.accessSecret).slice(0, 8);
-  return sha256(`${parts.toolName}|${parts.baseUrl}|${secretFingerprint}|${stableStringify(parts.args)}`);
+  return sha256(
+    `${parts.toolName}|${parts.baseUrl}|${secretFingerprint}|${stableStringify(parts.args)}`,
+  );
 }
 
 /** {@link createState} 的配置。 */

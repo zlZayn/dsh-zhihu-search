@@ -1,16 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./lib",
     "rootDir": "./src",
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -25,10 +21,6 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "src/client"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["src/client"]
 }

@@ -126,10 +126,7 @@ function mapPlatformError(code: number, message: string): ZhihuClientError {
 /** 判断异常是否为 AbortSignal 触发的中断。 */
 function isAbortError(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    error.name === 'AbortError'
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
   );
 }
 
@@ -353,7 +350,10 @@ export interface ZhihuChatChunk {
  * @param status - HTTP 状态码，作为分类的兜底证据。
  * @returns 已分类的错误；没有可用错误体时返回 `undefined`。
  */
-export function classifyChatFailure(failure: unknown, status?: number): ZhihuClientError | undefined {
+export function classifyChatFailure(
+  failure: unknown,
+  status?: number,
+): ZhihuClientError | undefined {
   if (typeof failure !== 'object' || failure === null) return undefined;
   const message =
     'message' in failure && typeof failure.message === 'string' && failure.message.trim() !== ''
@@ -372,7 +372,11 @@ export function classifyChatFailure(failure: unknown, status?: number): ZhihuCli
       hint: '知乎直答触发频率限制。稍等片刻再试，或降低调用频率。',
     });
   }
-  if (status === 401 || status === 403 || /unauthor|authentication|forbidden|invalid.?api.?key|20001/.test(hay)) {
+  if (
+    status === 401 ||
+    status === 403 ||
+    /unauthor|authentication|forbidden|invalid.?api.?key|20001/.test(hay)
+  ) {
     return new ZhihuClientError('auth', message, {
       ...codeField,
       hint: '鉴权失败。若 Secret 正确，请检查本机系统时间（知乎要求时间差 < 10 分钟）。',
@@ -390,7 +394,10 @@ export function classifyChatFailure(failure: unknown, status?: number): ZhihuCli
       hint: '请求不被知乎直答接受。若与档位有关，换成 fast 或 thinking 再试；档位是否可用取决于账号授权。',
     });
   }
-  if ((status ?? 0) >= 500 || /server_error|internal|overload|unavailable|temporar|90001/.test(hay)) {
+  if (
+    (status ?? 0) >= 500 ||
+    /server_error|internal|overload|unavailable|temporar|90001/.test(hay)
+  ) {
     return new ZhihuClientError('server', message, {
       ...codeField,
       hint: '知乎服务端错误，请稍后重试。',
@@ -424,7 +431,8 @@ export function deltaFromPayload(payload: string): ZhihuChatChunk | undefined {
   const choices = 'choices' in envelope ? envelope.choices : undefined;
   if (!Array.isArray(choices) || choices.length === 0) return undefined;
   const first = choices[0];
-  const delta = typeof first === 'object' && first !== null && 'delta' in first ? first.delta : undefined;
+  const delta =
+    typeof first === 'object' && first !== null && 'delta' in first ? first.delta : undefined;
   const finishReason =
     typeof first === 'object' &&
     first !== null &&
@@ -442,13 +450,22 @@ export function deltaFromPayload(payload: string): ZhihuChatChunk | undefined {
         })
       : undefined);
 
-  const chunk: { content?: string; reasoningContent?: string; finishReason?: string; error?: ZhihuClientError } = {};
+  const chunk: {
+    content?: string;
+    reasoningContent?: string;
+    finishReason?: string;
+    error?: ZhihuClientError;
+  } = {};
   if (typeof delta === 'object' && delta !== null) {
     const content =
-      'content' in delta && typeof delta.content === 'string' && delta.content !== '' ? delta.content : undefined;
+      'content' in delta && typeof delta.content === 'string' && delta.content !== ''
+        ? delta.content
+        : undefined;
     if (content !== undefined) chunk.content = content;
     const reasoning =
-      'reasoning_content' in delta && typeof delta.reasoning_content === 'string' && delta.reasoning_content !== ''
+      'reasoning_content' in delta &&
+      typeof delta.reasoning_content === 'string' &&
+      delta.reasoning_content !== ''
         ? delta.reasoning_content
         : undefined;
     if (reasoning !== undefined) chunk.reasoningContent = reasoning;
@@ -525,7 +542,9 @@ export interface ZhihuChatRequest {
 function isEnvelope(value: unknown): value is ZhihuApiResponse<unknown> {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record['Code'] === 'number' && typeof record['Message'] === 'string' && 'Data' in record;
+  return (
+    typeof record['Code'] === 'number' && typeof record['Message'] === 'string' && 'Data' in record
+  );
 }
 
 /**
@@ -555,7 +574,10 @@ export class ZhihuClient {
     this.#baseUrl = config.baseUrl ?? ZHIHU_BASE_URL;
     this.#timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     // 「默认值与配置值的较大者」：弹性交给这里，调用方不必关心两者的相对大小。
-    this.#streamTimeoutMs = Math.max(config.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS, this.#timeoutMs);
+    this.#streamTimeoutMs = Math.max(
+      config.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS,
+      this.#timeoutMs,
+    );
     this.#fetch = config.fetchImpl ?? fetch;
   }
 
@@ -596,7 +618,11 @@ export class ZhihuClient {
   }
 
   /** 发起一次请求并拆开信封；只负责单次尝试。 */
-  async #once<T>(path: string, init: RequestInit, signal: AbortSignal | undefined): Promise<ZhihuApiResponse<T>> {
+  async #once<T>(
+    path: string,
+    init: RequestInit,
+    signal: AbortSignal | undefined,
+  ): Promise<ZhihuApiResponse<T>> {
     const timed = withTimeout(signal, this.#timeoutMs);
     try {
       const response = await this.#fetch(`${this.#baseUrl}${path}`, {
@@ -633,7 +659,12 @@ export class ZhihuClient {
    * `param`/`auth`/`rate_limit` 都是确定性结果，重试只会浪费一次额度往返。
    * 实测失败调用不扣额度，所以重试的代价只是延迟。
    */
-  async #requestJson<T>(path: string, init: RequestInit, signal: AbortSignal | undefined, retries: number): Promise<T> {
+  async #requestJson<T>(
+    path: string,
+    init: RequestInit,
+    signal: AbortSignal | undefined,
+    retries: number,
+  ): Promise<T> {
     if (signal?.aborted === true) {
       throw new ZhihuClientError('aborted', '请求已被取消。');
     }
@@ -679,7 +710,11 @@ export class ZhihuClient {
       signal,
       1,
     );
-    return { HasMore: data?.HasMore ?? false, Items: data?.Items ?? [], SearchHashId: data?.SearchHashId };
+    return {
+      HasMore: data?.HasMore ?? false,
+      Items: data?.Items ?? [],
+      SearchHashId: data?.SearchHashId,
+    };
   }
 
   /**
@@ -695,7 +730,11 @@ export class ZhihuClient {
       signal,
       1,
     );
-    return { HasMore: data?.HasMore ?? false, Items: data?.Items ?? [], SearchHashId: data?.SearchHashId };
+    return {
+      HasMore: data?.HasMore ?? false,
+      Items: data?.Items ?? [],
+      SearchHashId: data?.SearchHashId,
+    };
   }
 
   /** 查询每日额度；实测不消耗业务额度，可用于自检。 */
@@ -711,7 +750,10 @@ export class ZhihuClient {
    *
    * @throws ZhihuClientError 当响应不是事件流（即错误体或非流式结果）时。
    */
-  async openChatStream(request: ZhihuChatRequest, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  async openChatStream(
+    request: ZhihuChatRequest,
+    signal?: AbortSignal,
+  ): Promise<ReadableStream<Uint8Array>> {
     const timed = withTimeout(signal, this.#streamTimeoutMs);
     let response: Response;
     try {
@@ -776,7 +818,9 @@ export class ZhihuClient {
     } catch {
       // 落到下面的通用分支。
     }
-    return new ZhihuClientError('parse', `知乎直答未返回事件流（HTTP ${status}）。`, { hint: text.slice(0, 200) });
+    return new ZhihuClientError('parse', `知乎直答未返回事件流（HTTP ${status}）。`, {
+      hint: text.slice(0, 200),
+    });
   }
 
   /**

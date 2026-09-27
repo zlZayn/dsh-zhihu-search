@@ -5,7 +5,7 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
@@ -13,4 +13,4 @@ updates:
       prefix: ci
     groups:
       actions:
-        patterns: ["*"]
+        patterns: ['*']

@@ -10,8 +10,7 @@
 
 /** Remote 调用的结果：失败折进 `error` 分支，而不是抛。 */
 export type RemoteOutcome<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly error: unknown };
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: unknown };
 
 /** 一条引用的配置状态；不含任何密钥值。 */
 export interface CredentialView {
@@ -72,7 +71,11 @@ export function createCredentialStore(
   const listeners = new Set<() => void>();
 
   const publish = (next: CredentialState): void => {
-    if (next.ref === state.ref && next.configured === state.configured && next.writable === state.writable) {
+    if (
+      next.ref === state.ref &&
+      next.configured === state.configured &&
+      next.writable === state.writable
+    ) {
       return;
     }
     state = next;

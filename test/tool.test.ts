@@ -39,7 +39,9 @@ const apiItem = {
  * @returns 渲染后的纯文本。
  */
 function renderText(
-  tool: { output: { render: (args: never, value: never) => Array<{ type: string; text?: string }> } },
+  tool: {
+    output: { render: (args: never, value: never) => Array<{ type: string; text?: string }> };
+  },
   args: unknown,
   value: unknown,
 ): string {
@@ -56,7 +58,9 @@ describe('zhihu_search', () => {
   };
 
   it('声明了工具名、超时预算与并发安全分类', () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
     expect(tool.name).toBe('zhihu_search');
     expect(tool.timeoutMs).toBe(15_000);
     expect(tool.isConcurrencySafe?.({ query: 'x' })).toBe(true);
@@ -64,7 +68,9 @@ describe('zhihu_search', () => {
   });
 
   it('投影结果：剥离 utm 溯源参数并清洗高亮标签', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [apiItem] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [apiItem] })),
+    );
     const value = (await tool.execute({ query: 'RAG' }, execContext())) as SearchOutput;
 
     expect(value.ok).toBe(true);
@@ -86,14 +92,18 @@ describe('zhihu_search', () => {
   });
 
   it('本地把 count 截断到端点上限 10', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
     await tool.execute({ query: 'RAG', count: 999 }, execContext());
     expect(harness.urls[0]).toContain('Count=10');
     harness.dispose();
   });
 
   it('把语义化排序编译进 URL，模型看不到原始语法', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
     await tool.execute({ query: 'RAG', sortField: 'voteUpCount', minValue: 100 }, execContext());
     expect(harness.urls[0]).toContain('SortBy=VoteUpCount%3Adesc%3A%28100%2C%29');
     harness.dispose();
@@ -106,7 +116,9 @@ describe('zhihu_search', () => {
       Url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
       VoteUpCount: 100 + i,
     }));
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: many })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: many })),
+    );
     const value = (await tool.execute(
       { query: 'RAG', count: 3, sortField: 'voteUpCount', minValue: 100 },
       execContext(),
@@ -129,8 +141,14 @@ describe('zhihu_search', () => {
       calls += 1;
       return jsonResponse(envelope({ HasMore: false, Items: many }));
     });
-    const small = (await tool.execute({ query: 'RAG', count: 3, sortField: 'voteUpCount', minValue: 1 }, execContext())) as SearchOutput;
-    const large = (await tool.execute({ query: 'RAG', count: 10, sortField: 'voteUpCount', minValue: 1 }, execContext())) as SearchOutput;
+    const small = (await tool.execute(
+      { query: 'RAG', count: 3, sortField: 'voteUpCount', minValue: 1 },
+      execContext(),
+    )) as SearchOutput;
+    const large = (await tool.execute(
+      { query: 'RAG', count: 10, sortField: 'voteUpCount', minValue: 1 },
+      execContext(),
+    )) as SearchOutput;
     expect(small.items).toHaveLength(3);
     expect(large.items).toHaveLength(8);
     // 同一个候选池，因此只发一次请求：缓存的是池子，截断发生在返回路径。
@@ -149,8 +167,13 @@ describe('zhihu_search', () => {
   });
 
   it('minValue 缺 sortField 时返回 param 错误，而不是静默下发未过滤查询', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
-    const value = (await tool.execute({ query: 'RAG', minValue: 100 }, execContext())) as SearchOutput;
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
+    const value = (await tool.execute(
+      { query: 'RAG', minValue: 100 },
+      execContext(),
+    )) as SearchOutput;
     expect(value.ok).toBe(false);
     expect(value.error?.kind).toBe('param');
     expect(value.error?.hint).toBeTruthy();
@@ -160,14 +183,18 @@ describe('zhihu_search', () => {
   });
 
   it('把日期编译成 publish_time 过滤', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
     await tool.execute({ query: 'RAG', publishedAfter: '2024-01-01' }, execContext());
     expect(harness.urls[0]).toContain('Filter=publish_time%3E%3D1704067200');
     harness.dispose();
   });
 
   it('每次请求都带 Bearer 与秒级时间戳', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
     await tool.execute({ query: 'RAG' }, execContext());
     const header = harness.headers[0] ?? {};
     expect(header['Authorization']).toBe('Bearer test-secret');
@@ -176,7 +203,9 @@ describe('zhihu_search', () => {
   });
 
   it('把平台错误映射成结构化输出而不是抛错', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse({ Code: 20001, Message: 'auth failed', Data: null }));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse({ Code: 20001, Message: 'auth failed', Data: null }),
+    );
     const value = (await tool.execute({ query: 'RAG' }, execContext())) as SearchOutput;
     expect(value.ok).toBe(false);
     expect(value.error?.kind).toBe('auth');
@@ -192,7 +221,9 @@ describe('zhihu_search', () => {
       ContentID: String(i),
       Url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
     }));
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: ten })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: ten })),
+    );
     const args = { query: 'RAG', count: 20 };
     const value = (await tool.execute(args, execContext())) as SearchOutput;
     expect(value.items).toHaveLength(10);
@@ -201,7 +232,9 @@ describe('zhihu_search', () => {
   });
 
   it('未知参数（page / cursor 之类）本地拒绝，且一次请求都不发', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
     const value = (await tool.execute(
       { query: 'RAG', page: 2 } as unknown as { query: string },
       execContext(),
@@ -215,8 +248,12 @@ describe('zhihu_search', () => {
   });
 
   it('白名单与参数定义一致：拒绝时列出的可用参数 == schema 声明（防两处漂移）', async () => {
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
-    const declared = Object.keys((tool.parameters as { properties: Record<string, unknown> }).properties);
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [] })),
+    );
+    const declared = Object.keys(
+      (tool.parameters as { properties: Record<string, unknown> }).properties,
+    );
     const value = (await tool.execute(
       { query: 'RAG', nonsense: 1 } as unknown as { query: string },
       execContext(),
@@ -323,7 +360,9 @@ describe('zhihu_search', () => {
       Url: 'https://www.zhihu.com/question/1/answer/2',
       AuthorName: '张三',
     };
-    const { tool, harness } = makeTool(async () => jsonResponse(envelope({ HasMore: false, Items: [raw] })));
+    const { tool, harness } = makeTool(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [raw] })),
+    );
     const value = (await tool.execute({ query: 'RAG' }, execContext())) as SearchOutput;
     expect(value.items[0]).not.toHaveProperty('voteUpCount');
     harness.dispose();
@@ -342,7 +381,10 @@ describe('zhihu_search', () => {
     const harness = makeHarness(async () => jsonResponse(envelope({})));
     // 函数调用模式下宿主只发 name/description/parameters，output.schema 不进上下文 ——
     // 描述在首次调用前是模型唯一的预期来源，所以「剧透」是契约，不是修辞。
-    for (const tool of [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps)]) {
+    for (const tool of [
+      createZhihuSearchTool(harness.deps),
+      createZhihuGlobalSearchTool(harness.deps),
+    ]) {
       expect(tool.description, tool.name).toContain('不含图片');
       expect(tool.description, tool.name).toContain('没有翻页参数');
       expect(tool.description, tool.name).toContain('结果含');
@@ -389,11 +431,17 @@ describe('Canonical Output 必须通过自己声明的 output schema', () => {
   // v1.4.0 正是这样：类型与投影都加了 commentCount / editTime，schema 却漏了，
   // 于是两个搜索工具只要有结果就整体失败 —— 而当时的测试直接读 execute() 的返回值，
   // 从不走 schema 校验，所以全绿放行。这组用例就是补上那道缺口。
-  const schemaOf = (tool: { output: { schema: unknown } }): JsonSchemaNode => tool.output.schema as JsonSchemaNode;
+  const schemaOf = (tool: { output: { schema: unknown } }): JsonSchemaNode =>
+    tool.output.schema as JsonSchemaNode;
 
   it('两个搜索工具的成功值都合法（结果带齐上游字段）', async () => {
-    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [apiItem] })));
-    for (const tool of [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps)]) {
+    const harness = makeHarness(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [apiItem] })),
+    );
+    for (const tool of [
+      createZhihuSearchTool(harness.deps),
+      createZhihuGlobalSearchTool(harness.deps),
+    ]) {
       const value = await tool.execute({ query: 'RAG' }, execContext());
       expect(validateJsonSchemaValue(schemaOf(tool), value), tool.name).toEqual([]);
     }
@@ -401,8 +449,13 @@ describe('Canonical Output 必须通过自己声明的 output schema', () => {
   });
 
   it('两个搜索工具的失败值也合法（错误面同样要过校验）', async () => {
-    const harness = makeHarness(async () => jsonResponse({ Code: 20001, Message: 'auth failed', Data: null }));
-    for (const tool of [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps)]) {
+    const harness = makeHarness(async () =>
+      jsonResponse({ Code: 20001, Message: 'auth failed', Data: null }),
+    );
+    for (const tool of [
+      createZhihuSearchTool(harness.deps),
+      createZhihuGlobalSearchTool(harness.deps),
+    ]) {
       const value = await tool.execute({ query: 'RAG' }, execContext());
       expect(validateJsonSchemaValue(schemaOf(tool), value), tool.name).toEqual([]);
     }
@@ -419,7 +472,10 @@ describe('Canonical Output 必须通过自己声明的 output schema', () => {
     okHarness.dispose();
 
     const failHarness = makeHarness(async () =>
-      jsonResponse({ error: { message: 'boom', type: 'server_error', code: 'internal_error' } }, 500),
+      jsonResponse(
+        { error: { message: 'boom', type: 'server_error', code: 'internal_error' } },
+        500,
+      ),
     );
     const failTool = createZhihuZhidaTool(failHarness.deps);
     const failValue = await failTool.execute({ question: 'q' }, execContext());
@@ -433,7 +489,16 @@ describe('Canonical Output 必须通过自己声明的 output schema', () => {
     const value = {
       ok: true,
       query: 'q',
-      items: [{ title: 't', url: 'https://a', snippet: 's', author: 'a', contentType: 'Answer', bogus: 1 }],
+      items: [
+        {
+          title: 't',
+          url: 'https://a',
+          snippet: 's',
+          author: 'a',
+          contentType: 'Answer',
+          bogus: 1,
+        },
+      ],
       hasMore: false,
     };
     expect(validateJsonSchemaValue(schemaOf(tool), value).length).toBeGreaterThan(0);
@@ -453,7 +518,10 @@ describe('zhihu_global_search', () => {
   it('知乎域名在本地就被拒绝，不浪费一次请求', async () => {
     const harness = makeHarness(async () => jsonResponse(envelope({})));
     const tool = createZhihuGlobalSearchTool(harness.deps);
-    const value = (await tool.execute({ query: 'crawler', site: 'zhihu.com' }, execContext())) as SearchOutput;
+    const value = (await tool.execute(
+      { query: 'crawler', site: 'zhihu.com' },
+      execContext(),
+    )) as SearchOutput;
     expect(value.ok).toBe(false);
     expect(value.error?.kind).toBe('param');
     expect(value.error?.hint).toContain('站内搜索');
@@ -471,7 +539,9 @@ describe('zhihu_global_search', () => {
       AuthorName: '某站',
       VoteUpCount: 0,
     };
-    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [external] })));
+    const harness = makeHarness(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: [external] })),
+    );
     const tool = createZhihuGlobalSearchTool(harness.deps);
     const value = (await tool.execute({ query: 'crawler' }, execContext())) as SearchOutput;
     expect(value.items).toHaveLength(1);
@@ -494,7 +564,9 @@ describe('zhihu_global_search', () => {
       ContentID: String(i),
       Url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
     }));
-    const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: many })));
+    const harness = makeHarness(async () =>
+      jsonResponse(envelope({ HasMore: false, Items: many })),
+    );
     const tool = createZhihuGlobalSearchTool(harness.deps);
     const args = { query: 'RAG', count: 30 };
     const value = (await tool.execute(args, execContext())) as SearchOutput;
@@ -536,7 +608,10 @@ describe('zhihu_zhida', () => {
   it('拼接 SSE 流并把思维链与正文分开', async () => {
     const harness = makeHarness(async () => sseResponse(sseChunks));
     const tool = createZhihuZhidaTool(harness.deps);
-    const value = (await tool.execute({ question: '什么是 RAG', mode: 'thinking', includeReasoning: true }, execContext())) as ZhidaOutput;
+    const value = (await tool.execute(
+      { question: '什么是 RAG', mode: 'thinking', includeReasoning: true },
+      execContext(),
+    )) as ZhidaOutput;
     expect(value.ok).toBe(true);
     expect(value.answer).toBe('检索增强生成');
     expect(value.reasoning).toBe('先想一下');
@@ -560,8 +635,14 @@ describe('zhihu_zhida', () => {
       return sseResponse(sseChunks);
     });
     const tool = createZhihuZhidaTool(harness.deps);
-    const first = (await tool.execute({ question: '什么是 RAG', includeReasoning: false }, execContext())) as ZhidaOutput;
-    const second = (await tool.execute({ question: '什么是 RAG', includeReasoning: true }, execContext())) as ZhidaOutput;
+    const first = (await tool.execute(
+      { question: '什么是 RAG', includeReasoning: false },
+      execContext(),
+    )) as ZhidaOutput;
+    const second = (await tool.execute(
+      { question: '什么是 RAG', includeReasoning: true },
+      execContext(),
+    )) as ZhidaOutput;
     expect(first.reasoning).toBe('');
     expect(second.reasoning).toBe('先想一下');
     expect(calls).toBe(1);
@@ -571,14 +652,20 @@ describe('zhihu_zhida', () => {
   it('把语义化档位映射为真实模型 id', async () => {
     const harness = makeHarness(async () => sseResponse(sseChunks));
     const tool = createZhihuZhidaTool(harness.deps);
-    const value = (await tool.execute({ question: 'q', mode: 'fast' }, execContext())) as ZhidaOutput;
+    const value = (await tool.execute(
+      { question: 'q', mode: 'fast' },
+      execContext(),
+    )) as ZhidaOutput;
     expect(value.model).toBe('zhida-fast-1p5');
     harness.dispose();
   });
 
   it('直答返回非事件流时给出结构化错误', async () => {
     const harness = makeHarness(async () =>
-      jsonResponse({ error: { message: 'model overloaded', type: 'server_error', param: null, code: 'busy' } }, 200),
+      jsonResponse(
+        { error: { message: 'model overloaded', type: 'server_error', param: null, code: 'busy' } },
+        200,
+      ),
     );
     const tool = createZhihuZhidaTool(harness.deps);
     const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;
@@ -588,7 +675,9 @@ describe('zhihu_zhida', () => {
   });
 
   it('空答案被视为错误，而不是返回空字符串', async () => {
-    const harness = makeHarness(async () => sseResponse(['data: {"choices":[{"delta":{}}]}\n\n', 'data: [DONE]\n\n']));
+    const harness = makeHarness(async () =>
+      sseResponse(['data: {"choices":[{"delta":{}}]}\n\n', 'data: [DONE]\n\n']),
+    );
     const tool = createZhihuZhidaTool(harness.deps);
     const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;
     expect(value.ok).toBe(false);
@@ -615,7 +704,17 @@ describe('zhihu_zhida', () => {
   it('直答的错误 code 是字符串时也要分类：频率限制给 rate_limit 与可行动 hint', async () => {
     // 实测形态：直答返回 OpenAI 兼容错误体，code 为字符串（不是数字错误码）。
     const harness = makeHarness(async () =>
-      jsonResponse({ error: { message: 'rate limit exceeded', type: 'rate_limit_error', param: null, code: 'rate_limit_exceeded' } }, 429),
+      jsonResponse(
+        {
+          error: {
+            message: 'rate limit exceeded',
+            type: 'rate_limit_error',
+            param: null,
+            code: 'rate_limit_exceeded',
+          },
+        },
+        429,
+      ),
     );
     const tool = createZhihuZhidaTool(harness.deps);
     const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;
@@ -627,7 +726,17 @@ describe('zhihu_zhida', () => {
 
   it('档位未授权（model_not_found）指向换档位，而不是退化成 unknown', async () => {
     const harness = makeHarness(async () =>
-      jsonResponse({ error: { message: 'model not found', type: 'invalid_request_error', param: 'model', code: 'model_not_found' } }, 404),
+      jsonResponse(
+        {
+          error: {
+            message: 'model not found',
+            type: 'invalid_request_error',
+            param: 'model',
+            code: 'model_not_found',
+          },
+        },
+        404,
+      ),
     );
     const tool = createZhihuZhidaTool(harness.deps);
     const value = (await tool.execute({ question: 'q' }, execContext())) as ZhidaOutput;

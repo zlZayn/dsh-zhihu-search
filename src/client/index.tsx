@@ -46,7 +46,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client';
 import type {} from '@deepseek-ai/dsh-client-locale/client';
 // 类型导入即声明：ctx.slots 由 ui-renderer 的浏览器半体合并进 Context。
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
-import { createCredentialStore, type CredentialView, type CredentialsRemoteFace } from './credential-store.js';
+import {
+  createCredentialStore,
+  type CredentialView,
+  type CredentialsRemoteFace,
+} from './credential-store.js';
 import { LOCALE_NS, ZHIHU_LOCALES } from './locales.js';
 
 /**
@@ -193,11 +197,29 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 // 一列控件直接铺在插件页的 `data-plugin-config` 区里；没有折叠头（标题与面包屑由插件页自己画）。
 const S = {
   form: { display: 'flex', flexDirection: 'column' },
-  readOnly: { margin: '12px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary)' },
+  readOnly: {
+    margin: '12px 0 0',
+    fontSize: 12,
+    lineHeight: 1.5,
+    color: 'var(--dsw-alias-label-tertiary)',
+  },
   field: { display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0' },
-  fieldDivider: { display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: '0.5px solid var(--dsw-alias-border-l2)' },
+  fieldDivider: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    padding: '12px 0',
+    borderTop: '0.5px solid var(--dsw-alias-border-l2)',
+  },
   head: { display: 'flex', alignItems: 'center', gap: 8 },
-  label: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, lineHeight: 1.5, color: 'var(--dsw-alias-label-primary)' },
+  label: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: 500,
+    lineHeight: 1.5,
+    color: 'var(--dsw-alias-label-primary)',
+  },
   badges: { display: 'inline-flex', alignItems: 'center', gap: 8 },
   reset: {
     border: 'none',
@@ -236,7 +258,12 @@ const S = {
   },
   toggleLabel: { flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 },
   // 状态行：比说明行重一档（secondary 对 tertiary），一行说清开关当前的含义。
-  stateNote: { margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-secondary)' },
+  stateNote: {
+    margin: 0,
+    fontSize: 12,
+    lineHeight: 1.5,
+    color: 'var(--dsw-alias-label-secondary)',
+  },
   // 说明句里的外链：只用卡片既有的语义令牌，颜色取自 ui-theme 的 --dsw-alias-link。
   // 卡片是纯内联样式、无法写 :hover，所以常驻下划线作为静态可点提示。
   link: {
@@ -252,7 +279,14 @@ const S = {
     paddingTop: 16,
   },
   // 错误色用有定义的那个令牌：原生照抄来的那一个在 harness 里从未定义，写了不会生效（见 [AGENTS.md](./AGENTS.md)）。
-  failed: { flex: 1, minWidth: 0, margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-state-error-primary)' },
+  failed: {
+    flex: 1,
+    minWidth: 0,
+    margin: 0,
+    fontSize: 12,
+    lineHeight: 1.5,
+    color: 'var(--dsw-alias-state-error-primary)',
+  },
   save: {
     appearance: 'none',
     border: '1px solid transparent',
@@ -280,7 +314,12 @@ function dimStyle(base: CSSProperties, disabled: boolean): CSSProperties {
  */
 function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
   const candidate: unknown = timer;
-  if (typeof candidate === 'object' && candidate !== null && 'unref' in candidate && typeof candidate.unref === 'function') {
+  if (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    'unref' in candidate &&
+    typeof candidate.unref === 'function'
+  ) {
     candidate.unref();
   }
 }
@@ -426,7 +465,11 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
       // 旧版是两三次独立写入，中间态在界面上可见（引用名已落、开关还没落）。
       const ops: PathOp[] = [];
       if (refDirty) {
-        ops.push(refText === '' ? { op: 'unset', path: [REF_FIELD] } : { op: 'set', path: [REF_FIELD], value: refText });
+        ops.push(
+          refText === ''
+            ? { op: 'unset', path: [REF_FIELD] }
+            : { op: 'set', path: [REF_FIELD], value: refText },
+        );
       }
       if (hideDirty) ops.push({ op: 'set', path: [HIDE_FIELD], value: hideText });
       if (ops.length > 0) {
@@ -451,13 +494,17 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
     <div style={S.form}>
       {/* 命名空间不在册（`status === 'unavailable'`）或宿主不可写时落到这里：读作「不可写」，
           不新增可见状态。描述还没回来（`loading`）时不显示，免得闪一行假提示。 */}
-      {!writable && snapshot.status !== 'loading'
-        ? <p style={S.readOnly} role="status">{t('readOnly')}</p>
-        : null}
+      {!writable && snapshot.status !== 'loading' ? (
+        <p style={S.readOnly} role="status">
+          {t('readOnly')}
+        </p>
+      ) : null}
 
       <div style={S.field}>
         <div style={S.head}>
-          <label style={S.label} htmlFor="zhihu-access-secret">{t('secretLabel')}</label>
+          <label style={S.label} htmlFor="zhihu-access-secret">
+            {t('secretLabel')}
+          </label>
           <span style={S.badges}>
             <Tag tone={credential.configured ? 'neutral' : 'quiet'}>
               {credential.configured ? t('secretConfigured') : t('secretMissing')}
@@ -477,12 +524,7 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
         />
         <p style={S.hint}>
           {t('secretHintBefore')}
-          <a
-            style={S.link}
-            href={PROFILE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a style={S.link} href={PROFILE_URL} target="_blank" rel="noopener noreferrer">
             {t('secretHintLink')}
           </a>
           {t('secretHintAfter')}
@@ -492,24 +534,24 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
 
       <div style={S.fieldDivider}>
         <div style={S.head}>
-          <label style={S.label} htmlFor="zhihu-access-secret-ref">{t('refLabel')}</label>
-          {refOverridden
-            ? (
-              <span style={S.badges}>
-                <Tag tone="neutral">{t('refOverridden')}</Tag>
-                <button
-                  type="button"
-                  style={dimStyle(S.reset, disabled)}
-                  disabled={disabled}
-                  onClick={() => {
-                    setRefDraft('');
-                  }}
-                >
-                  {t('reset')}
-                </button>
-              </span>
-            )
-            : null}
+          <label style={S.label} htmlFor="zhihu-access-secret-ref">
+            {t('refLabel')}
+          </label>
+          {refOverridden ? (
+            <span style={S.badges}>
+              <Tag tone="neutral">{t('refOverridden')}</Tag>
+              <button
+                type="button"
+                style={dimStyle(S.reset, disabled)}
+                disabled={disabled}
+                onClick={() => {
+                  setRefDraft('');
+                }}
+              >
+                {t('reset')}
+              </button>
+            </span>
+          ) : null}
         </div>
         <input
           id="zhihu-access-secret-ref"
@@ -544,7 +586,11 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
       </div>
 
       <div style={S.footer}>
-        {failed !== '' ? <p style={S.failed} role="status">{failed}</p> : null}
+        {failed !== '' ? (
+          <p style={S.failed} role="status">
+            {failed}
+          </p>
+        ) : null}
         <button
           type="button"
           style={dimStyle(S.save, blocked)}
@@ -588,7 +634,10 @@ export function apply(ctx: Context): void {
   const trackSavedRef = (ref: string): void => {
     savedRef = ref;
   };
-  const store = createCredentialStore(() => remote.credentials, () => savedRef);
+  const store = createCredentialStore(
+    () => remote.credentials,
+    () => savedRef,
+  );
 
   ctx.effect(
     () => ctx.locale.register(LOCALE_NS, ZHIHU_LOCALES),
@@ -678,7 +727,12 @@ export function apply(ctx: Context): void {
 
   ctx.effect(() => {
     // 服务缺席时这一环不发声：那时「槽在不在」还没到判的时候，报出来是替服务那一环说话。
-    slotProbe = armProbe(SLOT_MISSING_WARNING, SLOT_LATE_INFO, () => slotDeclared, () => serviceDeclared);
+    slotProbe = armProbe(
+      SLOT_MISSING_WARNING,
+      SLOT_LATE_INFO,
+      () => slotDeclared,
+      () => serviceDeclared,
+    );
     return () => {
       if (slotProbe?.timer !== undefined) clearTimeout(slotProbe.timer);
       slotProbe = undefined;
@@ -699,8 +753,9 @@ export function apply(ctx: Context): void {
 
       return ctx.slots.register(
         { name: 'plugins.bundle.config', key: BUNDLE_NAME, locale: LOCALE_NS },
-        (seat: { t: CardTranslate; view: 'page' }) =>
-          <ZhihuCard form={form} store={store} trackSavedRef={trackSavedRef} t={seat.t} />,
+        (seat: { t: CardTranslate; view: 'page' }) => (
+          <ZhihuCard form={form} store={store} trackSavedRef={trackSavedRef} t={seat.t} />
+        ),
       );
     });
   });

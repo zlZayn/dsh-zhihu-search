@@ -28,8 +28,11 @@ const LANGUAGE_ID = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u;
 
 /** 宿主 `iconOf` 认的扩展名与媒体类型（`package-meta.ts:16-19`）。 */
 const ICON_MEDIA_TYPES = new Map([
-  ['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.jpg', 'image/jpeg'],
-  ['.jpeg', 'image/jpeg'], ['.webp', 'image/webp'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
 ]);
 
 /** 宿主 `iconOf` 的上限：`MAX_ICON_BYTES = 256 * 1024`。 */
@@ -59,9 +62,9 @@ export function inspectPluginMetadata(root, pkg = readManifest(root)) {
   const localeDir = join(root, 'locale');
   const languageIds = existsSync(localeDir)
     ? readdirSync(localeDir, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-      .map((entry) => entry.name.slice(0, -'.json'.length))
-      .sort()
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+        .map((entry) => entry.name.slice(0, -'.json'.length))
+        .sort()
     : [];
 
   /** 按文件名读进来的 JSON 字典；解析失败的语言不在里面。 */
@@ -71,7 +74,9 @@ export function inspectPluginMetadata(root, pkg = readManifest(root)) {
     try {
       dictionariesOf.set(language, JSON.parse(readFileSync(file, 'utf8')));
     } catch (error) {
-      failures.push(`locale/${language}.json 不是合法 JSON —— ${String(error)}；格式错误时宿主只报一条诊断，界面直接退回技术名。`);
+      failures.push(
+        `locale/${language}.json 不是合法 JSON —— ${String(error)}；格式错误时宿主只报一条诊断，界面直接退回技术名。`,
+      );
     }
   }
 
@@ -87,17 +92,29 @@ export function inspectPluginMetadata(root, pkg = readManifest(root)) {
     return typeof value === 'string' && value.trim() !== '' ? value : undefined;
   };
 
-  require_('locale 目录含 en.json', languageIds.some((id) => id.toLowerCase() === 'en'),
-    'en.json 是宿主发现元数据的入口；没有它，其余语言文件一个都不会被读。');
-  require_('locale 目录含 zh.json', languageIds.some((id) => id.toLowerCase() === 'zh'),
-    '两份 README 与截图都按中英双语承诺；只给英文等于中文界面退回技术名。');
+  require_(
+    'locale 目录含 en.json',
+    languageIds.some((id) => id.toLowerCase() === 'en'),
+    'en.json 是宿主发现元数据的入口；没有它，其余语言文件一个都不会被读。',
+  );
+  require_(
+    'locale 目录含 zh.json',
+    languageIds.some((id) => id.toLowerCase() === 'zh'),
+    '两份 README 与截图都按中英双语承诺；只给英文等于中文界面退回技术名。',
+  );
 
   for (const language of languageIds) {
-    require_(`locale/${language}.json 是合法语言 id`, LANGUAGE_ID.test(language),
-      '文件名必须是一个语言 id；宿主对不是语言 id 的文件名直接报错。');
+    require_(
+      `locale/${language}.json 是合法语言 id`,
+      LANGUAGE_ID.test(language),
+      '文件名必须是一个语言 id；宿主对不是语言 id 的文件名直接报错。',
+    );
     for (const field of ['title', 'description']) {
-      require_(`locale/${language}.json 有非空 meta.${field}`, displayField(language, field) !== undefined,
-        `该字段必须是**非空字符串**；缺字段或写成空串时宿主只回落到下一档（${fallbackOf(field)}），页面不会报错。`);
+      require_(
+        `locale/${language}.json 有非空 meta.${field}`,
+        displayField(language, field) !== undefined,
+        `该字段必须是**非空字符串**；缺字段或写成空串时宿主只回落到下一档（${fallbackOf(field)}），页面不会报错。`,
+      );
     }
   }
 
@@ -106,42 +123,68 @@ export function inspectPluginMetadata(root, pkg = readManifest(root)) {
 
   for (const language of languageIds) {
     const resource = `${pkg.name}/locale/${language}.json`;
-    require_(`exports 暴露 ${resource}`,
+    require_(
+      `exports 暴露 ${resource}`,
       Object.hasOwn(exportsMap, './locale/*.json'),
-      `没有这条子路径导出时，宿主按 ${pkg.name}/locale/${language}.json 解析会拿到 ERR_PACKAGE_PATH_NOT_EXPORTED —— 元数据静默消失。`);
-    require_(`files 收录 locale/${language}.json`,
+      `没有这条子路径导出时，宿主按 ${pkg.name}/locale/${language}.json 解析会拿到 ERR_PACKAGE_PATH_NOT_EXPORTED —— 元数据静默消失。`,
+    );
+    require_(
+      `files 收录 locale/${language}.json`,
       files.includes('locale/*.json') || files.includes(`locale/${language}.json`),
-      '没随包的 locale 文件在 npm 上不存在，读到的还是包装前的仓库副本；落地包只会显示技术名。');
+      '没随包的 locale 文件在 npm 上不存在，读到的还是包装前的仓库副本；落地包只会显示技术名。',
+    );
   }
 
-  require_('exports 暴露 ./package.json', Object.hasOwn(exportsMap, './package.json'),
-    '标题与描述的包级回落、以及图标声明都经 <包名>/package.json 读；不导出就没有这两档回落。');
+  require_(
+    'exports 暴露 ./package.json',
+    Object.hasOwn(exportsMap, './package.json'),
+    '标题与描述的包级回落、以及图标声明都经 <包名>/package.json 读；不导出就没有这两档回落。',
+  );
   // 图标（可选字段）：声明了就得真的能读 —— 路径留在清单目录内、文件在、扩展名与大小都合宿主的口径。
   // 缺一处宿主只留一条诊断、图标位空着，界面不报错。本仓 2026-09-22 起声明了它。
-  require_('icon 声明留在主清单目录内', iconIsLocal(pkg.icon),
-    '顶层 icon 的路径相对**声明它的清单**解析，且必须留在该目录内（绝对路径、URL 与越界路径都会被宿主拒绝，只留一条诊断）。');
+  require_(
+    'icon 声明留在主清单目录内',
+    iconIsLocal(pkg.icon),
+    '顶层 icon 的路径相对**声明它的清单**解析，且必须留在该目录内（绝对路径、URL 与越界路径都会被宿主拒绝，只留一条诊断）。',
+  );
 
   if (pkg.icon !== undefined) {
     const iconPath = String(pkg.icon).replace(/^\.\//u, '');
     const absolute = join(root, iconPath);
     const mediaType = ICON_MEDIA_TYPES.get(iconPath.slice(iconPath.lastIndexOf('.')).toLowerCase());
-    require_(`icon 扩展名在宿主名单内（${ICON_MEDIA_TYPES.size} 种）`, mediaType !== undefined,
-      '宿主只认 SVG / PNG / JPEG / WebP；其余扩展名一律拒绝。');
-    require_(`icon 文件在（${iconPath}）`, existsSync(absolute),
-      '声明了却读不到：宿主留一条诊断、图标位空着 —— 与不声明同效。');
-    require_(`files 收录 ${iconPath}`, files.includes(iconPath),
-      '没随包的图标在 npm 上不存在；本地 link: 挂载照样显示，落地包却是空的。');
+    require_(
+      `icon 扩展名在宿主名单内（${ICON_MEDIA_TYPES.size} 种）`,
+      mediaType !== undefined,
+      '宿主只认 SVG / PNG / JPEG / WebP；其余扩展名一律拒绝。',
+    );
+    require_(
+      `icon 文件在（${iconPath}）`,
+      existsSync(absolute),
+      '声明了却读不到：宿主留一条诊断、图标位空着 —— 与不声明同效。',
+    );
+    require_(
+      `files 收录 ${iconPath}`,
+      files.includes(iconPath),
+      '没随包的图标在 npm 上不存在；本地 link: 挂载照样显示，落地包却是空的。',
+    );
     if (existsSync(absolute)) {
       const size = statSync(absolute).size;
-      require_(`icon 不超过 256 KiB（当前 ${size} B）`, size <= MAX_ICON_BYTES,
-        '宿主对超限的图标只留一条诊断并弃用；上限是 256 KiB。');
+      require_(
+        `icon 不超过 256 KiB（当前 ${size} B）`,
+        size <= MAX_ICON_BYTES,
+        '宿主对超限的图标只留一条诊断并弃用；上限是 256 KiB。',
+      );
     }
   }
 
   return {
     languageIds,
-    titles: Object.fromEntries(languageIds.map((language) => [language, displayField(language, 'title')])),
-    descriptions: Object.fromEntries(languageIds.map((language) => [language, displayField(language, 'description')])),
+    titles: Object.fromEntries(
+      languageIds.map((language) => [language, displayField(language, 'title')]),
+    ),
+    descriptions: Object.fromEntries(
+      languageIds.map((language) => [language, displayField(language, 'description')]),
+    ),
     failures,
   };
 }
@@ -193,6 +236,7 @@ function iconIsLocal(icon) {
   if (icon === undefined) return true;
   if (typeof icon !== 'string' || icon.trim() === '') return false;
   // 绝对路径（POSIX 与 Windows 盘符）、带协议的 URL、以及任何向上越界的路径。
-  if (icon.startsWith('/') || /^[A-Za-z]:[\\/]/.test(icon) || /^[A-Za-z][A-Za-z\d+.-]*:/.test(icon)) return false;
+  if (icon.startsWith('/') || /^[A-Za-z]:[\\/]/.test(icon) || /^[A-Za-z][A-Za-z\d+.-]*:/.test(icon))
+    return false;
   return !icon.split(/[\\/]/).includes('..');
 }

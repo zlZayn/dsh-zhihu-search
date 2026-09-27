@@ -50,7 +50,11 @@ require_(
 );
 require_('private', pkg.private !== true, '发布前要移除 "private": true。');
 require_('engines.dsh', typeof pkg.engines?.dsh === 'string', '宿主兼容范围必须声明。');
-require_('files 含 cordis.patch.yml', Array.isArray(pkg.files) && pkg.files.includes('cordis.patch.yml'), 'bundle 层依赖它。');
+require_(
+  'files 含 cordis.patch.yml',
+  Array.isArray(pkg.files) && pkg.files.includes('cordis.patch.yml'),
+  'bundle 层依赖它。',
+);
 require_('LICENSE 存在', existsSync('LICENSE'), 'package.json 声明 MIT，仓库里必须有对应文件。');
 
 // 发布流程不得改写版本号（跨仓规则 5b）。读的是**工作流文本**而不是跑它 ——
@@ -58,9 +62,12 @@ require_('LICENSE 存在', existsSync('LICENSE'), 'package.json 声明 MIT，仓
 {
   const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
   const writes = findVersionWrites(workflow);
-  require_('发布流程不改写版本号', writes.length === 0,
+  require_(
+    '发布流程不改写版本号',
+    writes.length === 0,
     `release.yml 里出现了会改版本的命令：${writes.join(' / ')}。版本要本地 bump 并提交（见 docs/PUBLISHING.md），` +
-    '否则工作树永远停在「上一个已发布版本」，界面上的版本 tag 与截图必然拍出旧号。');
+      '否则工作树永远停在「上一个已发布版本」，界面上的版本 tag 与截图必然拍出旧号。',
+  );
 }
 
 // 展示元数据随包且可解析：locale/<lang>.json 必须被 exports 暴露、被 files 收录、字段非空。

@@ -54,11 +54,16 @@ export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
       '答案由知乎生成，可能有误，重要结论请自行核对。',
 
     parameters: {
-      question: { type: 'string', required: true, description: '要提问的问题，中文描述越具体越好。' },
+      question: {
+        type: 'string',
+        required: true,
+        description: '要提问的问题，中文描述越具体越好。',
+      },
       mode: {
         type: 'string',
         enum: ZHIDA_MODELS,
-        description: '回答档位：fast 快速回答，thinking 深度思考，agent 智能体多步检索。默认 thinking。',
+        description:
+          '回答档位：fast 快速回答，thinking 深度思考，agent 智能体多步检索。默认 thinking。',
         default: 'thinking',
       },
       includeReasoning: {
@@ -107,7 +112,11 @@ export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
 
       try {
         if (question === '') throw new CompileError('问题不能为空。');
-        if (model === undefined) throw new CompileError(`不支持的档位：${String(mode)}`, `可用档位：${ZHIDA_MODELS.join(' / ')}`);
+        if (model === undefined)
+          throw new CompileError(
+            `不支持的档位：${String(mode)}`,
+            `可用档位：${ZHIDA_MODELS.join(' / ')}`,
+          );
 
         const includeReasoning = args.includeReasoning ?? false;
         // 缓存键必须含档位：不同档位的答案不同，共用键会返回错误的档位结果。
@@ -133,7 +142,10 @@ export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
         );
 
         if (result.content.trim() === '') {
-          throw new CompileError('知乎直答返回了空答案。', '可能是该档位当前不可用，请换一个档位重试。');
+          throw new CompileError(
+            '知乎直答返回了空答案。',
+            '可能是该档位当前不可用，请换一个档位重试。',
+          );
         }
 
         // 完整结果进缓存（含思维链），是否展示由命中方决定。
@@ -148,7 +160,14 @@ export function createZhihuZhidaTool(deps: ToolDeps): ToolDefinition {
 
         return { ...stored, reasoning: includeReasoning ? stored.reasoning : '' };
       } catch (error) {
-        return { ok: false, question, model: model ?? '', answer: '', reasoning: '', error: mapError(error) };
+        return {
+          ok: false,
+          question,
+          model: model ?? '',
+          answer: '',
+          reasoning: '',
+          error: mapError(error),
+        };
       }
     },
   });

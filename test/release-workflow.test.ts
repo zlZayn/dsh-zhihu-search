@@ -39,7 +39,9 @@ describe('发布流程：版本驱动', () => {
   it('dist-tag 由版本自己的预发布段推导，publish 与 Release 读同一个输出', () => {
     // 判据只此一处：publish 与 GitHub Release 两步都读 steps.version.outputs.dist_tag（各出现两次：
     // 一次判空、一次取值），都不按输入参数判。
-    expect((workflow.match(/steps\.version\.outputs\.dist_tag/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(
+      (workflow.match(/steps\.version\.outputs\.dist_tag/g) ?? []).length,
+    ).toBeGreaterThanOrEqual(2);
     expect(workflow).not.toContain('inputs.tier');
     expect(workflow).not.toContain('inputs.preid');
   });
@@ -99,16 +101,24 @@ describe('发布流程守卫：反向控制（喂合成文本）', () => {
   it('把真 workflow 改坏一处，判据就红（端到端反向控制）', () => {
     // 拿真文件做底、只插一行：证明「现在这条绿」不是因为正则匹配不到任何东西。
     const mutated = workflow.replace(
-      "        id: version\n",
-      "        id: version\n        run: npm version patch --no-git-tag-version\n",
+      '        id: version\n',
+      '        id: version\n        run: npm version patch --no-git-tag-version\n',
     );
     expect(mutated).not.toBe(workflow);
     expect(findVersionWrites(mutated)).toHaveLength(1);
   });
 
   it('提示语与注释不算 —— 否则「提醒你先本地 bump」这句正确的话会判自己红', () => {
-    expect(findVersionWrites('# 换版本线在本地做：npm version premajor --preid=alpha --no-git-tag-version')).toEqual([]);
-    expect(findVersionWrites('          echo "bump with: npm version <version> --no-git-tag-version"')).toEqual([]);
-    expect(findVersionWrites('            # 这里不是叫你在本地 bump：本 workflow 自己 bump')).toEqual([]);
+    expect(
+      findVersionWrites(
+        '# 换版本线在本地做：npm version premajor --preid=alpha --no-git-tag-version',
+      ),
+    ).toEqual([]);
+    expect(
+      findVersionWrites('          echo "bump with: npm version <version> --no-git-tag-version"'),
+    ).toEqual([]);
+    expect(
+      findVersionWrites('            # 这里不是叫你在本地 bump：本 workflow 自己 bump'),
+    ).toEqual([]);
   });
 });

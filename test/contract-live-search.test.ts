@@ -51,12 +51,19 @@ describe.skipIf(!hasCredential)('契约：zhihu_search 站内搜索', () => {
     const r = await callApi(SEARCH, { Query: QUERY, Count: 50 });
     expect(r.code).toBe(0);
     expect(r.items.length).toBeGreaterThan(0);
-    expect(r.items.length, '上限变了就要同步 tools/search.ts 的 MAX_COUNT 与 README 的 1–10').toBeLessThanOrEqual(10);
+    expect(
+      r.items.length,
+      '上限变了就要同步 tools/search.ts 的 MAX_COUNT 与 README 的 1–10',
+    ).toBeLessThanOrEqual(10);
   });
 
   it('区间只筛「本次检索到的候选」：带下限的结果是同一候选池的子集', async () => {
     const baseline = await callApi(SEARCH, { Query: QUERY, Count: 10 });
-    const filtered = await callApi(SEARCH, { Query: QUERY, Count: 10, SortBy: `${FIELD}:desc:(1,)` });
+    const filtered = await callApi(SEARCH, {
+      Query: QUERY,
+      Count: 10,
+      SortBy: `${FIELD}:desc:(1,)`,
+    });
     console.log(fingerprintLine('站内 下限1', filtered));
     expect(filtered.code).toBe(0);
     expect(
@@ -66,13 +73,21 @@ describe.skipIf(!hasCredential)('契约：zhihu_search 站内搜索', () => {
   });
 
   it('双边界语法可用：下界、上界、闭区间都真的生效', async () => {
-    const lower = await callApi(SEARCH, { Query: QUERY, Count: 10, SortBy: `${FIELD}:desc:(100,)` });
+    const lower = await callApi(SEARCH, {
+      Query: QUERY,
+      Count: 10,
+      SortBy: `${FIELD}:desc:(100,)`,
+    });
     for (const votes of votesOf(lower.items)) expect(votes).toBeGreaterThanOrEqual(100);
 
     const upper = await callApi(SEARCH, { Query: QUERY, Count: 10, SortBy: `${FIELD}:desc:(,10)` });
     for (const votes of votesOf(upper.items)) expect(votes).toBeLessThanOrEqual(10);
 
-    const closed = await callApi(SEARCH, { Query: QUERY, Count: 10, SortBy: `${FIELD}:desc:(10,100)` });
+    const closed = await callApi(SEARCH, {
+      Query: QUERY,
+      Count: 10,
+      SortBy: `${FIELD}:desc:(10,100)`,
+    });
     for (const votes of votesOf(closed.items)) {
       expect(votes).toBeGreaterThanOrEqual(10);
       expect(votes).toBeLessThanOrEqual(100);
@@ -83,14 +98,22 @@ describe.skipIf(!hasCredential)('契约：zhihu_search 站内搜索', () => {
     const bogus = await callApi(SEARCH, { Query: QUERY, Count: 5, SortBy: 'Bogus:desc' });
     expect(bogus.code).toBe(10001);
 
-    const negative = await callApi(SEARCH, { Query: QUERY, Count: 5, SortBy: `${FIELD}:desc:(-5,)` });
+    const negative = await callApi(SEARCH, {
+      Query: QUERY,
+      Count: 5,
+      SortBy: `${FIELD}:desc:(-5,)`,
+    });
     expect(negative.code).toBe(10001);
     expect(negative.message.toLowerCase()).toContain('nonnegative');
   });
 
   it('未记载的 Filter=publish_time 仍在生效（插件的时间过滤依赖它）', async () => {
     const since = Math.floor(Date.now() / 1000) - 30 * DAY_SECONDS;
-    const r = await callApi(SEARCH, { Query: QUERY, Count: 10, Filter: `publish_time>=${String(since)}` });
+    const r = await callApi(SEARCH, {
+      Query: QUERY,
+      Count: 10,
+      Filter: `publish_time>=${String(since)}`,
+    });
     console.log(fingerprintLine('站内 时间过滤', r));
     expect(r.code, '若这里回 10001：知乎不再识别站内 Filter，插件的时间过滤已静默失效').toBe(0);
     const times = editTimesOf(r.items);
@@ -100,7 +123,11 @@ describe.skipIf(!hasCredential)('契约：zhihu_search 站内搜索', () => {
 
   it('SearchHashId 仍不是游标：原样回传不改变结果', async () => {
     const first = await callApi(SEARCH, { Query: QUERY, Count: 10 });
-    const echoed = await callApi(SEARCH, { Query: QUERY, Count: 10, SearchHashId: first.searchHashId ?? '' });
+    const echoed = await callApi(SEARCH, {
+      Query: QUERY,
+      Count: 10,
+      SearchHashId: first.searchHashId ?? '',
+    });
     expect(
       sameSequence(idsOf(echoed.items), idsOf(first.items)),
       '若失败：SearchHashId 变成了游标，「没有翻页」这个结论要重评',
@@ -108,7 +135,11 @@ describe.skipIf(!hasCredential)('契约：zhihu_search 站内搜索', () => {
   });
 
   it('空态字段 EmptyReason 仍是常量「无相关内容」', async () => {
-    const r = await callApi(SEARCH, { Query: QUERY, Count: 5, Filter: `publish_time>=${String(FAR_FUTURE)}` });
+    const r = await callApi(SEARCH, {
+      Query: QUERY,
+      Count: 5,
+      Filter: `publish_time>=${String(FAR_FUTURE)}`,
+    });
     expect(r.code).toBe(0);
     expect(r.items).toHaveLength(0);
     expect(

@@ -27,7 +27,9 @@ describe('ZhihuClient.quota', () => {
   });
 
   it('失败时抛 ZhihuClientError，而不是返回坏数据', async () => {
-    const harness = makeHarness(async () => jsonResponse({ Code: 20001, Message: 'auth failed', Data: null }));
+    const harness = makeHarness(async () =>
+      jsonResponse({ Code: 20001, Message: 'auth failed', Data: null }),
+    );
     await expect(harness.deps.client.quota()).rejects.toBeInstanceOf(ZhihuClientError);
     harness.dispose();
   });

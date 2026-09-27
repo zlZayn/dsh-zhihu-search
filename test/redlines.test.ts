@@ -16,11 +16,13 @@ import { envelope, jsonResponse, makeHarness } from './helpers.js';
 
 /** 去掉块注释与行注释，避免注释里的字样触发守卫。 */
 function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+const packageJson = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+) as {
   name?: string;
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
@@ -32,7 +34,11 @@ const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.me
 function allTools() {
   const harness = makeHarness(async () => jsonResponse(envelope({ HasMore: false, Items: [] })));
   return {
-    tools: [createZhihuSearchTool(harness.deps), createZhihuGlobalSearchTool(harness.deps), createZhihuZhidaTool(harness.deps)],
+    tools: [
+      createZhihuSearchTool(harness.deps),
+      createZhihuGlobalSearchTool(harness.deps),
+      createZhihuZhidaTool(harness.deps),
+    ],
     dispose: () => {
       harness.dispose();
     },
@@ -46,7 +52,11 @@ describe('红线 1：@deepseek-ai/* 绝不进入 dependencies', () => {
   });
 
   it('上下文相关包全部在 peerDependencies 与 devDependencies', () => {
-    for (const name of ['@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/schemastery']) {
+    for (const name of [
+      '@deepseek-ai/cordis',
+      '@deepseek-ai/dsh-tools',
+      '@deepseek-ai/schemastery',
+    ]) {
       expect(Object.keys(packageJson.peerDependencies ?? {})).toContain(name);
       expect(Object.keys(packageJson.devDependencies ?? {})).toContain(name);
     }
@@ -121,7 +131,10 @@ describe('声明面自洽：任何 @deepseek-ai/dsh-* 的下限都不得低于 e
   it('engines.dsh 与每条 dsh 声明的下限都取同一档，且不低于它', () => {
     const floor = floorOf(packageJson.engines?.['dsh'] ?? '');
     expect(floor, 'engines.dsh 读不出下限').toBeDefined();
-    expect(floor![3], 'engines.dsh 的下限必须点名一条线（预发布标签），否则 next/alpha 会被混为一谈').not.toBe('');
+    expect(
+      floor![3],
+      'engines.dsh 的下限必须点名一条线（预发布标签），否则 next/alpha 会被混为一谈',
+    ).not.toBe('');
 
     const declared = [
       ...Object.entries(packageJson.peerDependencies ?? {}),
@@ -133,13 +146,18 @@ describe('声明面自洽：任何 @deepseek-ai/dsh-* 的下限都不得低于 e
     for (const [name, range] of declared) {
       const own = floorOf(range);
       expect(own, `${name} 的区间读不出下限：${range}`).toBeDefined();
-      expect(compareFloors(own!, floor!), `${name} 声明 ${range}，低于 engines.dsh 的下限`).toBeGreaterThanOrEqual(0);
+      expect(
+        compareFloors(own!, floor!),
+        `${name} 声明 ${range}，低于 engines.dsh 的下限`,
+      ).toBeGreaterThanOrEqual(0);
     }
   });
 });
 
 describe('类型检查开关', () => {
-  const tsconfig = JSON.parse(stripComments(readFileSync(new URL('../tsconfig.json', import.meta.url), 'utf8'))) as {
+  const tsconfig = JSON.parse(
+    stripComments(readFileSync(new URL('../tsconfig.json', import.meta.url), 'utf8')),
+  ) as {
     compilerOptions?: Record<string, unknown>;
   };
 
@@ -147,7 +165,12 @@ describe('类型检查开关', () => {
     // 它们是「类型与死代码」这一档的守卫（与 ESLint 的分工见 2026-09-27-adopt-eslint-prettier.md）：
     // 缺任何一个，覆盖面就不再成立。
     // client 与 test 两个 project 都 extends 根 tsconfig，所以这里一处生效、三个 project 都覆盖。
-    const flags = ['noUnusedLocals', 'noUnusedParameters', 'noImplicitReturns', 'noFallthroughCasesInSwitch'];
+    const flags = [
+      'noUnusedLocals',
+      'noUnusedParameters',
+      'noImplicitReturns',
+      'noFallthroughCasesInSwitch',
+    ];
     for (const flag of flags) {
       expect(tsconfig.compilerOptions?.[flag], flag).toBe(true);
     }
@@ -159,7 +182,9 @@ describe('锁文件：resolved 必须指向官方源', () => {
     // 镜像生成的锁文件会让 CI 去镜像取包（供应链隐患），也可能因镜像未同步而让 npm ci 失败。
     // 这条此前只写在 docs/PUBLISHING.md 的前置条件里（散文）—— 规则住在文字里就没人执行，
     // 所以 2026-09-20 落成断言。
-    const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8')) as {
+    const lock = JSON.parse(
+      readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'),
+    ) as {
       packages?: Record<string, { resolved?: string }>;
     };
     const offenders = Object.entries(lock.packages ?? {})
@@ -175,7 +200,16 @@ describe('红线 2 & 3：呈现层与模型上下文严格隔离', () => {
   it('模型可见的 Markdown 不含任何 UI 卡片字段', async () => {
     const { tools, dispose } = allTools();
     for (const tool of tools) {
-      const value = { ok: true, query: 'q', question: 'q', model: 'm', answer: 'a', reasoning: '', items: [], hasMore: false };
+      const value = {
+        ok: true,
+        query: 'q',
+        question: 'q',
+        model: 'm',
+        answer: 'a',
+        reasoning: '',
+        items: [],
+        hasMore: false,
+      };
       const blocks = tool.output.render({ query: 'q', question: 'q' }, value);
       const text = blocks.map((block) => ('text' in block ? block.text : '')).join('');
       expect(text).not.toContain('"card"');
@@ -190,7 +224,16 @@ describe('红线 2 & 3：呈现层与模型上下文严格隔离', () => {
     const value = {
       ok: true,
       query: 'q',
-      items: [{ title: 't', url: 'https://a', snippet: 's', author: 'a', voteUpCount: 1, contentType: 'Answer' }],
+      items: [
+        {
+          title: 't',
+          url: 'https://a',
+          snippet: 's',
+          author: 'a',
+          voteUpCount: 1,
+          contentType: 'Answer',
+        },
+      ],
       hasMore: false,
     };
     for (const tool of tools) {
@@ -205,8 +248,18 @@ describe('红线 2 & 3：呈现层与模型上下文严格隔离', () => {
 
 describe('红线 4：无可变全局状态', () => {
   it('两次 createState 完全隔离', () => {
-    const a = createState({ cacheMaxEntries: 10, cacheTtlMs: 1000, searchPerMinute: 1, zhidaPerMinute: 1 });
-    const b = createState({ cacheMaxEntries: 10, cacheTtlMs: 1000, searchPerMinute: 1, zhidaPerMinute: 1 });
+    const a = createState({
+      cacheMaxEntries: 10,
+      cacheTtlMs: 1000,
+      searchPerMinute: 1,
+      zhidaPerMinute: 1,
+    });
+    const b = createState({
+      cacheMaxEntries: 10,
+      cacheTtlMs: 1000,
+      searchPerMinute: 1,
+      zhidaPerMinute: 1,
+    });
     a.cache.set('k', 'v');
     expect(b.cache.get('k')).toBeUndefined();
     expect(a.searchBucket.tryConsume()).toBe(true);
@@ -218,7 +271,12 @@ describe('红线 4：无可变全局状态', () => {
   });
 
   it('dispose 会清空缓存', () => {
-    const state = createState({ cacheMaxEntries: 10, cacheTtlMs: 60_000, searchPerMinute: 60, zhidaPerMinute: 10 });
+    const state = createState({
+      cacheMaxEntries: 10,
+      cacheTtlMs: 60_000,
+      searchPerMinute: 60,
+      zhidaPerMinute: 10,
+    });
     state.cache.set('k', 'v');
     state.dispose();
     expect(state.cache.get('k')).toBeUndefined();
@@ -234,7 +292,13 @@ describe('红线 4：无可变全局状态', () => {
   });
 
   it('源码里没有模块级 let 声明（可变全局的典型形态）', () => {
-    const files = ['src/transport.ts', 'src/state.ts', 'src/utils/compiler.ts', 'src/utils/text.ts', 'src/utils/errors.ts'];
+    const files = [
+      'src/transport.ts',
+      'src/state.ts',
+      'src/utils/compiler.ts',
+      'src/utils/text.ts',
+      'src/utils/errors.ts',
+    ];
     for (const file of files) {
       const source = readFileSync(root + file, 'utf8');
       const topLevelLet = source.split('\n').filter((line) => /^(export )?let\s/.test(line));
@@ -262,7 +326,15 @@ describe('红线 5：模型绝不接触知乎原始语法', () => {
     const { tools, dispose } = allTools();
     for (const tool of tools) {
       const serialized = JSON.stringify(tool.parameters);
-      for (const forbidden of ['SortBy', 'Filter', 'VoteUpCount', 'CommentCount', 'publish_time', 'host==', 'desc:(']) {
+      for (const forbidden of [
+        'SortBy',
+        'Filter',
+        'VoteUpCount',
+        'CommentCount',
+        'publish_time',
+        'host==',
+        'desc:(',
+      ]) {
         expect(serialized, tool.name).not.toContain(forbidden);
       }
     }
@@ -303,9 +375,8 @@ describe('工具集不变量', () => {
       .filter((line) => !line.trimStart().startsWith('#'))
       .join('\n');
     expect(effective).not.toContain('@local/');
-    expect(effective).toContain(`name: ${packageJson.name}`)
+    expect(effective).toContain(`name: ${packageJson.name}`);
   });
-
 
   it('每个工具都有真实的描述文本（模型靠它做工具选择）', () => {
     const { tools, dispose } = allTools();
@@ -359,7 +430,10 @@ describe('文档不抄实测值', () => {
   }
 
   it('活文档里不写会漂的宿主版本；门面要留就得与真源同行', () => {
-    const files = [...liveDocs(), ...readdirSync(root + '.github/workflows').map((name) => '.github/workflows/' + name)];
+    const files = [
+      ...liveDocs(),
+      ...readdirSync(root + '.github/workflows').map((name) => '.github/workflows/' + name),
+    ];
     // 扫不到文件说明 walk 的路径规则坏了，先红这个，别让它静默变成一条永不触发的守卫。
     expect(files.length).toBeGreaterThan(10);
 
@@ -369,8 +443,14 @@ describe('文档不抄实测值', () => {
         for (const value of line.match(HOST_VERSION) ?? []) {
           if (FACADE.includes(file) && line.includes(HOME)) continue;
           throw new Error(
-            file + ':' + (index + 1) + ' 抄了会漂的宿主版本 ' + value +
-              ' —— 改成指向 ' + HOME + ' 的指针，或现查 npm view @deepseek-ai/dsh dist-tags',
+            file +
+              ':' +
+              (index + 1) +
+              ' 抄了会漂的宿主版本 ' +
+              value +
+              ' —— 改成指向 ' +
+              HOME +
+              ' 的指针，或现查 npm view @deepseek-ai/dsh dist-tags',
           );
         }
       });
@@ -379,7 +459,9 @@ describe('文档不抄实测值', () => {
 
   it('守卫跟着宿主线走：宿主换主版本号时这条会红，来改 HOST_VERSION', () => {
     // 声明面写的是范围（下限 + 上界），所以形状判据落在下限上。
-    expect(packageJson.engines?.['dsh'], '宿主已不在 0.x 线上，HOST_VERSION 的形状要跟着改')
-      .toMatch(/(?:^|[>=\s])0\./);
+    expect(
+      packageJson.engines?.['dsh'],
+      '宿主已不在 0.x 线上，HOST_VERSION 的形状要跟着改',
+    ).toMatch(/(?:^|[>=\s])0\./);
   });
 });

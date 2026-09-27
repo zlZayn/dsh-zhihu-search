@@ -110,10 +110,16 @@ export function projectItem(item: ZhihuSearchItem): SearchOutput['items'][number
     // 上游没报点赞数时整个键省略，不兜底成 0 —— 写 0 等于告诉模型「没人赞」。
     // 注意实测结论：上游**从未省略**该字段，外站网页也有这个键、值是占位的 0。
     // 省略分支是防伪造的兜底；外站那个 0 由渲染层决定不展示（present/search.ts）。
-    ...(typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount) ? { voteUpCount: item.VoteUpCount } : {}),
+    ...(typeof item.VoteUpCount === 'number' && Number.isFinite(item.VoteUpCount)
+      ? { voteUpCount: item.VoteUpCount }
+      : {}),
     // 投影规则同上：上游没报就省略，绝不兜底成 0（外站那个 0 是占位值，由渲染层决定不展示）。
-    ...(typeof item.CommentCount === 'number' && Number.isFinite(item.CommentCount) ? { commentCount: item.CommentCount } : {}),
-    ...(typeof item.EditTime === 'number' && Number.isFinite(item.EditTime) ? { editTime: item.EditTime } : {}),
+    ...(typeof item.CommentCount === 'number' && Number.isFinite(item.CommentCount)
+      ? { commentCount: item.CommentCount }
+      : {}),
+    ...(typeof item.EditTime === 'number' && Number.isFinite(item.EditTime)
+      ? { editTime: item.EditTime }
+      : {}),
     // ContentType 缺失时留空，不编造标签：实测站内与网页链接的平台各自返回**空串**（字段在、值为空），
     // 兜底成 'Answer'（站内）或 'Article'（全网）都会让模型把陌生网页当成知乎内容。
     contentType: typeof item.ContentType === 'string' ? item.ContentType : '',

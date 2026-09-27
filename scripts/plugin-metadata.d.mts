@@ -55,4 +55,7 @@ export function readManifest(root: string): Manifest;
  * @param language - 语言 id，例如 `en`。
  * @returns `meta` 字段，缺文件时 `undefined`。
  */
-export function displayMetadata(root: string, language: string): { title?: string; description?: string } | undefined;
+export function displayMetadata(
+  root: string,
+  language: string,
+): { title?: string; description?: string } | undefined;

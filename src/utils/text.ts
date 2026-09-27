@@ -72,5 +72,7 @@ export function stripTrackingParams(input: string): string {
   });
   for (const key of keys) parsed.searchParams.delete(key);
   // 参数被清空后会留下一个孤立的 '?'，Markdown 链接里很难看。
-  return parsed.search === '' && input.includes('?') ? `${parsed.origin}${parsed.pathname}${parsed.hash}` : parsed.toString();
+  return parsed.search === '' && input.includes('?')
+    ? `${parsed.origin}${parsed.pathname}${parsed.hash}`
+    : parsed.toString();
 }

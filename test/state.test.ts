@@ -22,10 +22,17 @@ describe('stableStringify', () => {
 });
 
 describe('buildCacheKey', () => {
-  const base = { toolName: 'zhihu_search', baseUrl: 'https://x', accessSecret: 'secret-a', args: { q: 1 } };
+  const base = {
+    toolName: 'zhihu_search',
+    baseUrl: 'https://x',
+    accessSecret: 'secret-a',
+    args: { q: 1 },
+  };
 
   it('参数键顺序不同但语义相同则键相同', () => {
-    expect(buildCacheKey({ ...base, args: { a: 1, b: 2 } })).toBe(buildCacheKey({ ...base, args: { b: 2, a: 1 } }));
+    expect(buildCacheKey({ ...base, args: { a: 1, b: 2 } })).toBe(
+      buildCacheKey({ ...base, args: { b: 2, a: 1 } }),
+    );
   });
 
   it('换凭据即换缓存空间', () => {
@@ -42,7 +49,8 @@ describe('buildCacheKey', () => {
 });
 
 describe('MemoryCache', () => {
-  const makeCache = (now: () => number) => new MemoryCache<string>({ maxEntries: 2, defaultTtlMs: 1000, now });
+  const makeCache = (now: () => number) =>
+    new MemoryCache<string>({ maxEntries: 2, defaultTtlMs: 1000, now });
 
   it('未过期时命中', () => {
     const t = 0;

@@ -23,7 +23,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 // 类型面由 [../scripts/plugin-metadata.d.mts](../scripts/plugin-metadata.d.mts) 提供（手写，改实现时同批改）。
-import { displayMetadata, inspectPluginMetadata, readManifest, type Manifest } from '../scripts/plugin-metadata.mjs';
+import {
+  displayMetadata,
+  inspectPluginMetadata,
+  readManifest,
+  type Manifest,
+} from '../scripts/plugin-metadata.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -49,7 +54,10 @@ function fixture(mutate: (dir: string) => void): string {
   fixtures.push(dir);
   mkdirSync(join(dir, 'locale'));
   for (const language of ['en', 'zh']) {
-    writeFileSync(join(dir, 'locale', `${language}.json`), readFileSync(join(root, 'locale', `${language}.json`)));
+    writeFileSync(
+      join(dir, 'locale', `${language}.json`),
+      readFileSync(join(root, 'locale', `${language}.json`)),
+    );
   }
   // 清单与图标先照抄本仓那份：只改一处，红了才说明是那一处引起的。
   writeFileSync(join(dir, 'package.json'), JSON.stringify(readManifest(root), null, 2));
@@ -138,13 +146,24 @@ describe('展示元数据：宿主读得到（本仓现状）', () => {
     expect(meta.icon).toBe('./icon.svg');
     const svg = readFileSync(join(root, 'icon.svg'), 'utf8');
     expect(svg).toContain('viewBox="0 0 36 36"');
-    for (const forbidden of ['currentColor', '<image', 'href', 'url(', '@import', 'font-family', '<style']) {
+    for (const forbidden of [
+      'currentColor',
+      '<image',
+      'href',
+      'url(',
+      '@import',
+      'font-family',
+      '<style',
+    ]) {
       expect(svg, forbidden).not.toContain(forbidden);
     }
   });
 
   it('locale 的 meta 与卡片字典的 key 互不重叠（两个命名空间，谁也不读对方）', () => {
-    const en = JSON.parse(readFileSync(join(root, 'locale', 'en.json'), 'utf8')) as Record<string, unknown>;
+    const en = JSON.parse(readFileSync(join(root, 'locale', 'en.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
     expect(Object.keys(en)).toEqual(['meta']);
     expect(displayMetadata(root, 'en')?.title).toBe(titles.en);
   });
@@ -169,7 +188,9 @@ describe('展示元数据守卫：反向控制', () => {
       writeManifest(target, manifest);
     });
     const failure = inspectPluginMetadata(dir).failures;
-    expect(failure.some((entry) => entry.includes('exports 暴露 dsh-zhihu-search/locale/en.json'))).toBe(true);
+    expect(
+      failure.some((entry) => entry.includes('exports 暴露 dsh-zhihu-search/locale/en.json')),
+    ).toBe(true);
   });
 
   it('exports 少 ./package.json 时红（包级回落与图标声明都经它读）', () => {
@@ -182,24 +203,40 @@ describe('展示元数据守卫：反向控制', () => {
   });
 
   it('字段为空串、缺字段或 JSON 写坏时红（宿主只回落，不报错）', () => {
-    const blank = fixture((target) => writeFileSync(join(target, 'locale', 'zh.json'), JSON.stringify({ meta: { title: '   ' } })));
+    const blank = fixture((target) =>
+      writeFileSync(join(target, 'locale', 'zh.json'), JSON.stringify({ meta: { title: '   ' } })),
+    );
     expect(failureFor(blank, 'locale/zh.json 有非空 meta.title')).toBeDefined();
     expect(failureFor(blank, 'locale/zh.json 有非空 meta.description')).toBeDefined();
 
-    const broken = fixture((target) => writeFileSync(join(target, 'locale', 'zh.json'), '{ "meta": '));
+    const broken = fixture((target) =>
+      writeFileSync(join(target, 'locale', 'zh.json'), '{ "meta": '),
+    );
     expect(failureFor(broken, 'locale/zh.json 不是合法 JSON')).toBeDefined();
   });
 
   it('文件名不是语言 id 时红，且不把缺语言的那条一起报出来', () => {
-    const dir = fixture((target) => writeFileSync(join(target, 'locale', 'not_a_language.json'), JSON.stringify({ meta: {} })));
+    const dir = fixture((target) =>
+      writeFileSync(join(target, 'locale', 'not_a_language.json'), JSON.stringify({ meta: {} })),
+    );
     const { failures } = inspectPluginMetadata(dir);
-    expect(failures.some((entry) => entry.includes('not_a_language.json 是合法语言 id'))).toBe(true);
+    expect(failures.some((entry) => entry.includes('not_a_language.json 是合法语言 id'))).toBe(
+      true,
+    );
     // 反向控制的反向：这一处改动不该让「随包」那几条跟着红 —— 否则红了也定位不到真正的原因。
-    expect(failures.some((entry) => entry.includes('files 收录 locale/not_a_language.json'))).toBe(false);
+    expect(failures.some((entry) => entry.includes('files 收录 locale/not_a_language.json'))).toBe(
+      false,
+    );
   });
 
   it('icon 声明越界或写成绝对路径时红，未声明则通过', () => {
-    for (const icon of ['../assets/logo.svg', '/opt/logo.svg', 'C:\\logo.svg', 'https://example.com/logo.svg', '']) {
+    for (const icon of [
+      '../assets/logo.svg',
+      '/opt/logo.svg',
+      'C:\\logo.svg',
+      'https://example.com/logo.svg',
+      '',
+    ]) {
       const dir = fixture((target) => {
         const manifest = readManifest(root);
         manifest.icon = icon;
@@ -229,7 +266,11 @@ describe('展示元数据守卫：反向控制', () => {
      * @param inFiles - 是否把该路径留在 `files` 里。
      * @returns 副本根目录。
      */
-    const withIcon = (icon: string, fill: ((dir: string, path: string) => void) | undefined, inFiles = true): string =>
+    const withIcon = (
+      icon: string,
+      fill: ((dir: string, path: string) => void) | undefined,
+      inFiles = true,
+    ): string =>
       fixture((target) => {
         const manifest = readManifest(root);
         manifest.icon = icon;
@@ -241,9 +282,11 @@ describe('展示元数据守卫：反向控制', () => {
         if (fill !== undefined) fill(target, relative);
       });
     /** 写一个指定字节数的占位文件（内容对判定不重要，大小才是）。 */
-    const bytes = (count: number) => (dir: string, path: string): void => {
-      writeFileSync(join(dir, path), 'x'.repeat(count));
-    };
+    const bytes =
+      (count: number) =>
+      (dir: string, path: string): void => {
+        writeFileSync(join(dir, path), 'x'.repeat(count));
+      };
 
     // 两件事各自单独验：文件不在（files 里还留着）与没随包（文件在）。
     const missing = withIcon('./icon.svg', undefined);
@@ -255,7 +298,11 @@ describe('展示元数据守卫：反向控制', () => {
     expect(failureFor(present, 'icon 不超过 256 KiB')).toBeUndefined();
 
     expect(failureFor(withIcon('./icon.ico', bytes(16)), 'icon 扩展名在宿主名单内')).toBeDefined();
-    expect(failureFor(withIcon('./icon.svg', bytes(256 * 1024 + 1)), 'icon 不超过 256 KiB')).toBeDefined();
-    expect(failureFor(withIcon('./icon.svg', bytes(16), false), 'files 收录 icon.svg')).toBeDefined();
+    expect(
+      failureFor(withIcon('./icon.svg', bytes(256 * 1024 + 1)), 'icon 不超过 256 KiB'),
+    ).toBeDefined();
+    expect(
+      failureFor(withIcon('./icon.svg', bytes(16), false), 'files 收录 icon.svg'),
+    ).toBeDefined();
   });
 });

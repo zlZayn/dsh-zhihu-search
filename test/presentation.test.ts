@@ -20,8 +20,22 @@ const okValue: SearchOutput = {
   ok: true,
   query: 'RAG',
   items: [
-    { title: '如何入门 RAG', url: 'https://www.zhihu.com/question/1/answer/2', snippet: '先看论文', author: '张三', voteUpCount: 42, contentType: 'Answer' },
-    { title: '向量库对比', url: 'https://www.zhihu.com/question/3/answer/4', snippet: '评测', author: '李四', voteUpCount: 7, contentType: 'Article' },
+    {
+      title: '如何入门 RAG',
+      url: 'https://www.zhihu.com/question/1/answer/2',
+      snippet: '先看论文',
+      author: '张三',
+      voteUpCount: 42,
+      contentType: 'Answer',
+    },
+    {
+      title: '向量库对比',
+      url: 'https://www.zhihu.com/question/3/answer/4',
+      snippet: '评测',
+      author: '李四',
+      voteUpCount: 7,
+      contentType: 'Article',
+    },
   ],
   hasMore: false,
 };
@@ -56,7 +70,15 @@ describe('renderSearch（模型可见层）', () => {
 
   it('红线 2：模型可见文本里绝不出现 UI 卡片字段', () => {
     const text = textOf(renderSearch(okValue));
-    for (const forbidden of ['"card"', "'card'", 'card:', 'sources', 'presentationMeta', 'truncated', 'kind:']) {
+    for (const forbidden of [
+      '"card"',
+      "'card'",
+      'card:',
+      'sources',
+      'presentationMeta',
+      'truncated',
+      'kind:',
+    ]) {
       expect(text).not.toContain(forbidden);
     }
   });
@@ -74,18 +96,29 @@ describe('renderSearch（模型可见层）', () => {
   });
 
   it('转义标题里的方括号，避免破坏 Markdown 链接结构', () => {
-    const text = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, title: 'RAG[入门]' }] }));
+    const text = textOf(
+      renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, title: 'RAG[入门]' }] }),
+    );
     expect(text).toContain('\\[入门\\]');
   });
 
   it('内容类型为空串时整段省略「类型」，而不是渲染成空的「类型: 」（外站页面实测形态）', () => {
-    const text = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, contentType: '' }] }));
+    const text = textOf(
+      renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, contentType: '' }] }),
+    );
     expect(text).not.toContain('类型');
     expect(text).toContain('**作者**: 张三');
   });
 
   it('外站页面不渲染点赞段：内容类型为空，上游那个 0 是占位值而不是「没人赞」', () => {
-    const external = { title: '第三方页面', url: 'https://example.com/a', snippet: '摘要', author: '某站', contentType: '', voteUpCount: 0 };
+    const external = {
+      title: '第三方页面',
+      url: 'https://example.com/a',
+      snippet: '摘要',
+      author: '某站',
+      contentType: '',
+      voteUpCount: 0,
+    };
     const text = textOf(renderSearch({ ...okValue, items: [external] }));
     expect(text).not.toContain('点赞');
     expect(text).not.toContain('类型');
@@ -93,15 +126,25 @@ describe('renderSearch（模型可见层）', () => {
   });
 
   it('知乎内容缺失点赞数时省略，真 0 照常渲染（「不知道」与「没人赞」是两回事）', () => {
-    const missing = { title: '知乎回答', url: 'https://www.zhihu.com/question/1/answer/2', snippet: '摘要', author: '张三', contentType: 'Answer' };
+    const missing = {
+      title: '知乎回答',
+      url: 'https://www.zhihu.com/question/1/answer/2',
+      snippet: '摘要',
+      author: '张三',
+      contentType: 'Answer',
+    };
     expect(textOf(renderSearch({ ...okValue, items: [missing] }))).not.toContain('点赞');
 
-    const zeroVotes = textOf(renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, voteUpCount: 0 }] }));
+    const zeroVotes = textOf(
+      renderSearch({ ...okValue, items: [{ ...okValue.items[0]!, voteUpCount: 0 }] }),
+    );
     expect(zeroVotes).toContain('**点赞**: 0');
   });
 
   it('带下限的空结果：首句就带条件限定，并说明下限只筛本次候选', () => {
-    const text = textOf(renderSearch({ ...okValue, items: [] }, { requestedCount: 5, minValue: 100, filtered: true }));
+    const text = textOf(
+      renderSearch({ ...okValue, items: [] }, { requestedCount: 5, minValue: 100, filtered: true }),
+    );
     expect(text).toContain('当前筛选条件下未命中');
     expect(text).not.toContain('未找到');
     expect(text).toContain('下限 100');
@@ -115,19 +158,27 @@ describe('renderSearch（模型可见层）', () => {
   });
 
   it('全网空态说的是「全网内容」，不是「知乎内容」', () => {
-    expect(textOf(renderSearch({ ...okValue, items: [] }, { scope: 'global' }))).toContain('全网内容');
+    expect(textOf(renderSearch({ ...okValue, items: [] }, { scope: 'global' }))).toContain(
+      '全网内容',
+    );
   });
 
   it('全网头部按来源构成分流：纯站外 / 混合 / 纯站内', () => {
     const zhihu = okValue.items[0]!;
-    const external = { title: '第三方页面', url: 'https://example.com/a', snippet: '摘要', author: '某站', contentType: '' };
+    const external = {
+      title: '第三方页面',
+      url: 'https://example.com/a',
+      snippet: '摘要',
+      author: '某站',
+      contentType: '',
+    };
 
     expect(textOf(renderSearch({ ...okValue, items: [external] }, { scope: 'global' }))).toContain(
       '的全网结果（纯站外来源）',
     );
-    expect(textOf(renderSearch({ ...okValue, items: [zhihu, external] }, { scope: 'global' }))).toContain(
-      '的全网结果（含 1 条知乎站内）',
-    );
+    expect(
+      textOf(renderSearch({ ...okValue, items: [zhihu, external] }, { scope: 'global' })),
+    ).toContain('的全网结果（含 1 条知乎站内）');
     expect(textOf(renderSearch(okValue, { scope: 'global' }))).toContain('的知乎结果');
     // 站内工具不区分来源，措辞与从前一致。
     expect(textOf(renderSearch(okValue))).toContain('的知乎结果');
@@ -145,7 +196,9 @@ describe('renderSearch（模型可见层）', () => {
       ...okValue.items[0]!,
       url: `https://www.zhihu.com/question/1/answer/${String(i)}`,
     }));
-    const text = textOf(renderSearch({ ...okValue, items: ten }, { requestedCount: 20, maxCount: 10 }));
+    const text = textOf(
+      renderSearch({ ...okValue, items: ten }, { requestedCount: 20, maxCount: 10 }),
+    );
     expect(text).toContain('达到本工具的单次检索上限');
   });
 
@@ -176,7 +229,15 @@ describe('renderSearch（模型可见层）', () => {
     expect(text).toContain('**评论**: 12');
     expect(text).toContain('**时间**: 2026-09-13');
 
-    const external = { title: '外站', url: 'https://example.com/a', snippet: 's', author: '某站', contentType: '', commentCount: 0, editTime: 1789291891 };
+    const external = {
+      title: '外站',
+      url: 'https://example.com/a',
+      snippet: 's',
+      author: '某站',
+      contentType: '',
+      commentCount: 0,
+      editTime: 1789291891,
+    };
     const externalText = textOf(renderSearch({ ...okValue, items: [external] }));
     expect(externalText).not.toContain('评论');
     expect(externalText).toContain('**时间**: 2026-09-13');
@@ -194,7 +255,9 @@ describe('renderSearch（模型可见层）', () => {
 
 describe('searchMetaFromValue（红线 3：必须是纯函数）', () => {
   it('连续两次调用产生完全相同的 JSON', () => {
-    expect(JSON.stringify(searchMetaFromValue(okValue))).toBe(JSON.stringify(searchMetaFromValue(okValue)));
+    expect(JSON.stringify(searchMetaFromValue(okValue))).toBe(
+      JSON.stringify(searchMetaFromValue(okValue)),
+    );
   });
 
   it('不掺入时间戳或随机数', () => {
@@ -204,7 +267,10 @@ describe('searchMetaFromValue（红线 3：必须是纯函数）', () => {
   });
 
   it('只承载 Markdown 无法无损表达的结构化来源', () => {
-    const meta = searchMetaFromValue(okValue) as { sources: Array<{ url: string }>; truncated: boolean };
+    const meta = searchMetaFromValue(okValue) as {
+      sources: Array<{ url: string }>;
+      truncated: boolean;
+    };
     expect(meta.sources).toHaveLength(2);
     expect(meta.sources[0]?.url).toBe('https://www.zhihu.com/question/1/answer/2');
     expect(meta.truncated).toBe(false);
@@ -224,21 +290,39 @@ describe('searchMetaFromValue（红线 3：必须是纯函数）', () => {
 
 describe('searchMetaFromResult（回放鲁棒性）', () => {
   it('对畸形元数据返回 undefined 而不是抛错', () => {
-    for (const bad of [undefined, null, 42, 'x', {}, { sources: 'no' }, { sources: [null, 1, {}] }]) {
+    for (const bad of [
+      undefined,
+      null,
+      42,
+      'x',
+      {},
+      { sources: 'no' },
+      { sources: [null, 1, {}] },
+    ]) {
       expect(() => searchMetaFromResult(bad)).not.toThrow();
     }
-    expect(searchMetaFromResult({ sources: [null, 1, {}] })).toEqual({ sources: [], truncated: false });
+    expect(searchMetaFromResult({ sources: [null, 1, {}] })).toEqual({
+      sources: [],
+      truncated: false,
+    });
   });
 
   it('丢弃缺少 url 的来源', () => {
-    const meta = searchMetaFromResult({ sources: [{ url: 'https://a' }, { title: 'no url' }], truncated: true });
+    const meta = searchMetaFromResult({
+      sources: [{ url: 'https://a' }, { title: 'no url' }],
+      truncated: true,
+    });
     expect(meta?.sources).toHaveLength(1);
     expect(meta?.truncated).toBe(true);
   });
 });
 
 describe('presentSearchResult（UI 层）', () => {
-  const result = { content: renderSearch(okValue), isError: false, meta: searchMetaFromValue(okValue) };
+  const result = {
+    content: renderSearch(okValue),
+    isError: false,
+    meta: searchMetaFromValue(okValue),
+  };
 
   it('产出 web 搜索卡片并携带结构化来源', () => {
     const view = presentSearchResult({ query: 'RAG' }, result);
@@ -270,7 +354,13 @@ describe('presentSearchResult（UI 层）', () => {
 });
 
 describe('renderZhida', () => {
-  const value: ZhidaOutput = { ok: true, question: '什么是 RAG', model: 'zhida-thinking-1p5', answer: '检索增强生成', reasoning: '先想一下' };
+  const value: ZhidaOutput = {
+    ok: true,
+    question: '什么是 RAG',
+    model: 'zhida-thinking-1p5',
+    answer: '检索增强生成',
+    reasoning: '先想一下',
+  };
 
   it('默认不把思维链交给模型（省上下文）', () => {
     const text = textOf(renderZhida(value));
@@ -283,7 +373,14 @@ describe('renderZhida', () => {
   });
 
   it('失败时给出错误与建议', () => {
-    const text = textOf(renderZhida({ ...value, ok: false, answer: '', error: { kind: 'rate_limit', message: '太快了', hint: '慢一点' } }));
+    const text = textOf(
+      renderZhida({
+        ...value,
+        ok: false,
+        answer: '',
+        error: { kind: 'rate_limit', message: '太快了', hint: '慢一点' },
+      }),
+    );
     expect(text).toContain('太快了');
     expect(text).toContain('慢一点');
   });

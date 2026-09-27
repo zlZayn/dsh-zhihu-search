@@ -38,7 +38,12 @@ const { createZhihuGlobalSearchTool } = await load('lib/tools/global-search.js')
 const { compileFilter } = await load('lib/utils/compiler.js');
 const { createState } = await load('lib/state.js');
 
-const state = createState({ cacheMaxEntries: 50, cacheTtlMs: 60_000, searchPerMinute: 60, zhidaPerMinute: 10 });
+const state = createState({
+  cacheMaxEntries: 50,
+  cacheTtlMs: 60_000,
+  searchPerMinute: 60,
+  zhidaPerMinute: 10,
+});
 const client = new ZhihuClient({ accessSecret: secret, baseUrl: 'https://developer.zhihu.com' });
 const deps = {
   client,
@@ -67,13 +72,28 @@ console.log(`验收目标：${target}\n版本：dsh-zhihu-search@${version}\n`);
   const args = { query: 'RAG', minValue: 100, count: 3, sortField: 'voteUpCount' };
   const value = await search.execute(args, exec);
   const votes = value.items.map((item) => item.voteUpCount ?? -1);
-  check('A1 扩池：返回条目全部满足下限', value.ok && votes.length > 0 && votes.every((v) => v >= 100), `条数 ${value.items.length}，点赞 ${JSON.stringify(votes)}`);
-  check('A1 输出通过宿主 schema 校验', schemaErrors(search, value).length === 0, schemaErrors(search, value).join('; '));
+  check(
+    'A1 扩池：返回条目全部满足下限',
+    value.ok && votes.length > 0 && votes.every((v) => v >= 100),
+    `条数 ${value.items.length}，点赞 ${JSON.stringify(votes)}`,
+  );
+  check(
+    'A1 输出通过宿主 schema 校验',
+    schemaErrors(search, value).length === 0,
+    schemaErrors(search, value).join('; '),
+  );
 
   const shortArgs = { query: '大模型', minValue: 500, count: 5, sortField: 'voteUpCount' };
   const shortValue = await search.execute(shortArgs, exec);
   const text = textOf(search.output.render(shortArgs, shortValue));
-  check('A1 筛少时说明「下限只筛本次候选」', text.includes('只在本次检索到的候选中'), text.split('\n').filter((l) => l.includes('筛出')).join(' '));
+  check(
+    'A1 筛少时说明「下限只筛本次候选」',
+    text.includes('只在本次检索到的候选中'),
+    text
+      .split('\n')
+      .filter((l) => l.includes('筛出'))
+      .join(' '),
+  );
 }
 
 // ── 验收 2：输出面与排序档位对称 ─────────────────────────────────
@@ -81,9 +101,21 @@ console.log(`验收目标：${target}\n版本：dsh-zhihu-search@${version}\n`);
   const search = createZhihuSearchTool(deps);
   const args = { query: '大模型', sortField: 'commentCount', count: 3 };
   const value = await search.execute(args, exec);
-  const complete = value.items.length > 0 && value.items.every((item) => typeof item.commentCount === 'number' && typeof item.editTime === 'number');
-  check('A2 每条都带评论数与时间', complete, value.items.map((i) => `c=${i.commentCount},t=${i.editTime}`).join(' | '));
-  check('A2 输出通过宿主 schema 校验', schemaErrors(search, value).length === 0, schemaErrors(search, value).join('; '));
+  const complete =
+    value.items.length > 0 &&
+    value.items.every(
+      (item) => typeof item.commentCount === 'number' && typeof item.editTime === 'number',
+    );
+  check(
+    'A2 每条都带评论数与时间',
+    complete,
+    value.items.map((i) => `c=${i.commentCount},t=${i.editTime}`).join(' | '),
+  );
+  check(
+    'A2 输出通过宿主 schema 校验',
+    schemaErrors(search, value).length === 0,
+    schemaErrors(search, value).join('; '),
+  );
   const text = textOf(search.output.render(args, value));
   check('A2 渲染出评论与时间', text.includes('**评论**') && text.includes('**时间**'));
 }
@@ -96,9 +128,23 @@ console.log(`验收目标：${target}\n版本：dsh-zhihu-search@${version}\n`);
   const global = createZhihuGlobalSearchTool(deps);
   const args = { query: 'DeepSeek Harness', count: 5, site: 'www.github.com' };
   const value = await global.execute(args, exec);
-  const hosts = value.items.map((item) => { try { return new URL(item.url).host; } catch { return '?'; } });
-  check('A3 真机返回 github.com 的结果（旧版为 0 条）', value.ok && value.items.length > 0 && hosts.every((h) => h === 'github.com'), `条数 ${value.items.length}，hosts ${JSON.stringify([...new Set(hosts)])}`);
-  check('A3 输出通过宿主 schema 校验', schemaErrors(global, value).length === 0, schemaErrors(global, value).join('; '));
+  const hosts = value.items.map((item) => {
+    try {
+      return new URL(item.url).host;
+    } catch {
+      return '?';
+    }
+  });
+  check(
+    'A3 真机返回 github.com 的结果（旧版为 0 条）',
+    value.ok && value.items.length > 0 && hosts.every((h) => h === 'github.com'),
+    `条数 ${value.items.length}，hosts ${JSON.stringify([...new Set(hosts)])}`,
+  );
+  check(
+    'A3 输出通过宿主 schema 校验',
+    schemaErrors(global, value).length === 0,
+    schemaErrors(global, value).join('; '),
+  );
 }
 
 console.log(failed === 0 ? '\n全部通过。' : `\n${failed} 项未通过。`);

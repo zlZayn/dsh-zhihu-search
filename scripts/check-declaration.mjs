@@ -23,36 +23,36 @@
  * 输出全英文、前缀 [INFO] / [WARN] / [NOTE]（与 dsh-ds-balance 的同名脚本同一套判据与输出面）。
  */
 
-import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * 我们告诉用户去装的那条 dist-tag 线。README 的「版本兼容」章节与它对齐。
  * 这是一条**线名**不是版本号 —— 会漂的是版本，现查即可，所以不写在这里。
  * 2026-09-24：宿主把新线发在 `next`（`0.1.7-rc.2`），声明面随之从 `alpha` 迁到 `next`。
  */
-export const TRACKED_LINE = 'next'
+export const TRACKED_LINE = 'next';
 
 /** 声明面里的宿主本体：`engines.dsh` 描述的就是它。 */
-const HOST_PACKAGE = '@deepseek-ai/dsh'
+const HOST_PACKAGE = '@deepseek-ai/dsh';
 
 /** 受管的平台包前缀；与 compat-swap.mjs 同一条边界。 */
-const MANAGED_PREFIX = '@deepseek-ai/dsh-'
+const MANAGED_PREFIX = '@deepseek-ai/dsh-';
 
 /** 声明区间可能出现的位置。 */
-const MANIFEST_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies']
+const MANIFEST_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 
 /** 用于上下文对照的三条线。 */
-const LINES = ['alpha', 'next', 'latest']
+const LINES = ['alpha', 'next', 'latest'];
 
 const USAGE = `usage:
   node scripts/check-declaration.mjs [--line <${LINES.join('|')}>]
 
-exit codes: 0 = the declaration covers the line / 1 = it does not / 2 = usage or precondition error`
+exit codes: 0 = the declaration covers the line / 1 = it does not / 2 = usage or precondition error`;
 
-const tagsCache = new Map()
+const tagsCache = new Map();
 
 /**
  * 找 npm 的 CLI 入口，直接用当前 node 跑它。
@@ -60,17 +60,19 @@ const tagsCache = new Map()
  * @returns npm-cli.js 的绝对路径。
  */
 function npmCli() {
-  const execDir = dirname(process.execPath)
+  const execDir = dirname(process.execPath);
   const candidates = [
     process.env.npm_execpath,
     join(execDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
     join(execDir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-  ].filter((value) => typeof value === 'string' && value.length > 0)
-  const found = candidates.find((value) => existsSync(value))
+  ].filter((value) => typeof value === 'string' && value.length > 0);
+  const found = candidates.find((value) => existsSync(value));
   if (!found) {
-    throw new Error('cannot locate the npm CLI entry (npm-cli.js) next to node; run inside a node install that ships npm')
+    throw new Error(
+      'cannot locate the npm CLI entry (npm-cli.js) next to node; run inside a node install that ships npm',
+    );
   }
-  return found
+  return found;
 }
 
 /**
@@ -80,19 +82,25 @@ function npmCli() {
  * @returns 匹配到的版本列表；npm 明确回答「区间内没有版本」时返回空数组。
  */
 function matchingVersions(name, range) {
-  const result = spawnSync(process.execPath, [npmCli(), 'view', `${name}@${range}`, 'version', '--json'], {
-    encoding: 'utf8',
-  })
-  if (result.error) throw result.error
-  const stderr = result.stderr ?? ''
+  const result = spawnSync(
+    process.execPath,
+    [npmCli(), 'view', `${name}@${range}`, 'version', '--json'],
+    {
+      encoding: 'utf8',
+    },
+  );
+  if (result.error) throw result.error;
+  const stderr = result.stderr ?? '';
   // npm 对「区间内没有任何版本」用的是 E404 + 这句；别的失败（网络、registry）必须炸出来，
   // 不能伪装成「罩不住」—— 那会把基础设施故障读成声明问题。
   if (result.status !== 0) {
-    if (stderr.includes('No match found for version')) return []
-    throw new Error(`npm view ${name}@${range} failed: ${stderr.trim().split('\n').slice(0, 3).join(' ')}`)
+    if (stderr.includes('No match found for version')) return [];
+    throw new Error(
+      `npm view ${name}@${range} failed: ${stderr.trim().split('\n').slice(0, 3).join(' ')}`,
+    );
   }
-  const parsed = JSON.parse(result.stdout)
-  return Array.isArray(parsed) ? parsed : [parsed]
+  const parsed = JSON.parse(result.stdout);
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
 /**
@@ -101,14 +109,14 @@ function matchingVersions(name, range) {
  * @returns dist-tag 到版本的表。
  */
 async function distTags(name) {
-  if (tagsCache.has(name)) return tagsCache.get(name)
+  if (tagsCache.has(name)) return tagsCache.get(name);
   const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
     headers: { accept: 'application/vnd.npm.install-v1+json' },
-  })
-  if (!response.ok) throw new Error(`registry answered ${response.status} for ${name}`)
-  const tags = (await response.json())['dist-tags'] ?? {}
-  tagsCache.set(name, tags)
-  return tags
+  });
+  if (!response.ok) throw new Error(`registry answered ${response.status} for ${name}`);
+  const tags = (await response.json())['dist-tags'] ?? {};
+  tagsCache.set(name, tags);
+  return tags;
 }
 
 /**
@@ -117,19 +125,19 @@ async function distTags(name) {
  * @returns 逐条声明，`where` 指明它写在哪儿。
  */
 function declarations(manifest) {
-  const found = []
-  const enginesDsh = manifest.engines?.dsh
+  const found = [];
+  const enginesDsh = manifest.engines?.dsh;
   if (typeof enginesDsh === 'string') {
-    found.push({ where: 'engines.dsh', name: HOST_PACKAGE, range: enginesDsh })
+    found.push({ where: 'engines.dsh', name: HOST_PACKAGE, range: enginesDsh });
   }
   for (const field of MANIFEST_FIELDS) {
     for (const [name, range] of Object.entries(manifest[field] ?? {})) {
-      if (!name.startsWith(MANAGED_PREFIX)) continue
-      if (typeof range !== 'string') continue
-      found.push({ where: field, name, range })
+      if (!name.startsWith(MANAGED_PREFIX)) continue;
+      if (typeof range !== 'string') continue;
+      found.push({ where: field, name, range });
     }
   }
-  return found
+  return found;
 }
 
 /**
@@ -138,81 +146,96 @@ function declarations(manifest) {
  * @returns 进程退出码。
  */
 async function check(line) {
-  const manifest = JSON.parse(readFileSync('package.json', 'utf8'))
-  const decls = declarations(manifest)
-  if (decls.length === 0) throw new Error('package.json declares no dsh compatibility range at all')
+  const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+  const decls = declarations(manifest);
+  if (decls.length === 0)
+    throw new Error('package.json declares no dsh compatibility range at all');
 
-  console.log(`[INFO] tracked line: ${line} (the dist-tag line the README's version-compatibility section names)`)
+  console.log(
+    `[INFO] tracked line: ${line} (the dist-tag line the README's version-compatibility section names)`,
+  );
 
   // 上下文：三条线现在各指向什么。只有被跟的那条会因为「罩不住」变红。
-  const names = [...new Set(decls.map((entry) => entry.name))].sort()
+  const names = [...new Set(decls.map((entry) => entry.name))].sort();
   for (const name of names) {
-    const tags = await distTags(name)
-    const cells = LINES.map((candidate) => `${candidate}=${tags[candidate] ?? '-'}`).join('  ')
-    console.log(`[INFO] ${name}  ${cells}`)
+    const tags = await distTags(name);
+    const cells = LINES.map((candidate) => `${candidate}=${tags[candidate] ?? '-'}`).join('  ');
+    console.log(`[INFO] ${name}  ${cells}`);
   }
 
-  const lineVersions = new Map()
+  const lineVersions = new Map();
   for (const name of names) {
-    const version = (await distTags(name))[line]
-    if (typeof version !== 'string') throw new Error(`${name} has no ${line} dist-tag`)
-    lineVersions.set(name, version)
+    const version = (await distTags(name))[line];
+    if (typeof version !== 'string') throw new Error(`${name} has no ${line} dist-tag`);
+    lineVersions.set(name, version);
   }
 
-  const uncovered = []
+  const uncovered = [];
   for (const entry of decls) {
-    const version = lineVersions.get(entry.name)
-    const matches = matchingVersions(entry.name, entry.range)
+    const version = lineVersions.get(entry.name);
+    const matches = matchingVersions(entry.name, entry.range);
     if (matches.includes(version)) {
-      console.log(`[INFO] ${entry.where} declares ${entry.range} for ${entry.name} — covers ${version}`)
-      continue
+      console.log(
+        `[INFO] ${entry.where} declares ${entry.range} for ${entry.name} — covers ${version}`,
+      );
+      continue;
     }
-    uncovered.push(entry)
-    console.log(`[WARN] ${entry.where} declares ${entry.range} for ${entry.name} — does NOT cover ${version}`)
+    uncovered.push(entry);
+    console.log(
+      `[WARN] ${entry.where} declares ${entry.range} for ${entry.name} — does NOT cover ${version}`,
+    );
   }
 
   // 判据落在被跟的那条线上，而不是 `latest`：宿主 `latest` 指向的版本比被跟的线还旧
   // （README 的安装一节因此要求显式点名版本线）。`latest` 更旧这件事是实测出来的，
   // 所以这里现比一次、打印出来，而不是把结论写死。
-  const hostTags = await distTags(HOST_PACKAGE)
+  const hostTags = await distTags(HOST_PACKAGE);
   if (hostTags.latest !== undefined && hostTags.latest !== hostTags[line]) {
-    console.log(`[NOTE] ${HOST_PACKAGE} latest=${hostTags.latest} differs from ${line}=${hostTags[line]}; the judgement is on the ${line} line.`)
+    console.log(
+      `[NOTE] ${HOST_PACKAGE} latest=${hostTags.latest} differs from ${line}=${hostTags[line]}; the judgement is on the ${line} line.`,
+    );
   }
 
   if (uncovered.length === 0) {
-    console.log(`[NOTE] declaration check passed: all ${decls.length} declared ranges cover the ${line} line`)
-    return 0
+    console.log(
+      `[NOTE] declaration check passed: all ${decls.length} declared ranges cover the ${line} line`,
+    );
+    return 0;
   }
-  console.log(`[WARN] declaration check failed: ${uncovered.length} of ${decls.length} declared ranges do not cover the ${line} line`)
-  console.log('[NOTE] update the declared ranges in package.json to a version you actually tested, or move the tracked line.')
-  return 1
+  console.log(
+    `[WARN] declaration check failed: ${uncovered.length} of ${decls.length} declared ranges do not cover the ${line} line`,
+  );
+  console.log(
+    '[NOTE] update the declared ranges in package.json to a version you actually tested, or move the tracked line.',
+  );
+  return 1;
 }
 
 function usageError(message) {
-  if (message) console.error(`[WARN] ${message}`)
-  console.error(USAGE)
-  process.exit(2)
+  if (message) console.error(`[WARN] ${message}`);
+  console.error(USAGE);
+  process.exit(2);
 }
 
 function parseLine(argv) {
-  const index = argv.indexOf('--line')
-  if (index === -1) return TRACKED_LINE
-  const line = argv[index + 1]
-  if (!line) usageError('--line needs a dist-tag after it')
-  if (!LINES.includes(line)) usageError(`unknown dist-tag: ${line}`)
-  return line
+  const index = argv.indexOf('--line');
+  if (index === -1) return TRACKED_LINE;
+  const line = argv[index + 1];
+  if (!line) usageError('--line needs a dist-tag after it');
+  if (!LINES.includes(line)) usageError(`unknown dist-tag: ${line}`);
+  return line;
 }
 
 /** 只有被当命令跑时才执行；被 import 时只暴露 TRACKED_LINE。 */
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const argv = process.argv.slice(2)
-  if (argv.includes('--help') || argv.includes('-h')) usageError('')
-  let code
+  const argv = process.argv.slice(2);
+  if (argv.includes('--help') || argv.includes('-h')) usageError('');
+  let code;
   try {
-    code = await check(parseLine(argv))
+    code = await check(parseLine(argv));
   } catch (error) {
-    console.error(`[WARN] ${error.message}`)
-    code = 2
+    console.error(`[WARN] ${error.message}`);
+    code = 2;
   }
-  process.exit(code)
+  process.exit(code);
 }

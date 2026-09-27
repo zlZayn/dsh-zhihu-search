@@ -53,15 +53,28 @@ describe('编译后的 host 图可在 Node 中求值', () => {
     };
     const ctx = {
       fiber: { id: 'zhihu-search-fiber' },
-      tools: { register: (d: { name: string }) => { registered.push(d.name); return () => undefined; } },
+      tools: {
+        register: (d: { name: string }) => {
+          registered.push(d.name);
+          return () => undefined;
+        },
+      },
       settings: {
-        configure: (presentation: unknown) => { presentations.push(presentation); return () => undefined; },
+        configure: (presentation: unknown) => {
+          presentations.push(presentation);
+          return () => undefined;
+        },
       },
       credentials,
-      inject: (_s: string[], cb: (c: unknown) => void) => { cb(ctx); },
+      inject: (_s: string[], cb: (c: unknown) => void) => {
+        cb(ctx);
+      },
       on: () => () => undefined,
       get: () => undefined,
-      effect: (fn: () => unknown) => { fn(); return { dispose: async () => undefined }; },
+      effect: (fn: () => unknown) => {
+        fn();
+        return { dispose: async () => undefined };
+      },
       logger: { warn: () => undefined },
     };
     mod.apply(ctx, mod.Config({ accessSecret: 'x' }));

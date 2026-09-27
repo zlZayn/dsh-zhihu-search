@@ -43,17 +43,23 @@ describe('decodeEntities', () => {
 
 describe('stripTrackingParams', () => {
   it('剥离知乎追加的 utm 溯源参数', () => {
-    expect(stripTrackingParams('https://www.zhihu.com/question/1/answer/2?utm_medium=openapi_platform&utm_source=abc123')).toBe(
-      'https://www.zhihu.com/question/1/answer/2',
-    );
+    expect(
+      stripTrackingParams(
+        'https://www.zhihu.com/question/1/answer/2?utm_medium=openapi_platform&utm_source=abc123',
+      ),
+    ).toBe('https://www.zhihu.com/question/1/answer/2');
   });
 
   it('保留业务参数', () => {
-    expect(stripTrackingParams('https://example.com/a?page=2&utm_source=x')).toBe('https://example.com/a?page=2');
+    expect(stripTrackingParams('https://example.com/a?page=2&utm_source=x')).toBe(
+      'https://example.com/a?page=2',
+    );
   });
 
   it('保留锚点', () => {
-    expect(stripTrackingParams('https://example.com/a?utm_source=x#sec')).toBe('https://example.com/a#sec');
+    expect(stripTrackingParams('https://example.com/a?utm_source=x#sec')).toBe(
+      'https://example.com/a#sec',
+    );
   });
 
   it('无法解析时原样返回而不是抛错', () => {

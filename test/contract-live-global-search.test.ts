@@ -30,7 +30,10 @@ describe.skipIf(!hasCredential)('契约：zhihu_global_search 全网搜索', () 
     console.log(fingerprintLine('全网基线', r));
     expect(r.code).toBe(0);
     expect(r.items.length).toBeGreaterThan(0);
-    expect(r.items.length, '上限变了就要同步 tools/global-search.ts 的 MAX_COUNT 与 README 的 1–20').toBeLessThanOrEqual(20);
+    expect(
+      r.items.length,
+      '上限变了就要同步 tools/global-search.ts 的 MAX_COUNT 与 README 的 1–20',
+    ).toBeLessThanOrEqual(20);
   });
 
   it('host 是整串精确匹配：返回的 host 恒等于过滤值，根域不命中子域', async () => {
@@ -71,7 +74,11 @@ describe.skipIf(!hasCredential)('契约：zhihu_global_search 全网搜索', () 
 
   it('Filter=publish_time 生效：返回项的 EditTime 全部不早于阈值', async () => {
     const since = Math.floor(Date.now() / 1000) - 30 * DAY_SECONDS;
-    const r = await callApi(GLOBAL, { Query: QUERY, Count: 10, Filter: `publish_time>=${String(since)}` });
+    const r = await callApi(GLOBAL, {
+      Query: QUERY,
+      Count: 10,
+      Filter: `publish_time>=${String(since)}`,
+    });
     expect(r.code).toBe(0);
     const times = editTimesOf(r.items);
     expect(times.length).toBeGreaterThan(0);
@@ -83,7 +90,10 @@ describe.skipIf(!hasCredential)('契约：zhihu_global_search 全网搜索', () 
     expect(r.code).toBe(0);
     expect(r.items.length).toBeGreaterThan(0);
     for (const item of r.items) {
-      expect(strField(item, 'ContentType'), '若失败：外站页面开始带类型，渲染层的空串判据要重评').toBe('');
+      expect(
+        strField(item, 'ContentType'),
+        '若失败：外站页面开始带类型，渲染层的空串判据要重评',
+      ).toBe('');
       expect(votesOf([item])[0], '若失败：外站开始给真实点赞数，占位 0 的取舍要重评').toBe(0);
     }
   });

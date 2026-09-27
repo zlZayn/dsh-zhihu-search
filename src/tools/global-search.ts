@@ -12,9 +12,19 @@
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools';
 import { compileFilter } from '../utils/compiler.js';
-import { presentSearchCall, presentSearchResult, renderSearch, searchMetaFromValue } from '../present/search.js';
+import {
+  presentSearchCall,
+  presentSearchResult,
+  renderSearch,
+  searchMetaFromValue,
+} from '../present/search.js';
 import { GLOBAL_SEARCH_MAX_COUNT } from '../transport.js';
-import { executeSearch, rawRequestedCount, resolveRequestedCount, SEARCH_OUTPUT_SCHEMA } from './search-shared.js';
+import {
+  executeSearch,
+  rawRequestedCount,
+  resolveRequestedCount,
+  SEARCH_OUTPUT_SCHEMA,
+} from './search-shared.js';
 import type { ToolDeps } from './deps.js';
 
 /** 工具名。 */
@@ -29,8 +39,6 @@ const MAX_COUNT = GLOBAL_SEARCH_MAX_COUNT;
 /** 未指定时使用的条数。 */
 const DEFAULT_COUNT = 8;
 
-
-
 /**
  * 参数白名单。
  *
@@ -38,11 +46,17 @@ const DEFAULT_COUNT = 8;
  * 未知键会被静默丢弃 —— 模型传 `page=2` 会拿到第一页却以为翻页成功。
  * 与参数定义的一致性由 `test/tool.test.ts` 断言守着。
  */
-const PARAM_NAMES = ['query', 'count', 'site', 'publishedAfter', 'publishedBefore', 'searchDb'] as const;
+const PARAM_NAMES = [
+  'query',
+  'count',
+  'site',
+  'publishedAfter',
+  'publishedBefore',
+  'searchDb',
+] as const;
 
 /** 协作式超时预算。 */
 const TIMEOUT_MS = 20_000;
-
 
 /**
  * 构造 `zhihu_global_search` 工具。
@@ -62,14 +76,30 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
 
     parameters: {
       query: { type: 'string', required: true, description: '搜索关键词。' },
-      count: { type: 'integer', description: `返回条数，1–${String(MAX_COUNT)}，默认 ${String(DEFAULT_COUNT)}。`, default: DEFAULT_COUNT },
+      count: {
+        type: 'integer',
+        description: `返回条数，1–${String(MAX_COUNT)}，默认 ${String(DEFAULT_COUNT)}。`,
+        default: DEFAULT_COUNT,
+      },
       site: {
         type: 'string',
-        description: '只搜索该域名，例如 github.com；传完整 URL 会被剥成主机名并去掉开头的 www.。域名是精确匹配（子站要单独写），不支持知乎域名。',
+        description:
+          '只搜索该域名，例如 github.com；传完整 URL 会被剥成主机名并去掉开头的 www.。域名是精确匹配（子站要单独写），不支持知乎域名。',
       },
-      publishedAfter: { type: 'string', description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。' },
-      publishedBefore: { type: 'string', description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。' },
-      searchDb: { type: 'string', enum: ['all', 'realtime', 'static'], description: '索引库，默认 all。realtime 偏最新，static 偏长期收录。', default: 'all' },
+      publishedAfter: {
+        type: 'string',
+        description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。',
+      },
+      publishedBefore: {
+        type: 'string',
+        description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。',
+      },
+      searchDb: {
+        type: 'string',
+        enum: ['all', 'realtime', 'static'],
+        description: '索引库，默认 all。realtime 偏最新，static 偏长期收录。',
+        default: 'all',
+      },
     },
 
     output: {
@@ -102,14 +132,19 @@ export function createZhihuGlobalSearchTool(deps: ToolDeps): ToolDefinition {
         toolName: ZHIHU_GLOBAL_SEARCH_TOOL,
         signal: exec.signal,
         plan: (query) => {
-          const count = resolveRequestedCount(args.count, { max: MAX_COUNT, fallback: DEFAULT_COUNT });
+          const count = resolveRequestedCount(args.count, {
+            max: MAX_COUNT,
+            fallback: DEFAULT_COUNT,
+          });
 
           // 全网作用域：允许 host；编译器会拦下知乎域名并给出「请用站内搜索」的提示。
           const filter = compileFilter(
             {
               ...(args.site === undefined ? {} : { site: args.site }),
               ...(args.publishedAfter === undefined ? {} : { publishedAfter: args.publishedAfter }),
-              ...(args.publishedBefore === undefined ? {} : { publishedBefore: args.publishedBefore }),
+              ...(args.publishedBefore === undefined
+                ? {}
+                : { publishedBefore: args.publishedBefore }),
             },
             'global',
           );

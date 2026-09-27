@@ -82,18 +82,22 @@ const en: Record<ZhihuLocaleKey, string> = {
   secretHintBefore: 'From the ',
   secretHintLink: 'Zhihu Open Platform profile',
   secretHintAfter: '. Stored outside the settings file. Leave blank to keep the current secret.',
-  secretShadowed: 'A read-only source (such as a process environment variable) supplies this reference; it cannot be overridden here.',
+  secretShadowed:
+    'A read-only source (such as a process environment variable) supplies this reference; it cannot be overridden here.',
   refLabel: 'Credential reference',
   refOverridden: 'Overridden',
   reset: 'Reset',
-  refHint: 'Environment variable or credential record name. Leave blank to use ZHIHU_ACCESS_SECRET.',
+  refHint:
+    'Environment variable or credential record name. Leave blank to use ZHIHU_ACCESS_SECRET.',
   hideNativeWebLabel: 'Hide native web search (web_search / web_fetch)',
   hideNativeWebOn: 'The model sees only the three Zhihu tools.',
   hideNativeWebOff: 'Native web search stays visible to the model.',
-  hideNativeWebHint: 'Visibility only — tool-web still loads. Takes effect next request; no restart.',
+  hideNativeWebHint:
+    'Visibility only — tool-web still loads. Takes effect next request; no restart.',
   save: 'Save',
   saving: 'Saving…',
-  saveRejected: 'The Host refused this write: the configuration changed elsewhere. Reopen this page and try again.',
+  saveRejected:
+    'The Host refused this write: the configuration changed elsewhere. Reopen this page and try again.',
 };
 
 /** 交给 `ctx.locale.register` 的双语字典。 */

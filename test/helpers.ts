@@ -72,7 +72,10 @@ export function makeHarness(handler: FetchHandler): Harness {
 
 /** 构造一个 JSON 响应。 */
 export function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 /** 构造一个 SSE 响应。 */

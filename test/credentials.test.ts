@@ -30,7 +30,9 @@ describe('resolveAccessSecret', () => {
   });
 
   it('凭据域为空时回落到环境变量', async () => {
-    expect(await resolveAccessSecret(sources({ fromEnvironment: () => 'from-env' }))).toBe('from-env');
+    expect(await resolveAccessSecret(sources({ fromEnvironment: () => 'from-env' }))).toBe(
+      'from-env',
+    );
   });
 
   it('两条都空时返回 undefined，交由调用方报鉴权错误', async () => {
@@ -67,7 +69,9 @@ describe('resolveAccessSecret', () => {
 
   it('凭据域没有被注入时不会抛错（服务可选）', async () => {
     await expect(
-      resolveAccessSecret(sources({ fromCredentials: async () => undefined, fromEnvironment: () => 'y' })),
+      resolveAccessSecret(
+        sources({ fromCredentials: async () => undefined, fromEnvironment: () => 'y' }),
+      ),
     ).resolves.toBe('y');
   });
 });

@@ -97,7 +97,9 @@ function resolveVersion(spec) {
   try {
     // 用裸名 'npm'：Windows 上 .cmd 不能被无 shell 地 spawn（Node 的 EINVAL 防护），
     // 而裸名在两侧都能解析到正确的可执行文件。stderr 一律丢弃（本机 npm 会往里写配置告警）。
-    raw = execFileSync('npm', ['view', spec, 'version', '--json', '--registry=' + REGISTRY], { encoding: 'utf8' });
+    raw = execFileSync('npm', ['view', spec, 'version', '--json', '--registry=' + REGISTRY], {
+      encoding: 'utf8',
+    });
   } catch {
     return undefined;
   }
@@ -107,7 +109,8 @@ function resolveVersion(spec) {
   } catch {
     return undefined;
   }
-  if (Array.isArray(parsed)) return parsed.length === 0 ? undefined : String(parsed[parsed.length - 1]);
+  if (Array.isArray(parsed))
+    return parsed.length === 0 ? undefined : String(parsed[parsed.length - 1]);
   return parsed === undefined || parsed === null ? undefined : String(parsed);
 }
 
@@ -115,7 +118,9 @@ const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
 const peers = manifest.peerDependencies ?? {};
 const devs = manifest.devDependencies ?? {};
 
-const targets = [...new Set([...Object.keys(peers), ...Object.keys(devs)])].filter((name) => name.startsWith(SWAP_PREFIX));
+const targets = [...new Set([...Object.keys(peers), ...Object.keys(devs)])].filter((name) =>
+  name.startsWith(SWAP_PREFIX),
+);
 if (targets.length === 0) {
   console.error('::error::没有找到任何 ' + SWAP_PREFIX + '* 依赖：package.json 的声明面变了？');
   process.exit(2);
@@ -139,13 +144,34 @@ if (command === 'check') {
       continue;
     }
     const ok = maxSatisfying === tagVersion;
-    console.log('  ' + (ok ? 'ok ' : '红 ') + ' ' + name + '：声明 ' + declared + ' 最新可取 ' + maxSatisfying + '，' + tag + ' = ' + tagVersion);
+    console.log(
+      '  ' +
+        (ok ? 'ok ' : '红 ') +
+        ' ' +
+        name +
+        '：声明 ' +
+        declared +
+        ' 最新可取 ' +
+        maxSatisfying +
+        '，' +
+        tag +
+        ' = ' +
+        tagVersion,
+    );
     if (!ok) stale += 1;
   }
   if (stale > 0) {
     console.error('');
-    console.error('::error::有 ' + String(stale) + ' 个声明已罩不住 ' + tag + ' 线：使用者按当前 tag 装到的宿主落在我们声明的范围之外。');
-    console.error('处理：核对上游变更后放宽 peer 范围并同步 README 的前置版本；范围放宽不改行为，按 docs/PUBLISHING.md 的 Q1/Q2 全否 → patch。');
+    console.error(
+      '::error::有 ' +
+        String(stale) +
+        ' 个声明已罩不住 ' +
+        tag +
+        ' 线：使用者按当前 tag 装到的宿主落在我们声明的范围之外。',
+    );
+    console.error(
+      '处理：核对上游变更后放宽 peer 范围并同步 README 的前置版本；范围放宽不改行为，按 docs/PUBLISHING.md 的 Q1/Q2 全否 → patch。',
+    );
     process.exit(1);
   }
   console.log('声明面仍罩得住 ' + tag + ' 线。');
@@ -158,12 +184,16 @@ if (command === 'verify') {
   for (const name of targets) {
     const version = resolveVersion(name + '@' + tag);
     if (version === undefined) {
-      console.log('::warning::' + name + ' 在 ' + tag + ' 线上没有版本，无从核对（swap 时也应已跳过）。');
+      console.log(
+        '::warning::' + name + ' 在 ' + tag + ' 线上没有版本，无从核对（swap 时也应已跳过）。',
+      );
       continue;
     }
     let installed;
     try {
-      installed = JSON.parse(readFileSync('node_modules/' + name + '/package.json', 'utf8')).version;
+      installed = JSON.parse(
+        readFileSync('node_modules/' + name + '/package.json', 'utf8'),
+      ).version;
     } catch {
       installed = undefined;
     }
@@ -176,7 +206,13 @@ if (command === 'verify') {
   }
   if (wrong > 0) {
     console.error('');
-    console.error('::error::有 ' + String(wrong) + ' 个包没有真正换到 ' + tag + ' 线 —— 换包那一步失败了，而旧版本的树会让测试全绿。');
+    console.error(
+      '::error::有 ' +
+        String(wrong) +
+        ' 个包没有真正换到 ' +
+        tag +
+        ' 线 —— 换包那一步失败了，而旧版本的树会让测试全绿。',
+    );
     console.error('先看 npm install 的输出：多半是上游包之间的 peer 冲突，需要清掉旧树重装。');
     process.exit(1);
   }
@@ -190,10 +226,18 @@ for (const name of targets) {
   const version = resolveVersion(name + '@' + tag);
   if (version === undefined) {
     if (peers[name] !== undefined) {
-      console.error('::error::' + name + ' 是 peerDependency，却在 ' + tag + ' 线上没有版本 —— 声明面点名了一个不存在的版本。');
+      console.error(
+        '::error::' +
+          name +
+          ' 是 peerDependency，却在 ' +
+          tag +
+          ' 线上没有版本 —— 声明面点名了一个不存在的版本。',
+      );
       process.exit(1);
     }
-    console.log('::warning::' + name + ' 在 ' + tag + ' 线上没有版本，跳过（它只是 devDependency）。');
+    console.log(
+      '::warning::' + name + ' 在 ' + tag + ' 线上没有版本，跳过（它只是 devDependency）。',
+    );
     skipped.push(name);
     continue;
   }
@@ -203,7 +247,8 @@ for (const name of targets) {
   if (peers[name] !== undefined) peers[name] = next;
   if (devs[name] !== undefined) devs[name] = next;
 }
-if (skipped.length > 0) console.log('跳过 ' + String(skipped.length) + ' 个：' + skipped.join(', '));
+if (skipped.length > 0)
+  console.log('跳过 ' + String(skipped.length) + ' 个：' + skipped.join(', '));
 
 writeFileSync('package.json', JSON.stringify(manifest, null, 2) + '\n');
 console.log('package.json 已改写。接着跑：npm install --ignore-scripts');

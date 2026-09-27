@@ -12,7 +12,12 @@
  */
 
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
-import type { GenericCallView, ToolResult, WebSearchResultView, WebSource } from '@deepseek-ai/dsh-tools';
+import type {
+  GenericCallView,
+  ToolResult,
+  WebSearchResultView,
+  WebSource,
+} from '@deepseek-ai/dsh-tools';
 import type { JsonValue } from '@deepseek-ai/dsh-util-values';
 import type { SearchOutput } from '../types.js';
 import { errorBlock } from './error-block.js';
@@ -87,7 +92,10 @@ export interface SearchMeta {
  * 不转义会把 `### [标题](url)` 撕成非法 Markdown，模型读到的结构就错位了。
  */
 function escapeLinkText(input: string): string {
-  return input.replace(/[\r\n]+/g, ' ').replace(/([[\]])/g, '\\$1').trim();
+  return input
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/([[\]])/g, '\\$1')
+    .trim();
 }
 
 /**
@@ -100,7 +108,10 @@ function escapeLinkText(input: string): string {
  * @param context - 本次调用的参数上下文（见 {@link SearchRenderContext}）。
  * @returns 单个文本块。
  */
-export function renderSearch(value: SearchOutput, context: SearchRenderContext = {}): ContentBlock[] {
+export function renderSearch(
+  value: SearchOutput,
+  context: SearchRenderContext = {},
+): ContentBlock[] {
   if (!value.ok) return errorBlock('搜索失败', value.error);
 
   const scopeNoun = context.scope === 'global' ? '全网内容' : '知乎内容';
@@ -126,9 +137,11 @@ export function renderSearch(value: SearchOutput, context: SearchRenderContext =
     // 点赞段只对知乎内容渲染。
     // 全网搜索会混进第三方网页：外站没有「知乎点赞」这回事，上游对它恒报 0，
     // 渲染出来就是把「不适用」说成「没人赞」——所以连同缺失一起整段省略。
-    if (item.contentType !== '' && item.voteUpCount !== undefined) meta.push(`**点赞**: ${String(item.voteUpCount)}`);
+    if (item.contentType !== '' && item.voteUpCount !== undefined)
+      meta.push(`**点赞**: ${String(item.voteUpCount)}`);
     // 评论数与点赞同源：外站没有「知乎评论」这回事，空类型时整段省略。
-    if (item.contentType !== '' && item.commentCount !== undefined) meta.push(`**评论**: ${String(item.commentCount)}`);
+    if (item.contentType !== '' && item.commentCount !== undefined)
+      meta.push(`**评论**: ${String(item.commentCount)}`);
     // 时间戳转日期，模型不必自己做时间戳算术；缺失时整段省略。
     const date = item.editTime === undefined ? '' : formatDate(item.editTime);
     if (date !== '') meta.push(`**时间**: ${date}`);
@@ -183,7 +196,11 @@ export function renderSearch(value: SearchOutput, context: SearchRenderContext =
  */
 export function searchMetaFromValue(value: SearchOutput): JsonValue {
   return {
-    sources: value.items.map((item) => ({ url: item.url, title: item.title, snippet: item.snippet })),
+    sources: value.items.map((item) => ({
+      url: item.url,
+      title: item.title,
+      snippet: item.snippet,
+    })),
     truncated: value.hasMore,
   };
 }
@@ -208,8 +225,8 @@ export function searchMetaFromResult(meta: unknown): SearchMeta | undefined {
     if (!('url' in raw) || typeof raw.url !== 'string') continue;
     results.push({
       url: raw.url,
-      ...(('title' in raw && typeof raw.title === 'string') ? { title: raw.title } : {}),
-      ...(('snippet' in raw && typeof raw.snippet === 'string') ? { snippet: raw.snippet } : {}),
+      ...('title' in raw && typeof raw.title === 'string' ? { title: raw.title } : {}),
+      ...('snippet' in raw && typeof raw.snippet === 'string' ? { snippet: raw.snippet } : {}),
     });
   }
   return { sources: results, truncated: 'truncated' in meta && meta.truncated === true };

@@ -19,7 +19,9 @@ import {
 
 describe('compileSortBy', () => {
   it('编译字段 + 默认降序 + 下限', () => {
-    expect(compileSortBy({ sortField: 'voteUpCount', minValue: 50 })).toBe('VoteUpCount:desc:(50,)');
+    expect(compileSortBy({ sortField: 'voteUpCount', minValue: 50 })).toBe(
+      'VoteUpCount:desc:(50,)',
+    );
   });
 
   it('下限省略时不生成括号段', () => {
@@ -59,11 +61,15 @@ describe('compileSortBy', () => {
   });
 
   it('下限截断为整数，避免生成知乎不认的小数语法', () => {
-    expect(compileSortBy({ sortField: 'voteUpCount', minValue: 99.9 })).toBe('VoteUpCount:desc:(99,)');
+    expect(compileSortBy({ sortField: 'voteUpCount', minValue: 99.9 })).toBe(
+      'VoteUpCount:desc:(99,)',
+    );
   });
 
   it('对非法下限抛 CompileError 而不是静默产出坏字符串', () => {
-    expect(() => compileSortBy({ sortField: 'voteUpCount', minValue: Number.NaN })).toThrow(CompileError);
+    expect(() => compileSortBy({ sortField: 'voteUpCount', minValue: Number.NaN })).toThrow(
+      CompileError,
+    );
   });
 
   it('拒绝负数下限 —— 知乎只收非负整数，本地拦下才给得出可据以纠正的 hint', () => {
@@ -101,7 +107,9 @@ describe('compileFilter', () => {
   });
 
   it('站内搜索作用域下允许 publish_time', () => {
-    expect(compileFilter({ publishedAfter: '2024-01-01' }, 'zhihu')).toBe('publish_time>=1704067200');
+    expect(compileFilter({ publishedAfter: '2024-01-01' }, 'zhihu')).toBe(
+      'publish_time>=1704067200',
+    );
   });
 
   it('剥掉开头的 www. —— host 是整串精确匹配，留着它会让查询静默返回 0 条', () => {

@@ -13,9 +13,12 @@ function headerSpy(): { fetchImpl: typeof fetch; headers: Array<Record<string, s
   const headers: Array<Record<string, string>> = [];
   const fetchImpl = (async (_input: string, init?: RequestInit) => {
     headers.push((init?.headers ?? {}) as Record<string, string>);
-    return new Response(JSON.stringify({ Code: 0, Message: 'success', Data: { HasMore: false, Items: [] } }), {
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({ Code: 0, Message: 'success', Data: { HasMore: false, Items: [] } }),
+      {
+        status: 200,
+      },
+    );
   }) as typeof fetch;
   return { fetchImpl, headers };
 }
@@ -63,14 +66,20 @@ describe('ZhihuClient 密钥解析', () => {
 
   it('凭据服务返回空白串时同样视为未配置', async () => {
     const spy = headerSpy();
-    const client = new ZhihuClient({ resolveAccessSecret: async () => '   ', fetchImpl: spy.fetchImpl });
+    const client = new ZhihuClient({
+      resolveAccessSecret: async () => '   ',
+      fetchImpl: spy.fetchImpl,
+    });
     await expect(client.searchZhihu({ query: 'x' })).rejects.toBeInstanceOf(ZhihuClientError);
   });
 
   it('每次请求都重新解析，密钥改动无需重启插件', async () => {
     const spy = headerSpy();
     let current = 'first';
-    const client = new ZhihuClient({ resolveAccessSecret: async () => current, fetchImpl: spy.fetchImpl });
+    const client = new ZhihuClient({
+      resolveAccessSecret: async () => current,
+      fetchImpl: spy.fetchImpl,
+    });
     await client.searchZhihu({ query: 'a' });
     current = 'second';
     await client.searchZhihu({ query: 'b' });

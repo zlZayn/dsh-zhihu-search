@@ -33,7 +33,13 @@ for (const stale of ['src/client.ts', 'src/client.tsx']) {
 const BUNDLE_ID = JSON.parse(readFileSync('package.json', 'utf8')).name;
 
 /** 宿主基线模块与同侪包，一律不打包进去。 */
-const HOST_PROVIDED = ['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client', '@deepseek-ai/*'];
+const HOST_PROVIDED = [
+  'react',
+  'react-dom',
+  'react/jsx-runtime',
+  'react-dom/client',
+  '@deepseek-ai/*',
+];
 
 await build({
   entryPoints: ['src/client/index.tsx'],

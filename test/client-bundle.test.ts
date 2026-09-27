@@ -99,7 +99,17 @@ describe('client bundle 信封', () => {
   it('只请求外壳预置模块（PLATFORM_MODULES），无需额外依赖边', () => {
     const source = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8');
     const requested = [...source.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]);
-    const allowed = ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis', '@deepseek-ai/dsh-client-store', '@deepseek-ai/dsh-client-ui-slots', '@deepseek-ai/dsh-client-ui-primitives', '@deepseek-ai/dsh-client-ui-dockkit'];
+    const allowed = [
+      'react',
+      'react/jsx-runtime',
+      'react-dom',
+      'react-dom/client',
+      '@deepseek-ai/cordis',
+      '@deepseek-ai/dsh-client-store',
+      '@deepseek-ai/dsh-client-ui-slots',
+      '@deepseek-ai/dsh-client-ui-primitives',
+      '@deepseek-ai/dsh-client-ui-dockkit',
+    ];
     expect(requested.length).toBeGreaterThan(0);
     for (const name of requested) expect(allowed, name).toContain(name);
   });
@@ -189,9 +199,15 @@ describe('client bundle 注册行为', () => {
     };
     // 记下每次取表单的实参：槽 key 取包名、get() 取 entry id，两者**今天同串但不是一回事**，
     // 所以这里必须能看见实际传进去的那个字符串。
-    const service = configForms === null
-      ? undefined
-      : { get: (id: string) => { formRequests.push(id); return configForms.get(id); } };
+    const service =
+      configForms === null
+        ? undefined
+        : {
+            get: (id: string) => {
+              formRequests.push(id);
+              return configForms.get(id);
+            },
+          };
     const ctx = {
       ...base,
       inject(names: string[], callback: (scoped: unknown) => unknown) {
@@ -361,9 +377,11 @@ describe('client bundle 配置能力探测', () => {
   type Arrival = 'auto' | 'manual' | 'absent';
 
   /** 探测用例的最小服务面：卡片外壳要的替身，两环由各用例给到场方式。 */
-  function probeContext(
-    arrival: { configForms: Arrival; slots: Arrival },
-  ): { ctx: Record<string, unknown>; fireConfigForms: () => void; fireSlots: () => void } {
+  function probeContext(arrival: { configForms: Arrival; slots: Arrival }): {
+    ctx: Record<string, unknown>;
+    fireConfigForms: () => void;
+    fireSlots: () => void;
+  } {
     const credentials = {
       describe: async () => ({ ok: true as const, value: {} }),
       set: async () => ({ ok: true as const, value: undefined }),
@@ -590,7 +608,10 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
       // 替身要**当场回调**：`inject` 的语义是「依赖齐了就注册」，不回调等于槽缺席。
       // 原先是 `inject: () => undefined`，所以那一组从来没验过注册路径 ——
       // 它只验了「apply 跑起来」。
-      slots: { inject: (_name: string, callback: () => unknown) => callback(), register: () => () => undefined },
+      slots: {
+        inject: (_name: string, callback: () => unknown) => callback(),
+        register: () => () => undefined,
+      },
       locale: { register: () => () => undefined },
       remote: { credentials, $on: () => () => undefined },
       'remote.credentials': credentials,
@@ -615,9 +636,12 @@ describe('client bundle 按真实 Cordis 语义装配', () => {
    * @param available - 要提供哪些服务；用来对比「少一个会怎样」。
    * @returns 是否真的执行到了 `apply`。
    */
-  async function mount(
-    available: Record<string, unknown>,
-  ): Promise<{ applied: boolean; failure?: string; slotsInjected: string[]; registrations: number }> {
+  async function mount(available: Record<string, unknown>): Promise<{
+    applied: boolean;
+    failure?: string;
+    slotsInjected: string[];
+    registrations: number;
+  }> {
     const ctx = new Context();
     await ctx.plugin({
       name: 'test-environment',

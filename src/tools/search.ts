@@ -11,10 +11,20 @@
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools';
 import { compileFilter, compileSortBy, SORT_FIELDS } from '../utils/compiler.js';
-import { presentSearchCall, presentSearchResult, renderSearch, searchMetaFromValue } from '../present/search.js';
+import {
+  presentSearchCall,
+  presentSearchResult,
+  renderSearch,
+  searchMetaFromValue,
+} from '../present/search.js';
 import type { SearchOutput } from '../types.js';
 import { ZHIHU_SEARCH_MAX_COUNT } from '../transport.js';
-import { executeSearch, rawRequestedCount, resolveRequestedCount, SEARCH_OUTPUT_SCHEMA } from './search-shared.js';
+import {
+  executeSearch,
+  rawRequestedCount,
+  resolveRequestedCount,
+  SEARCH_OUTPUT_SCHEMA,
+} from './search-shared.js';
 import type { ToolDeps } from './deps.js';
 
 /** 工具名。 */
@@ -41,8 +51,6 @@ const DEFAULT_COUNT = 5;
  */
 const FILTERED_CANDIDATE_COUNT = MAX_COUNT;
 
-
-
 /**
  * 按本次请求的条数截断候选池的筛选结果。
  *
@@ -54,7 +62,9 @@ const FILTERED_CANDIDATE_COUNT = MAX_COUNT;
  * @returns 条目数不超过 `requestedCount` 的结果。
  */
 function sliceItems(value: SearchOutput, requestedCount: number): SearchOutput {
-  return value.items.length <= requestedCount ? value : { ...value, items: value.items.slice(0, requestedCount) };
+  return value.items.length <= requestedCount
+    ? value
+    : { ...value, items: value.items.slice(0, requestedCount) };
 }
 /**
  * 参数白名单。
@@ -64,11 +74,18 @@ function sliceItems(value: SearchOutput, requestedCount: number): SearchOutput {
  * 会拿到第一页却以为翻页成功。校验放本地，schema 里不加散文。
  * 与参数定义的一致性由 `test/tool.test.ts` 断言守着，避免两处漂移。
  */
-const PARAM_NAMES = ['query', 'count', 'sortField', 'order', 'minValue', 'publishedAfter', 'publishedBefore'] as const;
+const PARAM_NAMES = [
+  'query',
+  'count',
+  'sortField',
+  'order',
+  'minValue',
+  'publishedAfter',
+  'publishedBefore',
+] as const;
 
 /** 协作式超时预算；超时必须早于 DSH 的外层截断，才能返回结构化错误。 */
 const TIMEOUT_MS = 15_000;
-
 
 /**
  * 构造 `zhihu_search` 工具。
@@ -90,11 +107,16 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
     // 语义化参数：模型永远不会看到 SortBy / Filter 的字符串语法。
     parameters: {
       query: { type: 'string', required: true, description: '搜索关键词，中文效果最好。' },
-      count: { type: 'integer', description: `返回条数，1–${String(MAX_COUNT)}，默认 ${String(DEFAULT_COUNT)}。`, default: DEFAULT_COUNT },
+      count: {
+        type: 'integer',
+        description: `返回条数，1–${String(MAX_COUNT)}，默认 ${String(DEFAULT_COUNT)}。`,
+        default: DEFAULT_COUNT,
+      },
       sortField: {
         type: 'string',
         enum: SORT_FIELDS,
-        description: '排序字段。default 沿用知乎相关性排序；voteUpCount 点赞数 · commentCount 评论数 · editTime 时间（发布或最后编辑，由上游决定）。',
+        description:
+          '排序字段。default 沿用知乎相关性排序；voteUpCount 点赞数 · commentCount 评论数 · editTime 时间（发布或最后编辑，由上游决定）。',
         default: 'default',
       },
       // 参数耦合只能写在描述里：DSH 的值 schema DSL 拒绝 dependentRequired / minimum / maximum
@@ -103,7 +125,8 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
       order: {
         type: 'string',
         enum: ['desc', 'asc'],
-        description: '[依赖 sortField] 排序方向，默认 desc（降序）。不给 sortField 时只接受默认值 desc。',
+        description:
+          '[依赖 sortField] 排序方向，默认 desc（降序）。不给 sortField 时只接受默认值 desc。',
         default: 'desc',
       },
       minValue: {
@@ -111,8 +134,14 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
         description:
           '[依赖 sortField] 排序字段的下限（含）。它只筛本次检索到的候选，不是全库过滤：达标项不足时返回条数会少于 count —— 放宽下限或换关键词，不要据此断定知乎没有高赞内容。',
       },
-      publishedAfter: { type: 'string', description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。' },
-      publishedBefore: { type: 'string', description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。' },
+      publishedAfter: {
+        type: 'string',
+        description: '只要该日期之后发布的内容，格式 YYYY-MM-DD。',
+      },
+      publishedBefore: {
+        type: 'string',
+        description: '只要该日期之前发布的内容，格式 YYYY-MM-DD。',
+      },
     },
 
     output: {
@@ -124,7 +153,9 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
           minValue: args.minValue,
           maxCount: MAX_COUNT,
           filtered:
-            args.minValue !== undefined || args.publishedAfter !== undefined || args.publishedBefore !== undefined,
+            args.minValue !== undefined ||
+            args.publishedAfter !== undefined ||
+            args.publishedBefore !== undefined,
           scope: 'zhihu',
         }),
       presentationMeta: (_args, value) => searchMetaFromValue(value),
@@ -144,7 +175,10 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
         toolName: ZHIHU_SEARCH_TOOL,
         signal: exec.signal,
         plan: (query) => {
-          const requestedCount = resolveRequestedCount(args.count, { max: MAX_COUNT, fallback: DEFAULT_COUNT });
+          const requestedCount = resolveRequestedCount(args.count, {
+            max: MAX_COUNT,
+            fallback: DEFAULT_COUNT,
+          });
           const sortField = args.sortField ?? 'default';
           const order = args.order ?? 'desc';
           const minValue = args.minValue;
@@ -158,13 +192,18 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
           const filter = compileFilter(
             {
               ...(args.publishedAfter === undefined ? {} : { publishedAfter: args.publishedAfter }),
-              ...(args.publishedBefore === undefined ? {} : { publishedBefore: args.publishedBefore }),
+              ...(args.publishedBefore === undefined
+                ? {}
+                : { publishedBefore: args.publishedBefore }),
             },
             'zhihu',
           );
 
           // 有下限时把候选池取满（理由见 FILTERED_CANDIDATE_COUNT）。
-          const poolCount = minValue === undefined ? requestedCount : Math.max(requestedCount, FILTERED_CANDIDATE_COUNT);
+          const poolCount =
+            minValue === undefined
+              ? requestedCount
+              : Math.max(requestedCount, FILTERED_CANDIDATE_COUNT);
 
           // 缓存键必须用**归一化后**的参数，且必须用候选池大小：
           // 否则 count=3 与 count=10 会各占一个键，却发出两个内容相同的请求。
@@ -172,7 +211,12 @@ export function createZhihuSearchTool(deps: ToolDeps): ToolDefinition {
             cacheArgs: { query, count: poolCount, sortBy, filter },
             fetch: (signal) =>
               deps.client.searchZhihu(
-                { query, count: poolCount, ...(sortBy === undefined ? {} : { sortBy }), ...(filter === undefined ? {} : { filter }) },
+                {
+                  query,
+                  count: poolCount,
+                  ...(sortBy === undefined ? {} : { sortBy }),
+                  ...(filter === undefined ? {} : { filter }),
+                },
                 signal,
               ),
             // 缓存完整池子，返回按本次条数截断 —— 顺序不可颠倒。

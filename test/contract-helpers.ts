@@ -16,7 +16,8 @@
  */
 
 /** 接入域名；契约测试默认打生产，可用环境变量指向沙箱。 */
-export const CONTRACT_BASE_URL = process.env['ZHIHU_CONTRACT_BASE_URL'] ?? 'https://developer.zhihu.com';
+export const CONTRACT_BASE_URL =
+  process.env['ZHIHU_CONTRACT_BASE_URL'] ?? 'https://developer.zhihu.com';
 
 /** 生产凭据。CI 从 repo secret 注入；本地从环境变量注入。 */
 export const CONTRACT_SECRET = (process.env['ZHIHU_ACCESS_SECRET'] ?? '').trim();
@@ -73,9 +74,13 @@ export async function callApi(
   try {
     parsed = JSON.parse(text) as typeof parsed;
   } catch {
-    throw new Error(`知乎返回了非 JSON 响应（HTTP ${String(response.status)}）：${text.slice(0, 200)}`);
+    throw new Error(
+      `知乎返回了非 JSON 响应（HTTP ${String(response.status)}）：${text.slice(0, 200)}`,
+    );
   }
-  const data = (typeof parsed.Data === 'object' && parsed.Data !== null ? parsed.Data : {}) as Record<string, unknown>;
+  const data = (
+    typeof parsed.Data === 'object' && parsed.Data !== null ? parsed.Data : {}
+  ) as Record<string, unknown>;
 
   return {
     http: response.status,

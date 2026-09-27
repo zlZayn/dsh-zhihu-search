@@ -46,7 +46,9 @@ describe('createCredentialStore', () => {
         fakeRemote({
           describe: async (refs) => ({
             ok: true,
-            value: Object.fromEntries(refs.map((ref) => [ref, { configured: true, writable: false }])),
+            value: Object.fromEntries(
+              refs.map((ref) => [ref, { configured: true, writable: false }]),
+            ),
           }),
         }),
       fixed('MY_KEY'),
@@ -58,7 +60,10 @@ describe('createCredentialStore', () => {
   it('引用名换了，状态立刻回到「未配置」而不是留着上一条的答案', async () => {
     let ref = 'A';
     const gate = deferred<RemoteOutcome<Record<string, CredentialView>>>();
-    const store = createCredentialStore(() => fakeRemote({ describe: () => gate.promise }), () => ref);
+    const store = createCredentialStore(
+      () => fakeRemote({ describe: () => gate.promise }),
+      () => ref,
+    );
 
     const first = store.refresh();
     ref = 'B';
@@ -101,7 +106,9 @@ describe('createCredentialStore', () => {
         fakeRemote({
           describe: async (refs) => ({
             ok: true,
-            value: Object.fromEntries(refs.map((ref) => [ref, { configured: stored, writable: true }])),
+            value: Object.fromEntries(
+              refs.map((ref) => [ref, { configured: stored, writable: true }]),
+            ),
           }),
           set: async () => {
             stored = true;

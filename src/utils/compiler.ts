@@ -63,7 +63,10 @@ export function compileSortBy(spec: SortBySpec): string | undefined {
 
   const mapped = SORT_FIELD_MAP[field];
   if (mapped === undefined) {
-    throw new CompileError(`不支持的排序字段：${String(field)}`, `可用字段：${SORT_FIELDS.join(' / ')}`);
+    throw new CompileError(
+      `不支持的排序字段：${String(field)}`,
+      `可用字段：${SORT_FIELDS.join(' / ')}`,
+    );
   }
 
   const order: SortOrder = spec.order ?? 'desc';
@@ -71,7 +74,10 @@ export function compileSortBy(spec: SortBySpec): string | undefined {
   if (min === undefined) return `${mapped}:${order}`;
 
   if (typeof min !== 'number' || !Number.isFinite(min)) {
-    throw new CompileError('minValue 必须是有限数字。', '例如 minValue: 100 表示「点赞数不少于 100」。');
+    throw new CompileError(
+      'minValue 必须是有限数字。',
+      '例如 minValue: 100 表示「点赞数不少于 100」。',
+    );
   }
   const bound = Math.trunc(min);
   // 知乎的边界是**非负 int64**。实测传 -5 会回 `SortBy bounds must be nonnegative integers`，
@@ -182,7 +188,10 @@ export function toUnixSeconds(input: string | number): number {
 
   const ms = Date.parse(normalized);
   if (Number.isNaN(ms)) {
-    throw new CompileError(`无法解析时间：${input}`, '请用 YYYY-MM-DD 或 ISO 8601，例如 2023-01-01。');
+    throw new CompileError(
+      `无法解析时间：${input}`,
+      '请用 YYYY-MM-DD 或 ISO 8601，例如 2023-01-01。',
+    );
   }
   return Math.floor(ms / 1000);
 }
@@ -220,8 +229,10 @@ export function compileFilter(spec: FilterSpec, scope: FilterScope = 'global'): 
     parts.push(`host=="${host}"`);
   }
 
-  if (spec.publishedAfter !== undefined) parts.push(`publish_time>=${String(toUnixSeconds(spec.publishedAfter))}`);
-  if (spec.publishedBefore !== undefined) parts.push(`publish_time<=${String(toUnixSeconds(spec.publishedBefore))}`);
+  if (spec.publishedAfter !== undefined)
+    parts.push(`publish_time>=${String(toUnixSeconds(spec.publishedAfter))}`);
+  if (spec.publishedBefore !== undefined)
+    parts.push(`publish_time<=${String(toUnixSeconds(spec.publishedBefore))}`);
 
   return parts.length === 0 ? undefined : parts.join(' AND ');
 }
@@ -264,6 +275,7 @@ function normalizeHost(input: string): string {
   const host = withoutScheme.split('/')[0] ?? '';
   const withoutPort = host.split(':')[0] ?? '';
   const cleaned = withoutPort.toLowerCase().replace(/^www\./, '');
-  if (cleaned === '') throw new CompileError(`无法解析站点：${input}`, '请传域名，例如 github.com。');
+  if (cleaned === '')
+    throw new CompileError(`无法解析站点：${input}`, '请传域名，例如 github.com。');
   return cleaned;
 }

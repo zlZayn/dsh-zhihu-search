@@ -183,7 +183,9 @@ function fakeAgent(
           restrict(filter: { deny: readonly string[] }) {
             const unknown = filter.deny.filter((toolName) => !knownTools.includes(toolName));
             if (unknown.length > 0) {
-              throw new Error(`tools.restrict() names unknown global tool(s) ${unknown.join(', ')}`);
+              throw new Error(
+                `tools.restrict() names unknown global tool(s) ${unknown.join(', ')}`,
+              );
             }
             const record = { deny: [...filter.deny], lifted: false };
             restrictions.push(record);
@@ -269,7 +271,9 @@ describe('apply', () => {
   it('拒绝非法配置值，避免 0 容量缓存这类静默事故', () => {
     const h = makeContext();
     expect(() => apply(h.ctx as never, resolve({ cacheMaxEntries: 0 }))).toThrow(/cacheMaxEntries/);
-    expect(() => apply(h.ctx as never, resolve({ searchPerMinute: -1 }))).toThrow(/searchPerMinute/);
+    expect(() => apply(h.ctx as never, resolve({ searchPerMinute: -1 }))).toThrow(
+      /searchPerMinute/,
+    );
     expect(() => apply(h.ctx as never, resolve({ timeoutMs: 1.5 }))).toThrow(/timeoutMs/);
   });
 
@@ -423,7 +427,8 @@ describe('隐藏原生网页工具', () => {
 
     commitVolatile(
       config.accessSecretRef,
-      resolve({ accessSecret: 'x', disableNativeWebSearch: true, accessSecretRef: 'OTHER_REF' }).accessSecretRef,
+      resolve({ accessSecret: 'x', disableNativeWebSearch: true, accessSecretRef: 'OTHER_REF' })
+        .accessSecretRef,
     );
     h.emit('loader/volatile-update');
     h.emit('loader/volatile-update');
