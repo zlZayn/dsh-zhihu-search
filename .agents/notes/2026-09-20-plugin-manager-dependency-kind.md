@@ -1,5 +1,7 @@
 # plugin-manager 的依赖形态：类型面必需、运行时不必需 → 只留 dev
 
+状态：生效
+
 ## 问题
 
 `@deepseek-ai/dsh-client-ui-plugin-manager` 同时声明在 `peerDependencies` 与 `devDependencies`，

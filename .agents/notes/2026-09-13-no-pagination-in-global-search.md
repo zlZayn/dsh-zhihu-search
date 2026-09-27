@@ -1,6 +1,6 @@
 # 决策：不做 global_search 的内部翻页，不引入 targetCount（2026-09-13）
 
-已否决。原方案是「把翻页逻辑收回到插件内部，用 targetCount 替代 hashId」。
+状态：已否决 —— 原方案是把翻页逻辑收回到插件内部，用 targetCount 替代 hashId；实测没有页可以翻，不实施
 
 ## 问题
 

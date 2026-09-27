@@ -1,5 +1,7 @@
 # 决策：走 awesome-dsh-plugin 注册表文件投稿，PR 延后到仓库满一天（2026-09-12）
 
+状态：生效
+
 条目文件在 fork 分支 `add-dsh-zhihu-search`；PR 已于 2026-09-14 开出：[#5037](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5037)。
 
 ## 问题

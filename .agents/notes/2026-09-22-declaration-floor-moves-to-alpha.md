@@ -1,5 +1,7 @@
 # 声明面：整条抬到 alpha 线（旧线的例外作废）
 
+状态：生效
+
 > 取代 [2026-09-20-declaration-floor-stays-on-next.md](2026-09-20-declaration-floor-stays-on-next.md)
 > 的**决策**（那份记录的事实仍然真实：那天确实抬不动）。
 > 与之同批的是设置接缝迁移，见 [2026-09-22-settings-seam-migration.md](2026-09-22-settings-seam-migration.md)。

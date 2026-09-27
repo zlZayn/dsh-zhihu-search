@@ -1,5 +1,8 @@
 # 设置接缝迁移：从 `settingsScope` 到「行配置 + volatile 活引用」
 
+状态：被取代
+指针：[配置入口回到 `plugins.bundle.config`](2026-09-22-config-entry-back-to-bundle-config.md)
+
 > **部分已被取代（2026-09-22 同日）**：本文件关于**注册哪个槽**的决策（只注册 `plugins.row.config`）
 > 作废 —— 配置入口已回到 `plugins.bundle.config`（内联在 bundle 详情页里，没有多一次 Configure），
 > 表单改由卡片自己经 `ctx.configForms.get(<entry id>)` 取。

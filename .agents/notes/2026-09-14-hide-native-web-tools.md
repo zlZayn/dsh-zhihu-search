@@ -1,6 +1,6 @@
 # 决策：用 tools.restrict() 隐藏原生网页工具，并做热切换（2026-09-14）
 
-已实施：新增 `disableNativeWebSearch`（默认 `false`）。打开后模型看不到 DSH 原生的 `web_search` / `web_fetch`，只用知乎的三个工具。
+状态：生效 —— 新增 `disableNativeWebSearch`（默认 `false`）。打开后模型看不到 DSH 原生的 `web_search` / `web_fetch`，只用知乎的三个工具。
 
 ## 问题
 

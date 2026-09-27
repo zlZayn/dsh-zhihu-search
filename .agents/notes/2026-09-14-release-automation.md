@@ -1,6 +1,6 @@
 # 决策：发版收敛为单一手动入口，认证迁到 Trusted Publishing（2026-09-14）
 
-已实施：`release.yml` 改为 `workflow_dispatch` 单一入口，一次运行跑完 bump → 发布 → tag → GitHub Release。
+状态：生效 —— `release.yml` 改为 `workflow_dispatch` 单一入口，一次运行跑完 bump → 发布 → tag → GitHub Release。
 
 ## 问题
 

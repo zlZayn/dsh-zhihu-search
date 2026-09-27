@@ -1,6 +1,6 @@
 # 决策：用客户端半体承载设置卡片（2026-09-12）
 
-已实施。取代 [密钥配置走原生插件配置表单](2026-09-12-secret-config-via-native-plugin-form.md)。
+状态：生效 —— 取代 [密钥配置走原生插件配置表单](2026-09-12-secret-config-via-native-plugin-form.md)
 
 ## 问题
 

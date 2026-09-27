@@ -1,5 +1,7 @@
 # 配置入口回到 `plugins.bundle.config`：这是**恢复到已发布 alpha 的入口**，不是又一次变更
 
+状态：生效
+
 **一轮之内把配置入口从 `plugins.row.config` 换回 `plugins.bundle.config`，这是它的决策记录。**
 事实核对一律回 DSH 源码（工作树 = tag `dsh-v0.1.7-alpha.1` = `c36a83ff6b`），不凭文档推断。
 

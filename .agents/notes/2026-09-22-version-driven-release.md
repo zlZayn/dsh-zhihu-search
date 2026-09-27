@@ -1,5 +1,7 @@
 # 发布改成版本驱动：bump 是发布前的独立一步，排在截图之前
 
+状态：生效
+
 **一轮之内把 `release.yml` 从「档位驱动」改成「版本驱动」，并把顺序写成规则，这是它的决策记录。**
 （它取代[发版档位与 dist-tag](2026-09-22-release-tiers-and-dist-tags.md) 里的 workflow 形态，那份的 semver 实测表仍然有效。）
 

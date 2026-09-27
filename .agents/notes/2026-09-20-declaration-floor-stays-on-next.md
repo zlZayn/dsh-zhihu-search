@@ -1,5 +1,8 @@
 # 声明面下限：试过抬到 alpha 线，抬不动 —— 维持停在 next 线
 
+状态：被取代
+指针：[声明面抬到 alpha 线](2026-09-22-declaration-floor-moves-to-alpha.md)
+
 > **已被取代（2026-09-22）**：本文件的**决策**（维持停在 next 线）作废 —— 声明面已整条抬到 alpha 线，
 > 见 [2026-09-22-declaration-floor-moves-to-alpha.md](2026-09-22-declaration-floor-moves-to-alpha.md)。
 > **正文一字不改**：它记录的是当时的事实（那天确实抬不动），那份事实仍然真实 —— 变的只是结论。

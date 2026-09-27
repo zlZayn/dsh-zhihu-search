@@ -1,5 +1,8 @@
 # 发版档位与 dist-tag：为什么必须有 `prerelease`，以及 dist-tag 凭什么判
 
+状态：被取代
+指针：[发布改成版本驱动](2026-09-22-version-driven-release.md)
+
 > **本文的 workflow 形态已被取代**（2026-09-22，同一天稍后）：用户拍板本仓改成**版本驱动** ——
 > `release.yml` **不再 bump**，发布的就是 `package.json` 里那个号；`tier` / `preid` 输入撤销，
 > dist-tag 由**版本自己那段**推（与 `dsh-ds-balance` 同形）。取代它的是
