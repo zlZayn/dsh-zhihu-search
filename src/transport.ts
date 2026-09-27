@@ -206,16 +206,15 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
       reject(new ZhihuClientError('aborted', '请求已被取消。'));
       return;
     }
-    let timer: NodeJS.Timeout | undefined;
-    const onAbort = (): void => {
-      if (timer !== undefined) clearTimeout(timer);
-      signal?.removeEventListener('abort', onAbort);
-      reject(new ZhihuClientError('aborted', '请求已被取消。'));
-    };
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
       resolve();
     }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(new ZhihuClientError('aborted', '请求已被取消。'));
+    };
     signal?.addEventListener('abort', onAbort, { once: true });
   });
 }

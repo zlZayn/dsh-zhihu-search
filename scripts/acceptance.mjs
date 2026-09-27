@@ -35,7 +35,6 @@ const load = (rel) => import(pathToFileURL(join(target, rel)).href);
 const { ZhihuClient } = await load('lib/transport.js');
 const { createZhihuSearchTool } = await load('lib/tools/search.js');
 const { createZhihuGlobalSearchTool } = await load('lib/tools/global-search.js');
-const { renderSearch } = await load('lib/present/search.js');
 const { compileFilter } = await load('lib/utils/compiler.js');
 const { createState } = await load('lib/state.js');
 

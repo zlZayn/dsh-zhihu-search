@@ -46,3 +46,5 @@ jobs:
 
       # `npm test` 自带 build：产物级测试（dist / client bundle）依赖 lib/ 已生成。
       - run: npm test
+
+      - run: npm run lint

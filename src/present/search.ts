@@ -87,7 +87,7 @@ export interface SearchMeta {
  * 不转义会把 `### [标题](url)` 撕成非法 Markdown，模型读到的结构就错位了。
  */
 function escapeLinkText(input: string): string {
-  return input.replace(/[\r\n]+/g, ' ').replace(/([\[\]])/g, '\\$1').trim();
+  return input.replace(/[\r\n]+/g, ' ').replace(/([[\]])/g, '\\$1').trim();
 }
 
 /**

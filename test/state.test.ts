@@ -45,7 +45,7 @@ describe('MemoryCache', () => {
   const makeCache = (now: () => number) => new MemoryCache<string>({ maxEntries: 2, defaultTtlMs: 1000, now });
 
   it('未过期时命中', () => {
-    let t = 0;
+    const t = 0;
     const cache = makeCache(() => t);
     cache.set('k', 'v');
     expect(cache.get('k')).toBe('v');
