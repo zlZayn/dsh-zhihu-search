@@ -85,8 +85,10 @@ function loadBundleRow(): LoaderRow {
  */
 const PLATFORM_STUBS: Record<string, unknown> = {
   '@deepseek-ai/dsh-client-ui-primitives': {
+    Button: () => null,
+    Input: () => null,
+    Switch: () => null,
     Tag: () => null,
-    IconChevronDownOutline14: () => null,
   },
 };
 

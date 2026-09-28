@@ -28,13 +28,13 @@
  * 与官方 web 搜索卡片同一套做法。配置里只留引用名，因此活动 profile 的 Cordis patch
  * 被截图或上传时不泄任何凭据。
  *
- * 复用 `@deepseek-ai/dsh-client-ui-primitives` 的 `Tag` 与 `Switch`：那是公共基础库，
- * 不是别的插件 —— 被 bundle-purity gate 禁止的是跨插件值导入。
- * 其余控件按官方 CSS 自带样式，取值只用 `--dsw-alias-*` 语义令牌。
+ * 复用 `@deepseek-ai/dsh-client-ui-primitives` 的 `Input`、`Button`、`Switch` 与 `Tag`：
+ * 那是公共基础库，不是别的插件 —— 被 bundle-purity gate 禁止的是跨插件值导入。
+ * 行布局（label / badge / hint 的排布）仍是内联样式，取值只用 `--dsw-alias-*` 语义令牌。
  */
 
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from 'react';
-import { Switch, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
+import { Button, Input, Switch, Tag } from '@deepseek-ai/dsh-client-ui-primitives';
 import type { Context } from '@deepseek-ai/cordis';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
 // 类型导入即声明：`plugins.bundle.config` 槽由插件管理页的浏览器半体合并进共享的 SlotMap，
@@ -221,29 +221,6 @@ const S = {
     color: 'var(--dsw-alias-label-primary)',
   },
   badges: { display: 'inline-flex', alignItems: 'center', gap: 8 },
-  reset: {
-    border: 'none',
-    background: 'none',
-    padding: 0,
-    font: 'inherit',
-    fontSize: 12,
-    lineHeight: 1.5,
-    color: 'var(--dsw-alias-label-secondary)',
-    cursor: 'pointer',
-  },
-  input: {
-    height: 34,
-    padding: '0 12px',
-    border: '0.5px solid var(--dsw-alias-border-l4)',
-    borderRadius: 8,
-    background: 'var(--dsw-alias-bg-layer-3)',
-    font: 'inherit',
-    fontSize: 13,
-    lineHeight: 1.5,
-    color: 'var(--dsw-alias-label-primary)',
-    boxSizing: 'border-box',
-    width: '100%',
-  },
   hint: { margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary)' },
   // 开关行：逐条对齐官方 SubagentModelSelectionCard.module.css 的 .toggleRow / .toggleLabel，
   // 右侧放原生 `Switch`（同一个 ui-primitives 包），因此外观与官方卡片一致。
@@ -287,24 +264,7 @@ const S = {
     lineHeight: 1.5,
     color: 'var(--dsw-alias-state-error-primary)',
   },
-  save: {
-    appearance: 'none',
-    border: '1px solid transparent',
-    borderRadius: 8,
-    padding: '5px 14px',
-    font: 'inherit',
-    fontSize: 13,
-    lineHeight: 1.5,
-    cursor: 'pointer',
-    background: 'var(--dsw-alias-label-primary)',
-    color: 'var(--dsw-alias-bg-layer-3)',
-  },
 } satisfies Record<string, CSSProperties>;
-
-/** 官方 CSS 的 `:disabled { opacity: .4 }`。 */
-function dimStyle(base: CSSProperties, disabled: boolean): CSSProperties {
-  return disabled ? { ...base, opacity: 0.4, cursor: 'default' } : base;
-}
 
 /**
  * 浏览器计时器没有 `unref`；Node 里有 —— 产物契约测试会在 Node 里求值本模块，
@@ -511,9 +471,8 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
             </Tag>
           </span>
         </div>
-        <input
+        <Input
           id="zhihu-access-secret"
-          style={S.input}
           type="password"
           autoComplete="off"
           value={secret}
@@ -540,22 +499,22 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
           {refOverridden ? (
             <span style={S.badges}>
               <Tag tone="neutral">{t('refOverridden')}</Tag>
-              <button
+              <Button
                 type="button"
-                style={dimStyle(S.reset, disabled)}
+                variant="ghost"
+                size="sm"
                 disabled={disabled}
                 onClick={() => {
                   setRefDraft('');
                 }}
               >
                 {t('reset')}
-              </button>
+              </Button>
             </span>
           ) : null}
         </div>
-        <input
+        <Input
           id="zhihu-access-secret-ref"
-          style={S.input}
           type="text"
           spellCheck={false}
           value={refText}
@@ -591,16 +550,16 @@ function ZhihuCard({ form, store, trackSavedRef, t }: CardProps): JSX.Element {
             {failed}
           </p>
         ) : null}
-        <button
+        <Button
           type="button"
-          style={dimStyle(S.save, blocked)}
+          variant="primary"
           disabled={blocked}
           onClick={() => {
             void save();
           }}
         >
           {saving ? t('saving') : t('save')}
-        </button>
+        </Button>
       </div>
     </div>
   );
