@@ -219,23 +219,3 @@ Access Secret 在[知乎开放平台个人中心](https://developer.zhihu.com/pr
 设计取向：工具参数与返回文本首先是**给模型用的 API**，其次才是给人读的文档 —— 写法规范见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「工具描述约定」与「模型可见文本的诚实性」。
 
 维护者文档地图见 [AGENTS.md](AGENTS.md)；不变的设计约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；发布流程见 [docs/PUBLISHING.md](docs/PUBLISHING.md)。
-
----
-
-## 本地提交钩子（pre-commit）
-
-提交前自动修复格式（Prettier）与 lint（ESLint）——只跑秒级检查，且一律走 `npx --no-install`，
-**不联网下载**；typecheck、测试与 `check:release` 留在 [ci.yml](.github/workflows/ci.yml)。
-
-前提：需要 uv 与 pre-commit（pre-commit 用 `uv tool install pre-commit` 装到 `~/.local/bin`）。
-
-```bash
-uv tool install pre-commit
-pre-commit install
-```
-
-> 装完需重开终端（或重载 shell 配置），PATH 才生效。
-
-- 手动全量跑：`pre-commit run --all-files`
-- 跳过单次：`git commit --no-verify`
-- 定义：[.pre-commit-config.yaml](.pre-commit-config.yaml)
