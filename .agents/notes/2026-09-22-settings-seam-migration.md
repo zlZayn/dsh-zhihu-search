@@ -58,6 +58,13 @@
   （宿主 `importLegacyDocument()` 按 section 名当 entry id 导入，而 `LEGACY_SECTION_ENTRIES` 只映射三个官方 section），
   `purge` 通道随之退场 —— 于是「先写后删」那条纪律变成结构性成立，而不是靠调用顺序保证。
 
+## 替代方案
+
+- **只把槽名换回去**：实测 `plugins.bundle.config` 渲染时不传 `form`——逼我们搬家的是「取不到读写面」，只改槽名没用。
+- **把跨字段校验留在 schema 里**：根级包 wrapper 会让 `volatileForm(schema)` 返回 `undefined`，整个 entry 不进 describe、卡片彻底不出现——校验必须拆出 schema。
+- **照官方 cookbook 用 `schema.check()`**：该成员在 0.1.7-alpha.1 不存在（官方那页自己写错）。
+- **保留 `settings.yaml` 半边迁徙（含 purge 通道）**：宿主按 section 名导入、只映射三个官方 section，那半边结构性不可达——瘦身成「组合配置单向迁徙」。
+
 ## 影响
 
 - `Config.accessSecret` 的 **redact 锚点作用没有保护对象了**（配置页只投影 volatile 字段），

@@ -70,6 +70,13 @@ tag 就会变成新号。构建与否只影响 JS/CSS，不影响这个号。
 - 它接进 `npm run check:release`，所以每次 `npm test`（先 build）与发布前都跑一遍。
   为什么必须这样：**跑一次 `release.yml` 只能在 `main` 上 dispatch**，规则得能在日常测试里判。
 
+## 替代方案
+
+- **维持档位驱动（workflow 自己 bump）**：要发的号在发布那一刻才诞生，「发布前截图」必然拍到旧号——顺序没定死，这不是显示错误。
+- **靠「记得先 bump」的纪律**：上一轮就是这么翻的车——顺序不落成规则就会漂；本次写进四处文档并落成断言。
+- **只写文档、不落断言**：`release.yml` 只能在 `main` 上 dispatch、跑一次成本高——用 `check-release` + 反向控制把规则带进每次 `npm test`。
+- **把「重拍前必须重新 build」当前提**：实测版本号由 host 实时读 `package.json`（`lib/` 产物 0 处命中）——bump 后刷新页面即变，重建不是必需。
+
 ## 影响与回滚
 
 - **对已发布产物**：只动 `.github/workflows/release.yml`、版本号与文档/测试；行为面零变化。

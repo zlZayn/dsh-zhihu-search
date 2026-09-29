@@ -40,6 +40,13 @@ gh pr create --repo awesome-dsh-plugin/awesome-dsh-plugin \
 - Repo carries the `dsh-plugin` topic"
 ```
 
+## 替代方案
+
+- **提前开 PR（不等仓库满一天）**：仓库年龄由 CI 自动校验、必然红；贡献指南明说「差一点就做完再来，重新提交不会留档」——等一天比开一个必红的 PR 更对。
+- **投任务书给的 `dsh-market/awesome-dsh-plugin`**：实测该仓库不存在；真正的精选列表是 `awesome-dsh-plugin/awesome-dsh-plugin`。
+- **手工编辑 README 投稿**：它的两个 README 由脚本生成、不接受手工编辑——唯一投稿产物是 `data/plugins/<owner>__<repo>.yml`。
+- **只等 topic 爬虫、不做注册表投稿**：`dsh-plugin.org` 靠 topic 自动收录，但覆盖不到 `awesome-dsh-plugin` 系（含 dsh-market 界面）——两条路并行才完整。
+
 ## 影响
 
 - `dsh-plugin.org` 与任何扫 topic 的市场在这一步之后就会爬到，不需要等 PR。
