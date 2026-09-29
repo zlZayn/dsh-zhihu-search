@@ -46,6 +46,8 @@
 
 ## 常用命令
 
+- 本地钩子：`pre-commit install`（每个 clone 一次；本体 `uv tool install pre-commit`）——提交前自动 `prettier --write` + `eslint --fix`（`npx --no-install`，不联网）；CI 只读新增 format:check
+
 - `npm run build`（host tsc + client tsc + esbuild）· `npm run typecheck` · `npm test`（先 build 再 vitest）· `npm run test:contract`（打真实接口，需 `ZHIHU_ACCESS_SECRET`，日常 CI 不跑）
 - 真机验收：`ZHIHU_ACCESS_SECRET=xxx node scripts/acceptance.mjs [包目录]` —— 默认验 profile 里装的那份，覆盖真实接口 + 宿主 schema 校验 + 渲染文本，见 [scripts/README.md](scripts/README.md)
 - **发版两步，顺序是死的**：① 本地 `npm version <档位> [--preid=alpha] --no-git-tag-version` → `git commit`；② `gh workflow run release.yml`（**没有 tier 参数** —— workflow 只发 `package.json` 里那个号，它不 bump）。档位按 [docs/PUBLISHING.md](docs/PUBLISHING.md) 的问题链定；**dist-tag 由版本自己那段推**（`2.0.0-alpha.1` → `alpha`，稳定档 → `latest`）；同一条 X.Y.Z 线上推下一个 alpha 要用 `prerelease`，不是 `premajor`（后者开新线，从 `2.0.0-alpha.0` 会得到不可覆盖的 `3.0.0-alpha.0`）；无行为变更时 [守卫](scripts/release-guard.mjs) 会拦下（`-f force=true` 才能越过）

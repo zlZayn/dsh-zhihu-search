@@ -2,3 +2,4 @@ node_modules/
 lib/
 package-lock.json
 *.md
+.pre-commit-config.yaml

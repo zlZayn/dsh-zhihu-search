@@ -48,3 +48,8 @@ jobs:
       - run: npm test
 
       - run: npm run lint
+
+      # 本次新增：lint 此前已在跑，但格式没进 CI —— 本仓有 .prettierrc.json，
+      # `npx prettier --check .` 此前只在本地手动跑。
+      - name: Format check
+        run: npm run format:check
